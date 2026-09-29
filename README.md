@@ -58,3 +58,4 @@ Instagram connects through **Instagram API with Instagram Login**, so an Instagr
 
 Newly generated video files are never uploaded to Firebase Storage. After rendering, the app saves only each video's external renderer URL and library metadata in Firestore under `users/{userId}/videos`, so links remain available across sessions. Deploy the included user-scoped Firestore rules with `firebase deploy --only firestore:rules`. If cloud saving is unavailable, the link is kept in browser storage. YouTube, Facebook Pages, and Instagram Professional accounts are supported social targets; connected Gmail can receive the video link. The final MP4 stays at the selected renderer's URL. Scene images may use Firebase Storage as renderer inputs; narration WAV is uploaded to the selected renderer's temporary asset endpoint, not Firebase Storage.
 
+
