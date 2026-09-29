@@ -32,7 +32,10 @@ export async function completeMetaOAuth(request: Request, provider: "facebook" |
     const tokenParams = new URLSearchParams({ client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, code });
     const tokenResponse = await fetch(`https://graph.facebook.com/${graphVersion}/oauth/access_token?${tokenParams}`, { cache: "no-store" });
     const tokenData = await tokenResponse.json();
-    if (!tokenResponse.ok || !tokenData.access_token) return redirect(request, "error=token_exchange_failed");
+    if (!tokenResponse.ok || !tokenData.access_token) {
+      console.error("Meta token exchange failed:", tokenData);
+      return redirect(request, `error=token_exchange_failed&details=${encodeURIComponent(tokenData?.error?.message || "Meta API rejected token exchange")}`);
+    }
 
     const longLivedParams = new URLSearchParams({
       grant_type: "fb_exchange_token",
@@ -77,8 +80,8 @@ export async function completeMetaOAuth(request: Request, provider: "facebook" |
     const query = new URLSearchParams({ connected });
     if (!instagramPage && provider === "facebook") query.set("warning", "meta_no_instagram");
     return redirect(request, query.toString());
-  } catch (error) {
-    console.error("Meta OAuth verification failed:", error instanceof Error ? error.message : "Unknown error");
-    return redirect(request, "error=token_exchange_failed");
+  } catch (error: any) {
+    console.error("Meta OAuth verification failed:", error?.message || "Unknown error");
+    return redirect(request, `error=token_exchange_failed&details=${encodeURIComponent(error?.message || "Unknown error")}`);
   }
 }
