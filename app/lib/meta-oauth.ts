@@ -74,7 +74,8 @@ export async function completeMetaOAuth(request: Request, provider: "facebook" |
       instagram_user_id: instagramPage?.instagram_business_account?.id,
       instagram_username: instagramPage?.instagram_business_account?.username,
     };
-    await writeTokens(tokens);
+    // Firestore rejects 'undefined' values. JSON stringify/parse safely strips them.
+    await writeTokens(JSON.parse(JSON.stringify(tokens)));
 
     const connected = ["facebook", ...(instagramPage ? ["instagram"] : [])].join(",");
     const query = new URLSearchParams({ connected });
