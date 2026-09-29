@@ -19,16 +19,15 @@ export const generateVideoJob = inngest.createFunction(
     });
     metadata.hashtags = ensureVideoHashtags(metadata.hashtags, `${metadata.title} ${metadata.description} ${prompt} ${format}`);
 
-    // 2. Render Video
-    const renderResult: RenderResult = await step.run("render-video", async () => {
-      try {
-        const res = await renderVideo(metadata.scenes, videoDuration, imageStyle, ttsLanguage, captionStyle, idToken, userId, voiceType || "Adam");
-        if ('error' in res) return { failed: true as const, error: String(res.error) };
-        return { ...res, failed: false as const };
-      } catch (err: any) {
-        return { failed: true as const, error: String(err.message) };
-      }
-    }) as RenderResult;
+    // 2. Render through short durable steps; the whole workflow may take longer than one Vercel invocation.
+    const renderRuntime = {
+      run: <T>(id: string, operation: () => Promise<T>) => step.run(`render-${id}`, operation),
+      sleep: (id: string, duration: string) => step.sleep(`render-${id}`, duration),
+    };
+    const renderOutput = await renderVideo(metadata.scenes, videoDuration, imageStyle, ttsLanguage, captionStyle, idToken, userId, voiceType || "Adam", renderRuntime);
+    const renderResult: RenderResult = "error" in renderOutput
+      ? { failed: true, error: String(renderOutput.error) }
+      : { ...renderOutput, failed: false };
 
     if (renderResult.failed) {
       return { success: false, error: renderResult.error };
@@ -144,11 +143,14 @@ export const extendVideoJob = inngest.createFunction(
         return res;
       });
 
-      const renderResult = await step.run("render-chunk-" + i, async () => {
-        const res = await renderVideo(metadata.scenes, chunkDuration, imageStyle, ttsLanguage, captionStyle, idToken, userId, voiceType);
-        if ('error' in res) return { failed: true, error: String(res.error), url: "" };
-        return { failed: false, error: "", url: res.videoUrl };
-      });
+      const chunkRuntime = {
+        run: <T>(id: string, operation: () => Promise<T>) => step.run(`chunk-${i}-render-${id}`, operation),
+        sleep: (id: string, duration: string) => step.sleep(`chunk-${i}-render-${id}`, duration),
+      };
+      const renderOutput = await renderVideo(metadata.scenes, chunkDuration, imageStyle, ttsLanguage, captionStyle, idToken, userId, voiceType, chunkRuntime);
+      const renderResult = "error" in renderOutput
+        ? { failed: true, error: String(renderOutput.error), url: "" }
+        : { failed: false, error: "", url: renderOutput.videoUrl };
 
       if (renderResult.failed) throw new Error("Chunk " + i + " failed: " + renderResult.error);
       if (renderResult.url) {

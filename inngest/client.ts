@@ -8,5 +8,6 @@ if (process.env.NODE_ENV === "development") {
 
 // Create a client to send and receive events
 export const inngest = new Inngest({ 
-  id: "youtube-automation"
+  id: "youtube-automation",
+  checkpointing: { maxRuntime: "240s" },
 });

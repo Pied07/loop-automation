@@ -55,6 +55,20 @@ async function uploadRendererAsset(bytes: Buffer, filename: string, contentType:
   throw new Error("No configured renderer can host the narration asset.");
 }
 
+type DurableRuntime = {
+  run(id: string, operation: () => Promise<unknown>): Promise<unknown>;
+  sleep(id: string, duration: string): Promise<void>;
+};
+
+async function runDurable<T>(runtime: DurableRuntime | undefined, id: string, operation: () => Promise<T>): Promise<T> {
+  return runtime ? await runtime.run(id, operation) as T : operation();
+}
+
+async function sleepDurable(runtime: DurableRuntime | undefined, id: string, duration: string, milliseconds: number): Promise<void> {
+  if (runtime) return runtime.sleep(id, duration);
+  await new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 function getPollinationsApiKey() {
   return process.env.POLLINATION_API_KEY?.trim() || process.env.POLLINATIONS_API_KEY?.trim() || process.env.POLLINATIONS_KEY?.trim();
 }
@@ -417,7 +431,7 @@ const GEMINI_TTS_VOICE_MAP: Record<string, string> = {
   Ethan: "Algenib", Emily: "Achernar", Clyde: "Gacrux", Matilda: "Despina", Sam: "Enceladus"
 };
 
-export async function renderVideo(scenes: any[], videoDuration: number = 15, imageStyle: string = "Realistic", ttsLanguage: string = "en-US", captionStyle: string = "Modern", idToken?: string, userId?: string, voiceType: string = "Adam") {
+export async function renderVideo(scenes: any[], videoDuration: number = 15, imageStyle: string = "Realistic", ttsLanguage: string = "en-US", captionStyle: string = "Modern", idToken?: string, userId?: string, voiceType: string = "Adam", durable?: DurableRuntime) {
   try {
     videoDuration = Math.max(1, Math.min(60, Math.floor(Number(videoDuration) || 15)));
     scenes = scenes.slice(0, 10);
@@ -436,6 +450,7 @@ export async function renderVideo(scenes: any[], videoDuration: number = 15, ima
     // Process scenes sequentially to avoid HF rate limits
     const sceneClips: { url: string; caption: string }[] = [];
     for (let idx = 0; idx < scenes.length; idx++) {
+      const sceneClip = await runDurable(durable, `generate-and-upload-scene-${idx + 1}`, async () => {
       const scene = scenes[idx];
       const promptStr = `${scene.imagePrompt} - ${imageStyle} style, highly detailed, professional`;
       const seed = Math.floor(Math.random() * 100000);
@@ -620,7 +635,9 @@ export async function renderVideo(scenes: any[], videoDuration: number = 15, ima
         }
       }
 
-      sceneClips.push({ url: finalUrl, caption: scene.caption });
+      return { url: finalUrl, caption: scene.caption };
+      });
+      sceneClips.push(sceneClip);
     }
     
     const captionWeight = (caption: string) => {
@@ -670,6 +687,7 @@ export async function renderVideo(scenes: any[], videoDuration: number = 15, ima
       return clip;
     });
 
+    const audioUrl = await runDurable(durable, "generate-and-upload-narration", async () => {
     if (!geminiKey) throw new Error("GEMINI_API_KEY is required for free-tier Gemini narration.");
     const ttsVoice = GEMINI_TTS_VOICE_MAP[voiceType];
     if (!ttsVoice) throw new Error(`The selected voice ${voiceType} is not configured for Gemini narration.`);
@@ -709,7 +727,8 @@ export async function renderVideo(scenes: any[], videoDuration: number = 15, ima
     if (typeof audioBase64 !== "string" || !audioBase64) throw new Error("Gemini returned no narration audio data.");
     const audioBuffer = Buffer.from(audioBase64, "base64");
     if (!audioBuffer.byteLength) throw new Error("Gemini returned an empty narration audio file.");
-    const audioUrl = await uploadRendererAsset(audioBuffer, `narration_${Date.now()}.wav`, "audio/wav", shotstackKey, j2vKey);
+    return uploadRendererAsset(audioBuffer, `narration_${Date.now()}.wav`, "audio/wav", shotstackKey, j2vKey);
+    });
     const audioClips = [{ alias: "narration", asset: { type: "audio", src: audioUrl }, start: 0, length: videoDuration }];
 
     const captionClip = {
@@ -748,6 +767,7 @@ export async function renderVideo(scenes: any[], videoDuration: number = 15, ima
 
     if (shotstackKey) {
       try {
+        const renderResult = await runDurable(durable, "submit-shotstack-render", async () => {
         const renderResponse = await fetch('https://api.shotstack.io/edit/v1/render', {
           method: 'POST',
           headers: { 'x-api-key': shotstackKey, 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -756,14 +776,12 @@ export async function renderVideo(scenes: any[], videoDuration: number = 15, ima
         const responseText = await renderResponse.text();
         let renderData: any;
         try { renderData = JSON.parse(responseText); } catch { renderData = null; }
-        if (!renderResponse.ok) {
-          shotstackError = `HTTP ${renderResponse.status}: ${responseText.slice(0, 700) || renderResponse.statusText}`;
-        } else if (renderData?.success && renderData?.response?.id) {
-          renderId = renderData.response.id;
-          shotstackError = "";
-        } else {
-          shotstackError = `Unexpected Shotstack response: ${responseText.slice(0, 700)}`;
-        }
+        if (!renderResponse.ok) return { id: "", error: `HTTP ${renderResponse.status}: ${responseText.slice(0, 700) || renderResponse.statusText}` };
+        if (renderData?.success && renderData?.response?.id) return { id: renderData.response.id as string, error: "" };
+        return { id: "", error: `Unexpected Shotstack response: ${responseText.slice(0, 700)}` };
+        });
+        renderId = renderResult.id;
+        shotstackError = renderResult.error;
       } catch(e) {
         shotstackError = e instanceof Error ? e.message : String(e);
         console.error("Shotstack init failed", e);
@@ -785,23 +803,25 @@ export async function renderVideo(scenes: any[], videoDuration: number = 15, ima
             ]
           }))
         };
+        const renderResult = await runDurable(durable, "submit-json2video-render", async () => {
         const j2vRes = await fetch("https://api.json2video.com/v2/movies", {
           method: 'POST',
           headers: { 'x-api-key': j2vKey, 'Content-Type': 'application/json' },
           body: JSON.stringify(j2vPayload)
         });
         const j2vData = await j2vRes.json();
-        if (j2vData.project) {
-          json2videoProjectId = j2vData.project;
-          j2vError = "";
-        } else j2vError = `Unexpected JSON2Video response: ${JSON.stringify(j2vData).slice(0, 500)}`;
+        if (j2vData.project) return { project: String(j2vData.project), error: "" };
+        return { project: "", error: `Unexpected JSON2Video response: ${JSON.stringify(j2vData).slice(0, 500)}` };
+        });
+        json2videoProjectId = renderResult.project;
+        j2vError = renderResult.error;
       } catch(e) {
         j2vError = e instanceof Error ? e.message : String(e);
         console.error("JSON2Video init failed", e);
       }
     }
 
-    // 6. Poll for completion of both (Vercel allows up to 60s for server actions)
+    // Poll durably so the full renderer wait can outlive one Vercel invocation.
     let shotstackDone = !renderId;
     let j2vDone = !json2videoProjectId;
     
@@ -812,41 +832,35 @@ export async function renderVideo(scenes: any[], videoDuration: number = 15, ima
     
     let attempts = 0;
     while ((!shotstackDone || !j2vDone) && attempts < 120) {
-      await new Promise(r => setTimeout(r, 5000)); // wait 5 seconds
+      await sleepDurable(durable, `render-poll-wait-${attempts}`, "5s", 5000);
       
       // Check Shotstack
       if (!shotstackDone && shotstackKey) {
         try {
+          const status = await runDurable(durable, `poll-shotstack-render-${attempts}`, async () => {
           const statusResponse = await fetch(`https://api.shotstack.io/edit/v1/render/${renderId}`, {
             headers: { 'x-api-key': shotstackKey }
           });
           const statusData = await statusResponse.json();
-          if (statusData?.response?.status) {
-            if (statusData.response.status === "done") {
-              shotstackUrl = statusData.response.url;
-              shotstackDone = true;
-            } else if (statusData.response.status === "failed") {
-              shotstackError = statusData.response.error || "Unknown Shotstack error";
-              shotstackDone = true;
-            }
-          }
+          return { status: statusData?.response?.status || "", url: statusData?.response?.url || "", error: statusData?.response?.error || "" };
+          });
+          if (status.status === "done") { shotstackUrl = status.url; shotstackDone = true; }
+          else if (status.status === "failed") { shotstackError = status.error || "Unknown Shotstack error"; shotstackDone = true; }
         } catch (e) { }
       }
       
       // Check JSON2Video
       if (!j2vDone && j2vKey) {
         try {
+          const status = await runDurable(durable, `poll-json2video-render-${attempts}`, async () => {
           const j2vRes = await fetch(`https://api.json2video.com/v2/movies?project=${json2videoProjectId}`, {
             headers: { 'x-api-key': j2vKey }
           });
           const j2vData = await j2vRes.json();
-          if (j2vData?.movie?.status === "done") {
-            json2videoUrl = j2vData.movie.url;
-            j2vDone = true;
-          } else if (j2vData?.movie?.status === "error") {
-            j2vError = j2vData.movie.message || "Unknown JSON2Video error";
-            j2vDone = true;
-          }
+          return { status: j2vData?.movie?.status || "", url: j2vData?.movie?.url || "", error: j2vData?.movie?.message || "" };
+          });
+          if (status.status === "done") { json2videoUrl = status.url; j2vDone = true; }
+          else if (status.status === "error") { j2vError = status.error || "Unknown JSON2Video error"; j2vDone = true; }
         } catch(e) {}
       }
       
