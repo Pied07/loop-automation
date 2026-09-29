@@ -44,6 +44,6 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/?connected=youtube', request.url));
   } catch (err: any) {
     console.error('Error exchanging YouTube code for token:', err);
-    return NextResponse.redirect(new URL('/?error=token_exchange_failed', request.url));
+    return NextResponse.redirect(new URL(`/?error=token_exchange_failed&details=${encodeURIComponent(err.message || 'unknown')}`, request.url));
   }
 }
