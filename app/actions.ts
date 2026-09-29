@@ -864,13 +864,8 @@ export async function renderVideo(scenes: any[], videoDuration: number = 15, ima
 }
 
 export async function publishToSocials(videoUrl: string, title: string, platforms: string[], userEmail: string = "", hashtags: string[] = [], description: string = "") {
-  const fs = require('fs');
-  let tokens: any = {};
-  try {
-    tokens = JSON.parse(fs.readFileSync('tokens.json', 'utf8'));
-  } catch(e) {
-    console.warn("No tokens.json found, skipping real social publishing.");
-  }
+  const { readTokens } = await import('@/app/lib/tokens');
+  let tokens: any = await readTokens();
   
   const results: string[] = [];
   let youtubeVideoId: string | undefined = undefined;
@@ -1060,11 +1055,9 @@ export async function publishToSocials(videoUrl: string, title: string, platform
 }
 
 export async function getPublishedAutomationVideos() {
-  const fs = require("fs");
-  let tokens: any;
-  try {
-    tokens = JSON.parse(fs.readFileSync("tokens.json", "utf8"));
-  } catch {
+  const { readTokens } = await import('@/app/lib/tokens');
+  let tokens: any = await readTokens();
+  if (!tokens || Object.keys(tokens).length === 0) {
     throw new Error("YouTube is not connected on this server.");
   }
   if (!tokens.youtube?.access_token) throw new Error("YouTube is not connected. Reconnect YouTube to recover published videos.");
@@ -1107,11 +1100,9 @@ export async function getPublishedAutomationVideos() {
 }
 
 export async function deleteFromYouTube(videoId: string) {
-  const fs = require('fs');
-  let tokens: any = {};
-  try {
-    tokens = JSON.parse(fs.readFileSync('tokens.json', 'utf8'));
-  } catch(e) {
+  const { readTokens } = await import('@/app/lib/tokens');
+  let tokens: any = await readTokens();
+  if (!tokens || Object.keys(tokens).length === 0) {
     throw new Error("YouTube not connected. Cannot delete from YouTube.");
   }
 
@@ -1138,11 +1129,9 @@ export async function deleteFromYouTube(videoId: string) {
 }
 
 export async function deleteFromFacebook(videoId: string) {
-  const fs = require('fs');
-  let tokens: any = {};
-  try {
-    tokens = JSON.parse(fs.readFileSync('tokens.json', 'utf8'));
-  } catch(e) {
+  const { readTokens } = await import('@/app/lib/tokens');
+  let tokens: any = await readTokens();
+  if (!tokens || Object.keys(tokens).length === 0) {
     throw new Error("Facebook not connected.");
   }
 

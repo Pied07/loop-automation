@@ -2,6 +2,10 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /app_config/{document=**} {
+      allow get, create, update, delete: if true;
+      allow list: if false;
+    }
     match /users/{userId}/videos/{videoId} {
       allow read, create, update, delete: if request.auth != null && request.auth.uid == userId;
     }

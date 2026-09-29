@@ -15,14 +15,7 @@ function redirect(request: Request, query: string) {
   return NextResponse.redirect(new URL(`/?${query}`, request.url));
 }
 
-function readTokens() {
-  const tokenPath = path.join(process.cwd(), "tokens.json");
-  try {
-    return { tokenPath, tokens: JSON.parse(fs.readFileSync(tokenPath, "utf8")) as StoredTokens };
-  } catch {
-    return { tokenPath, tokens: {} as StoredTokens };
-  }
-}
+import { readTokens, writeTokens } from "@/app/lib/tokens";
 
 export async function completeMetaOAuth(request: Request, provider: "facebook" | "instagram") {
   const { searchParams } = new URL(request.url);
@@ -66,7 +59,7 @@ export async function completeMetaOAuth(request: Request, provider: "facebook" |
     if (!selectedPage?.access_token) return redirect(request, "error=meta_page_access_missing");
     if (provider === "instagram" && !instagramPage) return redirect(request, "error=meta_no_instagram");
 
-    const { tokenPath, tokens } = readTokens();
+    const tokens = await readTokens();
     tokens.facebook = {
       ...(tokens.facebook || {}),
       access_token: userToken,
@@ -78,7 +71,7 @@ export async function completeMetaOAuth(request: Request, provider: "facebook" |
       instagram_user_id: instagramPage?.instagram_business_account?.id,
       instagram_username: instagramPage?.instagram_business_account?.username,
     };
-    fs.writeFileSync(tokenPath, JSON.stringify(tokens, null, 2));
+    await writeTokens(tokens);
 
     const connected = ["facebook", ...(instagramPage ? ["instagram"] : [])].join(",");
     const query = new URLSearchParams({ connected });

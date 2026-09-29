@@ -34,14 +34,11 @@ export async function GET(request: Request) {
     const { tokens } = await oauth2Client.getToken(code);
     
     // Save tokens securely
-    const tokensPath = path.join(process.cwd(), 'tokens.json');
-    let existingTokens: any = {};
-    if (fs.existsSync(tokensPath)) {
-      existingTokens = JSON.parse(fs.readFileSync(tokensPath, 'utf8'));
-    }
+    const { readTokens, writeTokens } = await import("@/app/lib/tokens");
+    let existingTokens = await readTokens();
     
     existingTokens.youtube = tokens;
-    fs.writeFileSync(tokensPath, JSON.stringify(existingTokens, null, 2));
+    await writeTokens(existingTokens);
 
     // Redirect back to app with success parameter
     return NextResponse.redirect(new URL('/?connected=youtube', request.url));
