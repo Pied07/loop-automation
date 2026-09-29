@@ -37,7 +37,7 @@ import {
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { useEffect, useState, type FormEvent } from "react";
 import { auth, firebaseConfigured, listenToVideos, deleteVideo, deleteVideosByYouTubeId, deleteVideosByFacebookId, saveVideo, type VideoRecord } from "./firebase";
-import { generateVideoContent, generateDetailedPrompt, renderVideo, publishToSocials, deleteFromYouTube, deleteFromFacebook, getPublishedAutomationVideos } from "./actions";
+import { generateVideoContent, renderVideo, publishToSocials, deleteFromYouTube, deleteFromFacebook, getPublishedAutomationVideos } from "./actions";
 
 type GeneratedScript = {
   title: string;
@@ -530,16 +530,27 @@ export default function Home() {
     const idea = ideaText.trim() || `Invent a fresh, original ${format} story with a strong opening, coherent visual moments, and a satisfying ending.`;
     
     try {
-      const generated = await generateDetailedPrompt(idea, {
-        format,
-        duration: videoDuration,
-        imageCount: numImages,
-        imageStyle,
-        captionStyle,
-        voice: voiceType,
-        language: ttsLanguage
+      const response = await fetch("/api/generate-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          idea,
+          details: {
+            format,
+            duration: videoDuration,
+            imageCount: numImages,
+            imageStyle,
+            captionStyle,
+            voice: voiceType,
+            language: ttsLanguage
+          }
+        })
       });
-      setIdeaText(generated);
+      const result = await response.json();
+      if (!response.ok || !result.success || typeof result.prompt !== "string") {
+        throw new Error(result.error || "AI prompt generation failed. Check the provider keys and try again.");
+      }
+      setIdeaText(result.prompt);
       notify("Your video prompt is ready to refine or copy.");
     } catch (error: unknown) {
       notify(error instanceof Error ? error.message : "AI prompt generation failed. Check the provider keys and try again.");
