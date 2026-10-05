@@ -326,29 +326,53 @@ export default function Home() {
       return;
     }
     setIsSplitting(true);
-    setSplitStep("Downloading video...");
-    setSplitProgress(20);
+    setSplitStep("Downloading video stream...");
+    setSplitProgress(12);
     setClips([]);
     setClipResults({});
     setSourceTitle("");
+
+    // Advance smoothly across realistic processing stages
+    const progressInterval = setInterval(() => {
+      setSplitProgress((prev) => {
+        if (prev < 32) {
+          setSplitStep("Downloading video stream...");
+          return Math.min(32, prev + 3);
+        } else if (prev < 58) {
+          setSplitStep("Analyzing audio and detecting viral moments...");
+          return Math.min(58, prev + 2);
+        } else if (prev < 82) {
+          setSplitStep("Cropping to 9:16 vertical and splitting clips...");
+          return Math.min(82, prev + 1.2);
+        } else if (prev < 94) {
+          setSplitStep("Generating AI titles and viral hashtags...");
+          return Math.min(94, prev + 0.6);
+        }
+        return prev;
+      });
+    }, 700);
+
     try {
       const res = await fetch("/api/viral-clips", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ videoUrl: videoUrl.trim(), contentCategory: selectedCategory }),
       });
+      clearInterval(progressInterval);
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || "Failed to process video.");
-      setClips(data.clips);
-      setSourceTitle(data.sourceTitle);
       setSplitProgress(100);
       setSplitStep(`✅ ${data.clips.length} clips ready!`);
+      setClips(data.clips);
+      setSourceTitle(data.sourceTitle);
       notify(`Split into ${data.clips.length} clips! Review and publish below.`);
     } catch (err: any) {
+      clearInterval(progressInterval);
       notify(err.message || "Failed to process video.");
       setSplitStep("");
       setSplitProgress(0);
     } finally {
+      clearInterval(progressInterval);
       setIsSplitting(false);
     }
   }
@@ -608,12 +632,27 @@ export default function Home() {
                   </button>
                 </div>
                 {isSplitting && (
-                  <div style={{ marginTop: '16px', padding: '16px', background: 'var(--paper)', borderRadius: '12px', border: '1px solid var(--line)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px', fontWeight: 600, color: 'var(--green-dark)' }}>
-                      <span>{splitStep}</span><span>{splitProgress}%</span>
+                  <div style={{ marginTop: '16px', padding: '16px 18px', background: '#111218', borderRadius: '12px', border: '1px solid #272a38', boxShadow: '0 4px 20px rgba(0,0,0,0.35)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: '#f8fafc' }}>
+                        <LoaderCircle className="spin" size={15} style={{ color: '#e50914' }} />
+                        <span>{splitStep}</span>
+                      </div>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#ff3b45', fontVariantNumeric: 'tabular-nums' }}>
+                        {Math.round(splitProgress)}%
+                      </span>
                     </div>
-                    <div style={{ height: '8px', background: '#e7e9e3', borderRadius: '4px', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${splitProgress}%`, background: 'var(--green)', transition: 'width 0.4s ease' }} />
+                    <div style={{ height: '8px', background: '#1e2230', borderRadius: '999px', overflow: 'hidden', position: 'relative' }}>
+                      <div
+                        style={{
+                          height: '100%',
+                          width: `${Math.min(100, Math.max(0, Math.round(splitProgress)))}%`,
+                          background: 'linear-gradient(90deg, #e50914 0%, #ff3b45 100%)',
+                          borderRadius: '999px',
+                          boxShadow: '0 0 10px rgba(229, 9, 20, 0.6)',
+                          transition: 'width 0.4s ease',
+                        }}
+                      />
                     </div>
                   </div>
                 )}

@@ -17,13 +17,18 @@ function sanitizeFilename(name: string): string {
 
 // Check if ffmpeg is available
 async function checkFfmpeg(): Promise<string> {
-  // Try bundled ffmpeg installer first
+  // 1. Check local binary in project root (e.g. ffmpeg.exe or ffmpeg)
+  const localBin = path.join(process.cwd(), process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg");
+  if (fs.existsSync(localBin)) return localBin;
+
+  // 2. Try bundled ffmpeg installer
   try {
     const requireFunc = typeof process !== "undefined" && process.versions && process.versions.node ? eval("require") : require;
     const ffmpegPath = requireFunc("@ffmpeg-installer/ffmpeg").path;
     if (ffmpegPath && fs.existsSync(ffmpegPath)) return ffmpegPath;
   } catch {}
-  // Fallback to system ffmpeg
+
+  // 3. Fallback to system ffmpeg
   try {
     await execAsync("ffmpeg -version");
     return "ffmpeg";
