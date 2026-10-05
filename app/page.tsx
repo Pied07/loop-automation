@@ -41,6 +41,8 @@ import { useEffect, useState, useRef, type FormEvent } from "react";
 import { auth, firebaseConfigured, listenToVideos, deleteVideo, deleteVideosByYouTubeId, deleteVideosByFacebookId, saveVideo, type VideoRecord } from "./firebase";
 import { deleteFromYouTube, deleteFromFacebook, getPublishedAutomationVideos } from "./actions";
 import { autoFindViralVideo } from "./viral-actions";
+import { FaYoutube, FaInstagram, FaFacebookF } from "react-icons/fa6";
+import { SiGmail } from "react-icons/si";
 
 type ClipMeta = {
   clipPath: string;
@@ -94,8 +96,8 @@ function StyleImageCard({ s, isSelected, onClick }: { s: any, isSelected: boolea
   const [errored, setErrored] = useState(false);
 
   return (
-    <div onClick={onClick} style={{ cursor: 'pointer', borderRadius: '10px', overflow: 'hidden', border: isSelected ? '2.5px solid #22c55e' : '2.5px solid #e5e7eb', boxShadow: isSelected ? '0 0 0 3px rgba(34,197,94,0.2)' : '0 1px 4px rgba(0,0,0,0.08)', transition: 'all 0.2s', background: '#fff' }}>
-      <div style={{ position: 'relative', height: '90px', overflow: 'hidden', background: errored ? s.fallback : '#f3f4f6' }}>
+    <div onClick={onClick} style={{ cursor: 'pointer', borderRadius: '10px', overflow: 'hidden', border: isSelected ? '2.5px solid #e50914' : '1.5px solid #232635', boxShadow: isSelected ? '0 0 0 3px rgba(229,9,20,0.25)' : 'none', transition: 'all 0.2s', background: '#151722' }}>
+      <div style={{ position: 'relative', height: '90px', overflow: 'hidden', background: errored ? s.fallback : '#1a1d2a' }}>
         {!errored && (
           <img
             src={s.img} alt={s.label}
@@ -108,13 +110,13 @@ function StyleImageCard({ s, isSelected, onClick }: { s: any, isSelected: boolea
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite' }} />
         )}
         {isSelected && (
-          <div style={{ position: 'absolute', top: 5, right: 5, background: '#22c55e', borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'absolute', top: 5, right: 5, background: '#e50914', borderRadius: '50%', width: 18, height: 18, boxShadow: '0 0 8px rgba(229,9,20,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </div>
         )}
       </div>
-      <div style={{ padding: '6px 8px', background: isSelected ? '#f0fdf4' : '#fafaf9' }}>
-        <div style={{ fontWeight: 700, fontSize: '12px', color: isSelected ? '#16a34a' : '#374151' }}>{s.label}</div>
+      <div style={{ padding: '6px 8px', background: isSelected ? 'rgba(229,9,20,0.12)' : '#111218' }}>
+        <div style={{ fontWeight: 700, fontSize: '12px', color: isSelected ? '#ff3b45' : '#f8fafc' }}>{s.label}</div>
         <div style={{ fontSize: '11px', color: '#9ca3af' }}>{s.desc}</div>
       </div>
     </div>
@@ -155,7 +157,7 @@ export default function Home() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
-        const cachedVideos = JSON.parse(localStorage.getItem("loop-studio-session-videos") || "[]");
+        const cachedVideos = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]");
         if (Array.isArray(cachedVideos)) {
           const sessionVideos = cachedVideos
             .filter((video: VideoRecord) => video?.sessionOnly && (video.videoUrl || video.youtubeVideoId))
@@ -163,7 +165,7 @@ export default function Home() {
           window.setTimeout(() => setVideos(sessionVideos), 0);
         }
       } catch {
-        localStorage.removeItem("loop-studio-session-videos");
+        localStorage.removeItem("tvd-studio-session-videos");
       }
       const stored = localStorage.getItem("app_connections");
       const existingConns: string[] = stored ? JSON.parse(stored) : [];
@@ -242,7 +244,7 @@ export default function Home() {
     void getPublishedAutomationVideos().then(async (recovered) => {
       if (!active) return;
       let hiddenVideoIds: string[] = [];
-      try { hiddenVideoIds = JSON.parse(localStorage.getItem("loop-studio-hidden-youtube-videos") || "[]"); } catch { hiddenVideoIds = []; }
+      try { hiddenVideoIds = JSON.parse(localStorage.getItem("tvd-studio-hidden-youtube-videos") || "[]"); } catch { hiddenVideoIds = []; }
       const records = (recovered as VideoRecord[]).filter((video) => !hiddenVideoIds.includes(video.youtubeVideoId || ""));
       await Promise.allSettled(records.map((video) => saveVideo(userId, video)));
       if (active) setVideos((current) => mergeVideoRecords(current, records.map((video) => ({ ...video, sessionOnly: false }))));
@@ -496,12 +498,12 @@ export default function Home() {
       }
 
       if (target.sessionOnly || target.youtubeVideoId || target.facebookVideoId) {
-        const cachedVideos = JSON.parse(localStorage.getItem("loop-studio-session-videos") || "[]") as VideoRecord[];
-        localStorage.setItem("loop-studio-session-videos", JSON.stringify(cachedVideos.filter((video) => video.id !== target.id && video.youtubeVideoId !== target.youtubeVideoId && video.facebookVideoId !== target.facebookVideoId)));
+        const cachedVideos = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]") as VideoRecord[];
+        localStorage.setItem("tvd-studio-session-videos", JSON.stringify(cachedVideos.filter((video) => video.id !== target.id && video.youtubeVideoId !== target.youtubeVideoId && video.facebookVideoId !== target.facebookVideoId)));
       }
       if (target.youtubeVideoId) {
-        const hiddenVideoIds = JSON.parse(localStorage.getItem("loop-studio-hidden-youtube-videos") || "[]") as string[];
-        if (!hiddenVideoIds.includes(target.youtubeVideoId)) localStorage.setItem("loop-studio-hidden-youtube-videos", JSON.stringify([...hiddenVideoIds, target.youtubeVideoId]));
+        const hiddenVideoIds = JSON.parse(localStorage.getItem("tvd-studio-hidden-youtube-videos") || "[]") as string[];
+        if (!hiddenVideoIds.includes(target.youtubeVideoId)) localStorage.setItem("tvd-studio-hidden-youtube-videos", JSON.stringify([...hiddenVideoIds, target.youtubeVideoId]));
       }
       setVideos((current) => current.filter((video) => {
         if (target.youtubeVideoId) return video.youtubeVideoId !== target.youtubeVideoId;
@@ -561,7 +563,7 @@ export default function Home() {
 
   return <div className="workspace">
     <aside className={`sidebar ${mobileNav ? "sidebar-open" : ""}`}>
-      <a className="brand" href="#studio" onClick={(event) => { event.preventDefault(); setScreen("studio"); }}><span className="brand-mark"><Play size={17} fill="currentColor" /></span><span>loop<span className="brand-dot">.</span></span></a>
+      <a className="brand" href="#studio" onClick={(event) => { event.preventDefault(); setScreen("studio"); }}><img src="/assets/theme.png" alt="The Viral Desk" style={{ height: "38px", width: "38px", objectFit: "cover", borderRadius: "50%", boxShadow: "0 0 12px rgba(229,9,20,0.45)" }} /><span>The Viral Desk</span></a>
       <div className="sidebar-label">WORKSPACE</div>
       <nav className="side-nav" aria-label="Workspace">
         <button className={screen === "studio" ? "nav-item active" : "nav-item"} onClick={() => { setScreen("studio"); setMobileNav(false); }}><Scissors size={17} /> Create viral clips</button>
@@ -577,7 +579,7 @@ export default function Home() {
     <main className="main-panel">
       <header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Toggle menu"><Menu size={20} /></button><div className="breadcrumb"><span>Workspace</span><span className="crumb-divider">/</span><strong>{screen === "studio" ? "Create viral clips" : screen === "library" ? "My clips" : "Settings"}</strong></div><div className="topbar-actions"><span className={`connection-pill ${firebaseConfigured ? "connected" : "preview"}`}><span />{firebaseConfigured ? "Firebase connected" : "Preview mode"}</span><button className="help-button" onClick={() => notify("Connect Firebase and platform accounts to enable production workflows.")}><CircleHelp size={16} /><span>Help</span></button></div></header>
       {screen === "studio" && <section className="studio-content">
-        <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> VIRAL CLIPS STUDIO</div><h1>Turn viral videos into <em>your content.</em></h1><p>Paste a viral video URL, split it into clips, auto-generate descriptions &amp; hashtags, and post — all free.</p></div><button className="secondary-button export-button" onClick={exportCsv}><ArrowDownToLine size={16} /> Export spreadsheet</button></div>
+        <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> THE VIRAL DESK STUDIO</div><h1>Turn viral videos into <em>your content.</em></h1><p>Paste a viral video URL, split it into clips, auto-generate descriptions &amp; hashtags, and post — all free.</p></div><button className="secondary-button export-button" onClick={exportCsv}><ArrowDownToLine size={16} /> Export spreadsheet</button></div>
         <div className="creator-layout">
           <div className="creator-form">
             <div className="form-section"><div className="section-title"><span className="step-number">01</span><div><h2>Choose content category</h2><p>What type of viral content is this?</p></div></div>
@@ -593,7 +595,7 @@ export default function Home() {
                       value={videoUrl}
                       onChange={(e) => setVideoUrl(e.target.value)}
                       placeholder="https://www.youtube.com/watch?v=..."
-                      style={{ width: '100%', padding: '12px 14px 12px 40px', borderRadius: '10px', border: '1.5px solid var(--line)', fontSize: '13px', background: '#fff', outline: 'none', boxSizing: 'border-box' }}
+                      style={{ width: '100%', padding: '12px 14px 12px 40px', borderRadius: '10px', border: '1.5px solid #272a38', fontSize: '13px', background: '#0c0d12', color: '#ffffff', outline: 'none', boxSizing: 'border-box' }}
                     />
                   </div>
                   <button className="secondary-button" onClick={handleAutoFind} disabled={isFinding || isSplitting} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
@@ -625,25 +627,25 @@ export default function Home() {
                   {clips.map((clip) => {
                     const result = clipResults[clip.partNumber];
                     return (
-                      <div key={clip.partNumber} style={{ border: '1.5px solid var(--line)', borderRadius: '14px', padding: '16px', background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                      <div key={clip.partNumber} style={{ border: '1.5px solid #1f2230', borderRadius: '14px', padding: '18px', background: '#151722', boxShadow: '0 8px 25px rgba(0,0,0,0.4)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
                           <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                              <span style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: '#fff', fontWeight: 800, fontSize: '11px', padding: '3px 10px', borderRadius: '20px', letterSpacing: '0.05em' }}>{clip.title}</span>
+                              <span style={{ background: 'linear-gradient(135deg,#e50914,#b20710)', color: '#fff', fontWeight: 800, fontSize: '11px', padding: '4px 12px', borderRadius: '20px', letterSpacing: '0.05em', boxShadow: '0 0 12px rgba(229,9,20,0.4)' }}>{clip.title}</span>
                               <span style={{ fontSize: '12px', color: '#9ca3af' }}>{Math.round(clip.duration)}s</span>
                               {result?.status === 'done' && <span style={{ background: '#f0fdf4', color: '#16a34a', fontWeight: 700, fontSize: '11px', padding: '2px 8px', borderRadius: '20px' }}>✅ Published</span>}
                               {result?.status === 'publishing' && <span style={{ background: '#fef9c3', color: '#a16207', fontWeight: 700, fontSize: '11px', padding: '2px 8px', borderRadius: '20px' }}>⏳ Publishing...</span>}
                               {result?.status === 'error' && <span style={{ background: '#fef2f2', color: '#dc2626', fontWeight: 700, fontSize: '11px', padding: '2px 8px', borderRadius: '20px' }}>❌ Failed</span>}
                             </div>
-                            <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#374151', lineHeight: 1.5 }}>{clip.description}</p>
+                            <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#cbd5e1', lineHeight: 1.6 }}>{clip.description}</p>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                              {clip.hashtags.map((tag) => <span key={tag} style={{ background: '#f0fdf4', color: '#16a34a', fontSize: '11px', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>#{tag}</span>)}
+                              {Array.from(new Set(clip.hashtags)).map((tag, idx) => <span key={`${tag}-${idx}`} style={{ background: 'rgba(229,9,20,0.12)', color: '#ff4d56', fontSize: '11px', padding: '3px 9px', borderRadius: '6px', fontWeight: 600 }}>#{tag.replace(/^#/, '')}</span>)}
                             </div>
                             {result?.status === 'done' && (
                               <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                {result.youtubeUrl && <a href={result.youtubeUrl} target="_blank" rel="noreferrer" style={{ color: '#ff0000', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}>▶ YouTube</a>}
-                                {result.facebookUrl && <a href={result.facebookUrl} target="_blank" rel="noreferrer" style={{ color: '#1877F2', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}>📘 Facebook</a>}
-                                {result.instagramUrl && <a href={result.instagramUrl} target="_blank" rel="noreferrer" style={{ color: '#e1306c', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}>📸 Instagram</a>}
+                                {result.youtubeUrl && <a href={result.youtubeUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#ff4444', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}><FaYoutube size={14} /> YouTube</a>}
+                                {result.facebookUrl && <a href={result.facebookUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#38bdf8', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}><FaFacebookF size={12} /> Facebook</a>}
+                                {result.instagramUrl && <a href={result.instagramUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#f472b6', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}><FaInstagram size={13} /> Instagram</a>}
                               </div>
                             )}
                             {result?.status === 'error' && <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '6px' }}>{result.error}</p>}
@@ -684,7 +686,7 @@ export default function Home() {
                 { step: '06', icon: '🗑️', title: 'Auto-cleanup', desc: 'Clip files deleted locally after publishing — saves space' },
               ].map(({ step, icon, title, desc }) => (
                 <div key={step} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                  <span style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: '#fff', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 800, flexShrink: 0 }}>{step}</span>
+                  <span style={{ background: 'linear-gradient(135deg,#e50914,#b20710)', color: '#fff', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 800, flexShrink: 0, boxShadow: '0 0 10px rgba(229,9,20,0.4)' }}>{step}</span>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>{icon} {title}</div>
                     <div style={{ fontSize: '12px', color: 'var(--muted)', lineHeight: 1.4, marginTop: '2px' }}>{desc}</div>
@@ -699,22 +701,12 @@ export default function Home() {
       </section>}
       {screen === "library" && <section className="library-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR CLIPS LIBRARY</div><h1>Viral content, <em>in motion.</em></h1><p>Your published clips with links to YouTube, Facebook, and Instagram.</p></div><button className="secondary-button" onClick={exportCsv}><ArrowDownToLine size={16} /> Export spreadsheet</button></div>
       
-      <div className="library-tabber" style={{ display: 'flex', gap: '12px', borderBottom: '1px solid #e5e7eb', marginBottom: '24px', paddingBottom: '16px' }}>
+      <div className="library-tabber">
         {["All", ...(connections.includes("YouTube") ? ["YouTube"] : []), ...(connections.includes("Instagram") ? ["Instagram"] : []), ...(connections.includes("Facebook") ? ["Facebook"] : [])].map(tab => (
           <button 
             key={tab} 
             onClick={() => setPlatformTab(tab)}
-            style={{
-              background: platformTab === tab ? '#e3ffeb' : '#fff', 
-              color: platformTab === tab ? '#166534' : '#666',
-              border: platformTab === tab ? '1px solid #166534' : '1px solid #e5e7eb',
-              fontWeight: 600, 
-              cursor: 'pointer', 
-              padding: '6px 16px',
-              borderRadius: '20px',
-              fontSize: '13px',
-              transition: 'all 0.2s ease'
-            }}
+            className={`tab-pill ${platformTab === tab ? "active" : ""}`}
           >
             {tab}
           </button>
@@ -738,16 +730,16 @@ export default function Home() {
       <div className="video-type-label"><Film size={11} /> {video.format || "Viral Clip"}</div>
       <h3>{video.title}</h3>
       <p style={{ color: video.status === 'failed' ? '#d32f2f' : 'inherit' }}>{video.description}</p>
-      {video.status !== 'failed' && <div className="hashtag-row">{video.hashtags.map((tag) => <span key={tag}>#{tag.replace(/^#/, "")}</span>)}</div>}
+      {video.status !== 'failed' && <div className="hashtag-row">{Array.from(new Set(video.hashtags || [])).map((tag, idx) => <span key={`${tag}-${idx}`}>#{tag.replace(/^#/, '')}</span>)}</div>}
       <div className="video-card-actions">
         <span>{video.createdAt}</span>
         <div style={{display:'flex', gap:'8px', marginLeft:'auto'}}>
-        {video.youtubeVideoId && <a href={`https://youtube.com/watch?v=${video.youtubeVideoId}`} target="_blank" rel="noreferrer" className="secondary-button" style={{padding:'4px 8px', fontSize:'11px', color: '#ff0000', borderColor: '#ff000033', backgroundColor: '#ff000011'}} title="Watch on YouTube">YouTube</a>}
-        {video.facebookVideoId && <a href={`https://www.facebook.com/video/${video.facebookVideoId}`} target="_blank" rel="noreferrer" className="secondary-button" style={{padding:'4px 8px', fontSize:'11px', color: '#1877F2', borderColor: '#1877F233', backgroundColor: '#1877F211'}} title="Watch on Facebook">Facebook</a>}
+        {video.youtubeVideoId && <a href={`https://youtube.com/watch?v=${video.youtubeVideoId}`} target="_blank" rel="noreferrer" className="secondary-button" style={{display: 'inline-flex', alignItems: 'center', gap: '5px', padding:'4px 10px', fontSize:'11px', color: '#ff4d56', borderColor: 'rgba(229,9,20,0.3)', backgroundColor: 'rgba(229,9,20,0.1)'}} title="Watch on YouTube"><FaYoutube size={13} /> YouTube</a>}
+        {video.facebookVideoId && <a href={`https://www.facebook.com/video/${video.facebookVideoId}`} target="_blank" rel="noreferrer" className="secondary-button" style={{display: 'inline-flex', alignItems: 'center', gap: '5px', padding:'4px 10px', fontSize:'11px', color: '#38bdf8', borderColor: 'rgba(56,189,248,0.3)', backgroundColor: 'rgba(56,189,248,0.1)'}} title="Watch on Facebook"><FaFacebookF size={12} /> Facebook</a>}
         {!video.youtubeVideoId && !video.facebookVideoId && video.videoUrl && !video.videoUrl.includes("youtube.com/") && <a href={video.videoUrl} download className="icon-button" title="Download video"><Download size={16} /></a>}
         <button className="icon-button" style={{ color: '#ea4335' }} onClick={() => setVideoToDelete(video)} title="Delete video"><Trash2 size={16} /></button>
         </div></div></div></article>)}</div> : <div className="empty-library"><div className="empty-art"><span /><span /><span /><Clapperboard size={27} /></div><h2>{query || filter !== "All videos" ? "No matching clips" : "No clips published yet."}</h2><p>{query || filter !== "All videos" ? "Try another search or category." : "Published viral clips will appear here with YouTube, Facebook, and Instagram links."}</p>{!query && filter === "All videos" && <button className="primary-button" onClick={() => setScreen("studio")}><TrendingUp size={16} /> Create your first viral clip</button>}</div>}</section>}
-      {screen === "settings" && <section className="settings-content"><div className="eyebrow"><span className="eyebrow-dot" /> WORKSPACE SETTINGS</div><h1>Your studio, <em>your way.</em></h1><p className="settings-intro">Manage the connections that power your viral clips workflow.</p><div className="settings-row"><div className="settings-icon youtube-icon"><Play size={18} /></div><div className="settings-copy"><h2>YouTube publishing</h2><p>Connect YouTube to publish viral clips directly to your channel.</p></div><button className={`secondary-button ${connections.includes("YouTube") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("YouTube")}>{connections.includes("YouTube") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon" style={{ background: '#f5efdf', color: '#e1306c', borderRadius: '50%', padding: '8px', display: 'flex' }}><Camera size={18} /></div><div className="settings-copy"><h2>Instagram publishing</h2><p>Connect Instagram to automatically post viral clips as Reels.</p></div><button className={`secondary-button ${connections.includes("Instagram") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Instagram")}>{connections.includes("Instagram") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon" style={{ background: '#f5efdf', color: '#1877F2', borderRadius: '50%', padding: '8px', display: 'flex' }}><Users size={18} /></div><div className="settings-copy"><h2>Facebook publishing</h2><p>Connect Facebook to cross-post your viral clips as Facebook Reels.</p></div><button className={`secondary-button ${connections.includes("Facebook") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Facebook")}>{connections.includes("Facebook") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon" style={{ background: '#f5efdf', color: '#EA4335', borderRadius: '50%', padding: '8px', display: 'flex' }}><Mail size={18} /></div><div className="settings-copy"><h2>Gmail notifications</h2><p>Connect Gmail to receive post links (YouTube, Facebook, Instagram) after each clip is published.</p></div><button className={`secondary-button ${connections.includes("Gmail") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Gmail")}>{connections.includes("Gmail") ? "Disconnect" : "Connect"}</button></div><div className="settings-note"><CircleHelp size={17} /><p>100% free workflow: local yt-dlp + ffmpeg for splitting, smart rule-based descriptions &amp; hashtags, direct posting to your connected platforms. No paid services or API keys needed.</p></div></section>}
+      {screen === "settings" && <section className="settings-content"><div className="eyebrow"><span className="eyebrow-dot" /> WORKSPACE SETTINGS</div><h1>Your studio, <em>your way.</em></h1><p className="settings-intro">Manage the connections that power your viral clips workflow.</p><div className="settings-row"><div className="settings-icon youtube-icon"><FaYoutube size={22} /></div><div className="settings-copy"><h2>YouTube publishing</h2><p>Connect YouTube to publish viral clips directly to your channel.</p></div><button className={`secondary-button ${connections.includes("YouTube") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("YouTube")}>{connections.includes("YouTube") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon instagram-icon"><FaInstagram size={21} /></div><div className="settings-copy"><h2>Instagram publishing</h2><p>Connect Instagram to automatically post viral clips as Reels.</p></div><button className={`secondary-button ${connections.includes("Instagram") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Instagram")}>{connections.includes("Instagram") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon facebook-icon"><FaFacebookF size={19} /></div><div className="settings-copy"><h2>Facebook publishing</h2><p>Connect Facebook to cross-post your viral clips as Facebook Reels.</p></div><button className={`secondary-button ${connections.includes("Facebook") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Facebook")}>{connections.includes("Facebook") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon gmail-icon"><SiGmail size={19} /></div><div className="settings-copy"><h2>Gmail notifications</h2><p>Connect Gmail to receive post links (YouTube, Facebook, Instagram) after each clip is published.</p></div><button className={`secondary-button ${connections.includes("Gmail") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Gmail")}>{connections.includes("Gmail") ? "Disconnect" : "Connect"}</button></div><div className="settings-note"><CircleHelp size={17} /><p>100% free workflow: local yt-dlp + ffmpeg for splitting, smart rule-based descriptions &amp; hashtags, direct posting to your connected platforms. No paid services or API keys needed.</p></div></section>}
     </main>
     {toast && <div className="toast-message"><span className="toast-check"><Check size={14} /></span>{toast}</div>}
     {disconnectingPlatform && (
@@ -795,11 +787,11 @@ export default function Home() {
 }
 
 function Landing({ onStart, onLogin }: { onStart: () => void; onLogin: () => void }) {
-  return <main className="landing-page"><nav className="landing-nav"><a className="brand landing-brand" href="#top"><span className="brand-mark"><Play size={17} fill="currentColor" /></span><span>loop<span className="brand-dot">.</span></span></a><div className="landing-links"><a href="#how-it-works">How it works</a><a href="#formats">Formats</a></div><div className="landing-actions"><button className="text-button" onClick={onLogin}>Log in</button><button className="nav-cta" onClick={onStart}>Start creating <ArrowRight size={15} /></button></div></nav>
-    <section className="landing-hero" id="top"><div className="hero-copy"><div className="hero-kicker"><span className="live-dot" /> VIRAL CLIPS & SOCIAL AUTOMATION</div><h1>Turn viral videos into<br /><em>your content.</em></h1><p>Paste any viral video URL or auto-find trending videos. Split them into parts, generate tailored descriptions & hashtags, and post across socials — 100% free.</p><div className="hero-actions"><button className="hero-cta" onClick={onStart}>Create your first clip <ArrowRight size={17} /></button><span className="hero-meta"><span className="hero-avatars"><i>J</i><i>M</i><i>A</i></span>Made for curious creators</span></div><div className="hero-proof"><span><Check size={14} /> Vertical-first ideas</span><span><Check size={14} /> Your style, your story</span></div></div><div className="hero-art"><div className="art-orbit orbit-one" /><div className="art-orbit orbit-two" /><div className="hero-poster poster-back"><span className="poster-label">TINY MOMENTS</span><div className="poster-flower"><i /><i /><i /><i /><i /><b /></div><span className="poster-bottom">somewhere<br />between seconds</span></div><div className="hero-poster poster-front"><div className="poster-image image-ceramic" /><div className="poster-gradient" /><span className="poster-topline">LOOP STUDIO <i>✳</i></span><span className="poster-caption">little things<br /><em>feel big.</em></span><span className="poster-play"><Play size={16} fill="currentColor" /></span><span className="poster-duration">0:09</span></div><div className="float-note note-top"><span><Sparkles size={15} /></span><div><strong>One little idea</strong><small>Endless ways to loop</small></div></div><div className="float-note note-bottom"><span className="note-music"><Music2 size={16} /></span><div><strong>Made to be replayed</strong><small>9 seconds · feels like more</small></div></div><span className="art-spark spark-a">✳</span><span className="art-spark spark-b">✳</span></div><div className="hero-scroll">SCROLL TO MAKE SOMETHING <span>↓</span></div></section>
+  return <main className="landing-page"><nav className="landing-nav"><a className="brand landing-brand" href="#top"><img src="/assets/theme.png" alt="The Viral Desk" style={{ height: "42px", width: "42px", objectFit: "cover", borderRadius: "50%", boxShadow: "0 0 16px rgba(229,9,20,0.45)" }} /><span>The Viral Desk</span></a><div className="landing-links"><a href="#how-it-works">How it works</a><a href="#formats">Formats</a></div><div className="landing-actions"><button className="text-button" onClick={onLogin}>Log in</button><button className="nav-cta" onClick={onStart}>Start creating <ArrowRight size={15} /></button></div></nav>
+    <section className="landing-hero" id="top"><div className="hero-copy"><div className="hero-kicker"><span className="live-dot" /> VIRAL CLIPS & SOCIAL AUTOMATION</div><h1>Turn viral videos into<br /><em>your content.</em></h1><p>Paste any viral video URL or auto-find trending videos. Split them into parts, generate tailored descriptions & hashtags, and post across socials — 100% free.</p><div className="hero-actions"><button className="hero-cta" onClick={onStart}>Create your first clip <ArrowRight size={17} /></button><span className="hero-meta"><span className="hero-avatars"><i>J</i><i>M</i><i>A</i></span>Made for curious creators</span></div><div className="hero-proof"><span><Check size={14} /> Vertical-first ideas</span><span><Check size={14} /> Your style, your story</span></div></div><div className="hero-art"><div className="art-orbit orbit-one" /><div className="art-orbit orbit-two" /><div className="hero-poster poster-back"><span className="poster-label">TINY MOMENTS</span><div className="poster-flower"><i /><i /><i /><i /><i /><b /></div><span className="poster-bottom">somewhere<br />between seconds</span></div><div className="hero-poster poster-front"><div className="poster-image image-ceramic" /><div className="poster-gradient" /><span className="poster-topline">THE VIRAL DESK <i>✳</i></span><span className="poster-caption">little things<br /><em>feel big.</em></span><span className="poster-play"><Play size={16} fill="currentColor" /></span><span className="poster-duration">0:09</span></div><div className="float-note note-top"><span><Sparkles size={15} /></span><div><strong>One little idea</strong><small>Endless viral reach</small></div></div><div className="float-note note-bottom"><span className="note-music"><Music2 size={16} /></span><div><strong>Made to be replayed</strong><small>9 seconds · feels like more</small></div></div><span className="art-spark spark-a">✳</span><span className="art-spark spark-b">✳</span></div><div className="hero-scroll">SCROLL TO MAKE SOMETHING <span>↓</span></div></section>
     <section className="format-strip" id="formats"><div className="strip-label">A FORMAT FOR<br />EVERY LITTLE OBSESSION</div><div className="strip-items">{formats.slice(0, 6).map(({ name, icon: Icon, tone }) => <div className="strip-item" key={name}><span className={`format-icon ${tone}`}><Icon size={17} /></span><span>{name}</span></div>)}<div className="strip-item more-formats"><span className="format-icon custom-tone"><Plus size={17} /></span><span>And your own</span></div></div></section>
     <section className="how-section" id="how-it-works"><div className="how-heading"><div className="eyebrow"><span className="eyebrow-dot" /> FROM SPARK TO SHORT</div><h2>A tiny process.<br /><em>A whole lot of possibility.</em></h2></div><div className="how-steps"><article><span className="how-number">01</span><span className="how-icon icon-pick"><Film size={20} /></span><h3>Pick a feeling</h3><p>ASMR, mini stories, nature, or the niche only you could dream up.</p></article><article><span className="how-number">02</span><span className="how-icon icon-shape"><Sparkles size={20} /></span><h3>Auto-split into clips</h3><p>Automatically cut videos into parts with tailored descriptions and 8-10 hashtags.</p></article><article><span className="how-number">03</span><span className="how-icon icon-loop"><Play size={20} /></span><h3>Publish across socials</h3><p>One-click publish to YouTube, Facebook, and Instagram with Gmail delivery.</p></article></div></section>
-    <section className="landing-end"><span className="end-star">✳</span><div className="eyebrow">THE NEXT NINE SECONDS ARE YOURS</div><h2>What will you <em>make loop?</em></h2><button className="hero-cta" onClick={onStart}>Start your studio <ArrowRight size={17} /></button><p>Free to explore · Your ideas stay yours</p></section><footer className="landing-footer"><a className="brand landing-brand" href="#top"><span className="brand-mark"><Play size={15} fill="currentColor" /></span><span>loop<span className="brand-dot">.</span></span></a><span>Viral clip repurposing studio for modern creators.</span><span>© 2026 loop studio</span></footer></main>;
+    <section className="landing-end"><span className="end-star">✳</span><div className="eyebrow">THE NEXT NINE SECONDS ARE YOURS</div><h2>What will you <em>create next?</em></h2><button className="hero-cta" onClick={onStart}>Start your studio <ArrowRight size={17} /></button><p>Free to explore · Your ideas stay yours</p></section><footer className="landing-footer"><a className="brand landing-brand" href="#top"><img src="/assets/theme.png" alt="The Viral Desk" style={{ height: "32px", width: "32px", objectFit: "cover", borderRadius: "50%", boxShadow: "0 0 10px rgba(229,9,20,0.45)" }} /><span>The Viral Desk</span></a><span>Viral clip repurposing studio for modern creators.</span><span>© 2026 The Viral Desk</span></footer></main>;
 }
 
 function AuthDialog({ mode, setMode, email, setEmail, password, setPassword, error, loading, configured, onClose, onSubmit, onPreview }: {

@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "loop. | Viral Clips & Social Automation Studio",
-  description: "Repurpose viral videos into multi-part clips with tailored hashtags, and auto-publish to YouTube, Facebook, and Instagram.",
+  title: "The Viral Desk | Viral Clips & Social Automation Studio",
+  description: "The Viral Desk — Repurpose viral videos into multi-part clips with custom video outros, and auto-publish to YouTube, Facebook, and Instagram.",
+  icons: { icon: "/assets/logo.png" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

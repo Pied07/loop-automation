@@ -149,6 +149,51 @@ async function downloadWithYtdlCore(videoUrl: string, outputPath: string): Promi
   return { title };
 }
 
+// ─── Outro Merger ─────────────────────────────────────────────────────────────
+
+async function appendOutroToClip(
+  ffmpegBin: string,
+  clipPath: string,
+  outroPath: string,
+  outputPath: string
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const filter =
+      "[0:v]scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=24[v0];" +
+      "[1:v]scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=24[v1];" +
+      "[0:a]aformat=sample_rates=48000:channel_layouts=stereo[a0];" +
+      "[1:a]aformat=sample_rates=48000:channel_layouts=stereo[a1];" +
+      "[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]";
+
+    const args = [
+      "-y",
+      "-i", clipPath,
+      "-i", outroPath,
+      "-filter_complex", filter,
+      "-map", "[v]",
+      "-map", "[a]",
+      "-c:v", "libx264",
+      "-preset", "ultrafast",
+      "-crf", "23",
+      "-c:a", "aac",
+      "-b:a", "128k",
+      outputPath,
+    ];
+
+    const proc = spawn(ffmpegBin, args, { shell: false });
+    let errOut = "";
+    proc.stderr.on("data", (d: Buffer) => { errOut += d.toString(); });
+    proc.on("close", (code: number | null) => {
+      if (code === 0 && fs.existsSync(outputPath) && fs.statSync(outputPath).size > 1000) {
+        resolve();
+      } else {
+        reject(new Error(`Failed to append video outro: ${errOut.slice(-300)}`));
+      }
+    });
+    proc.on("error", (e: Error) => reject(e));
+  });
+}
+
 // ─── Split Video ──────────────────────────────────────────────────────────────
 
 async function splitVideo(
@@ -161,6 +206,8 @@ async function splitVideo(
   // Determine clip length: short (< 10 min) → 90s clips, long (≥ 10 min) → 1200s (20 min) clips
   const clipLength = totalDuration < 600 ? 90 : 1200;
   const clips: { clipPath: string; duration: number; startTime: number }[] = [];
+  const outroPath = path.join(process.cwd(), "public", "assets", "video-outro.mp4");
+  const hasOutro = fs.existsSync(outroPath);
 
   let startTime = 0;
   let partIndex = 1;
@@ -172,7 +219,11 @@ async function splitVideo(
 
     const clipFilename = `clip_${timestamp}_part${partIndex}.mp4`;
     const clipPath = path.join(clipsDir, clipFilename);
+    const tempSliceFilename = `temp_${timestamp}_part${partIndex}.mp4`;
+    const tempSlicePath = path.join(clipsDir, tempSliceFilename);
+    const targetSlicePath = hasOutro ? tempSlicePath : clipPath;
 
+    // 1. Cut the segment from source
     await new Promise<void>((resolve, reject) => {
       const args = [
         "-y",
@@ -182,19 +233,37 @@ async function splitVideo(
         "-c:v", "copy",
         "-c:a", "copy",
         "-avoid_negative_ts", "make_zero",
-        clipPath,
+        targetSlicePath,
       ];
       const proc = spawn(ffmpegBin, args, { shell: false });
       let errOut = "";
       proc.stderr.on("data", (d: Buffer) => { errOut += d.toString(); });
       proc.on("close", (code: number | null) => {
-        if (code === 0) resolve();
+        if (code === 0 && fs.existsSync(targetSlicePath)) resolve();
         else reject(new Error(`ffmpeg split failed (part ${partIndex}): ${errOut.slice(-300)}`));
       });
       proc.on("error", (e: Error) => reject(e));
     });
 
-    clips.push({ clipPath, duration, startTime });
+    // 2. Merge the video-outro to the end of every clip
+    let finalDuration = duration;
+    if (hasOutro) {
+      try {
+        await appendOutroToClip(ffmpegBin, tempSlicePath, outroPath, clipPath);
+        finalDuration += 10.01; // Outro duration
+      } catch (outroErr: any) {
+        console.warn("Could not append outro, using slice directly:", outroErr.message);
+        if (fs.existsSync(tempSlicePath)) {
+          fs.renameSync(tempSlicePath, clipPath);
+        }
+      } finally {
+        if (fs.existsSync(tempSlicePath)) {
+          try { fs.unlinkSync(tempSlicePath); } catch {}
+        }
+      }
+    }
+
+    clips.push({ clipPath, duration: Math.round(finalDuration * 100) / 100, startTime });
     startTime += duration;
     partIndex++;
   }
