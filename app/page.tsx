@@ -38,7 +38,8 @@ import {
 } from "lucide-react";
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { useEffect, useState, useRef, type FormEvent } from "react";
-import { auth, firebaseConfigured, listenToVideos, deleteVideo, deleteVideosByYouTubeId, deleteVideosByFacebookId, saveVideo, type VideoRecord } from "./firebase";
+import { auth, firebaseConfigured, database, listenToVideos, deleteVideo, deleteVideosByYouTubeId, deleteVideosByFacebookId, saveVideo, type VideoRecord } from "./firebase";
+import { doc, onSnapshot } from "firebase/firestore";
 import { deleteFromYouTube, deleteFromFacebook, getPublishedAutomationVideos } from "./actions";
 import { autoFindViralVideo } from "./viral-actions";
 import { FaYoutube, FaInstagram, FaFacebookF } from "react-icons/fa6";
@@ -361,19 +362,50 @@ export default function Home() {
       clearInterval(progressInterval);
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || "Failed to process video.");
+
+      if (data.cloudMode === "github" && data.jobId && database) {
+        setSplitStep("GitHub Actions cloud runner started...");
+        setSplitProgress(18);
+
+        const unsub = onSnapshot(doc(database, "jobs", data.jobId), (snap) => {
+          if (!snap.exists()) return;
+          const job = snap.data();
+          if (job.progress) setSplitProgress(job.progress);
+          if (job.step) setSplitStep(job.step);
+          if (job.sourceTitle) setSourceTitle(job.sourceTitle);
+
+          if (job.status === "done" && job.clips) {
+            unsub();
+            setSplitProgress(100);
+            setSplitStep(`✅ ${job.clips.length} clips ready from cloud!`);
+            setClips(job.clips);
+            setIsSplitting(false);
+            notify(`Cloud split complete: ${job.clips.length} clips ready! Review and publish below.`);
+          } else if (job.status === "failed") {
+            unsub();
+            setIsSplitting(false);
+            setSplitProgress(0);
+            setSplitStep("");
+            notify(job.error || "GitHub cloud runner failed.");
+          }
+        });
+        return;
+      }
+
       setSplitProgress(100);
       setSplitStep(`✅ ${data.clips.length} clips ready!`);
       setClips(data.clips);
       setSourceTitle(data.sourceTitle);
       notify(`Split into ${data.clips.length} clips! Review and publish below.`);
+      setIsSplitting(false);
     } catch (err: any) {
       clearInterval(progressInterval);
       notify(err.message || "Failed to process video.");
       setSplitStep("");
       setSplitProgress(0);
+      setIsSplitting(false);
     } finally {
       clearInterval(progressInterval);
-      setIsSplitting(false);
     }
   }
 

@@ -1,0 +1,66 @@
+name: Cloud Video Splitter Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      videoUrl:
+        description: 'URL of the video to split'
+        required: true
+        type: string
+      contentCategory:
+        description: 'Content Category'
+        required: false
+        default: 'Trending'
+        type: string
+      jobId:
+        description: 'Firestore Job ID for real-time progress tracking'
+        required: true
+        type: string
+      userId:
+        description: 'User ID'
+        required: false
+        default: 'creator'
+        type: string
+      firebaseApiKey:
+        description: 'Firebase API Key'
+        required: false
+        type: string
+      firebaseProjectId:
+        description: 'Firebase Project ID'
+        required: false
+        type: string
+      firebaseStorageBucket:
+        description: 'Firebase Storage Bucket'
+        required: false
+        type: string
+
+jobs:
+  split-and-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install yt-dlp & FFmpeg
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          pip install --upgrade yt-dlp
+
+      - name: Run Cloud Video Processing
+        env:
+          VIDEO_URL: ${{ inputs.videoUrl }}
+          CONTENT_CATEGORY: ${{ inputs.contentCategory }}
+          JOB_ID: ${{ inputs.jobId }}
+          USER_ID: ${{ inputs.userId }}
+          FIREBASE_API_KEY: ${{ inputs.firebaseApiKey || secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          FIREBASE_PROJECT_ID: ${{ inputs.firebaseProjectId || secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          FIREBASE_STORAGE_BUCKET: ${{ inputs.firebaseStorageBucket || secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+        run: |
+          python scripts/cloud_splitter.py

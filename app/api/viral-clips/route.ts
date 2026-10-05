@@ -15,7 +15,50 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Video URL is required." }, { status: 400 });
     }
 
-    // 1. Check if Hugging Face Cloud Worker is configured (100% free cloud video processing)
+    // 1. Check if GitHub Actions Cloud Runner is configured (100% free, 2000 mins/mo, preinstalled FFmpeg)
+    const githubPat = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
+    const githubRepo = process.env.GITHUB_REPO || "Pied07/loop-automation";
+
+    if (githubPat) {
+      const jobId = `job_${Date.now()}`;
+      const dispatchUrl = `https://api.github.com/repos/${githubRepo}/actions/workflows/split-video.yml/dispatches`;
+
+      const ghRes = await fetch(dispatchUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${githubPat}`,
+          Accept: "application/vnd.github.v3+json",
+          "Content-Type": "application/json",
+          "User-Agent": "The-Viral-Desk-App",
+        },
+        body: JSON.stringify({
+          ref: "main",
+          inputs: {
+            videoUrl,
+            contentCategory: contentCategory || "Trending",
+            jobId,
+            userId: body.userId || "creator",
+            firebaseApiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
+            firebaseProjectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "",
+            firebaseStorageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
+          },
+        }),
+      });
+
+      if (!ghRes.ok) {
+        const ghErr = await ghRes.text();
+        return NextResponse.json({ error: `Failed to trigger GitHub cloud runner: ${ghErr}` }, { status: ghRes.status });
+      }
+
+      return NextResponse.json({
+        success: true,
+        cloudMode: "github",
+        jobId,
+        message: "Cloud video processor started on GitHub Actions!",
+      });
+    }
+
+    // 2. Check if Hugging Face Cloud Worker is configured
     const workerUrl = process.env.HUGGINGFACE_WORKER_URL;
     if (workerUrl) {
       let cleanWorkerUrl = workerUrl.replace(/\/$/, "");
@@ -40,7 +83,7 @@ export async function POST(req: NextRequest) {
           return NextResponse.json(
             {
               error:
-                "Cloud worker returned a webpage instead of API JSON. In your Hugging Face Space README.md, make sure 'sdk: docker' and 'app_port: 7860' are set so Hugging Face activates Docker instead of static HTML.",
+                "Cloud worker returned a webpage instead of API JSON. In your Hugging Face Space README.md, change 'sdk: static' to 'sdk: gradio' so Hugging Face starts Python instead of a static webpage.",
             },
             { status: 502 }
           );
