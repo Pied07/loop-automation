@@ -125,38 +125,64 @@ def run():
     timestamp = int(time.time())
     source_file = CLIPS_DIR / f"source_{timestamp}.mp4"
 
-    # 1. Download using yt-dlp with anti-blocking parameters
-    download_cmd = [
-        "yt-dlp",
-        VIDEO_URL,
-        "--output", str(source_file),
-        "--format", "best[height<=720][ext=mp4]/bestvideo[height<=720]+bestaudio/best",
-        "--recode-video", "mp4",
-        "--no-playlist",
-        "--no-warnings",
-        "--extractor-args", "youtube:player_client=android,web",
-        "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "--print-json",
-    ]
-    try:
-        proc = subprocess.run(download_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        if proc.returncode != 0:
-            raise RuntimeError(proc.stderr or "yt-dlp failed")
-        info = json.loads(proc.stdout.strip().split("\n")[-1] or "{}")
-        title = info.get("title") or info.get("fulltitle") or "Viral Video"
-        total_duration = float(info.get("duration") or 0)
-    except Exception as e:
-        print(f"Primary yt-dlp failed: {e}. Trying direct/fallback download...")
+    # 1. Download using yt-dlp with anti-blocking client fallback
+    clients_to_try = ["tv_embedded", "ios", "mweb", "android_creator"]
+    title = "Viral Video"
+    total_duration = 0.0
+    download_success = False
+    last_error = ""
+
+    for client in clients_to_try:
+        print(f"Attempting download with player_client={client}...")
+        download_cmd = [
+            "yt-dlp",
+            VIDEO_URL,
+            "--output", str(source_file),
+            "-f", "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
+            "--recode-video", "mp4",
+            "--no-playlist",
+            "--no-warnings",
+            "--extractor-args", f"youtube:player_client={client}",
+            "--print-json",
+        ]
+
+        cookie_file = Path("cookies.txt")
+        if cookie_file.exists() and cookie_file.stat().st_size > 10:
+            download_cmd.extend(["--cookies", str(cookie_file)])
+
         try:
-            # Fallback download without custom formats
+            proc = subprocess.run(download_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if proc.returncode == 0 and source_file.exists() and source_file.stat().st_size > 1000:
+                try:
+                    info = json.loads(proc.stdout.strip().split("\n")[-1] or "{}")
+                    title = info.get("title") or info.get("fulltitle") or "Viral Video"
+                    total_duration = float(info.get("duration") or 0)
+                except Exception:
+                    pass
+                download_success = True
+                print(f"Download succeeded with {client}: {title}")
+                break
+            else:
+                last_error = proc.stderr or f"Exit code {proc.returncode}"
+                print(f"Client {client} failed: {last_error[:200]}")
+        except Exception as e:
+            last_error = str(e)
+            print(f"Client {client} exception: {e}")
+
+    if not download_success:
+        # Final fallback: generic download
+        try:
             fallback_cmd = ["yt-dlp", VIDEO_URL, "--output", str(source_file), "--no-playlist", "--no-warnings"]
             proc2 = subprocess.run(fallback_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
-            title = "Viral Video"
-            total_duration = 0.0
-        except Exception as inner_e:
-            print(f"Download error: {inner_e}")
-            update_job_status(status="failed", error=f"Download failed: {str(e)}")
-            sys.exit(1)
+            if source_file.exists() and source_file.stat().st_size > 1000:
+                download_success = True
+        except Exception as fe:
+            last_error = str(fe)
+
+    if not download_success:
+        print(f"All download attempts failed: {last_error}")
+        update_job_status(status="failed", error=f"Download failed: {last_error[:250]}")
+        sys.exit(1)
 
     update_job_status(status="processing", progress=50, step="Cutting 9:16 vertical clips with FFmpeg...", source_title=title, total_duration=total_duration)
 
