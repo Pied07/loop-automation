@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "loop. | Your short-form video studio",
-  description: "Turn a tiny idea into a scroll-stopping short. Shape prompts and keep your video library in one little studio.",
+  title: "loop. | Viral Clips & Social Automation Studio",
+  description: "Repurpose viral videos into multi-part clips with tailored hashtags, and auto-publish to YouTube, Facebook, and Instagram.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

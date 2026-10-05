@@ -16,62 +16,65 @@ import {
   Flower2,
   FolderOpen,
   Lightbulb,
+  Link,
   LoaderCircle,
   LogOut,
   Mail,
   Menu,
-  Mic2,
   Mountain,
   Music2,
   Play,
   Plus,
-  RefreshCw,
+  Scissors,
   Search,
   Settings2,
+  Share2,
   Sparkles,
+  TrendingUp,
   Users,
   WandSparkles,
   X,
   Trash2,
 } from "lucide-react";
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, useRef, type FormEvent } from "react";
 import { auth, firebaseConfigured, listenToVideos, deleteVideo, deleteVideosByYouTubeId, deleteVideosByFacebookId, saveVideo, type VideoRecord } from "./firebase";
-import { generateVideoContent, renderVideo, publishToSocials, deleteFromYouTube, deleteFromFacebook, getPublishedAutomationVideos } from "./actions";
+import { deleteFromYouTube, deleteFromFacebook, getPublishedAutomationVideos } from "./actions";
+import { autoFindViralVideo } from "./viral-actions";
 
-type GeneratedScript = {
+type ClipMeta = {
+  clipPath: string;
+  publicUrl: string;
+  partNumber: number;
   title: string;
   description: string;
   hashtags: string[];
-  scenes: { imagePrompt: string; caption: string }[];
-  captions: string;
+  duration: number;
+  startTime: number;
+};
+
+type PublishStatus = "idle" | "publishing" | "done" | "error";
+
+type ClipPublishResult = {
+  status: PublishStatus;
+  youtubeUrl?: string;
+  facebookUrl?: string;
+  instagramUrl?: string;
+  logs: string[];
+  error?: string;
 };
 
 const formats = [
-  { name: "ASMR", icon: AudioLines, tone: "mint", detail: "Quiet, sensory stories" },
-  { name: "Horror", icon: Flame, tone: "coral", detail: "Spooky tales & chills" },
-  { name: "Historical", icon: Clapperboard, tone: "gold", detail: "Tales from the past" },
-  { name: "Motivational", icon: Sparkles, tone: "mint", detail: "Inspiring stories" },
-  { name: "Sci-Fi", icon: Lightbulb, tone: "blue", detail: "Future & tech" },
-  { name: "Romance", icon: Flower2, tone: "pink", detail: "Love & connection" },
-  { name: "Mystery", icon: WandSparkles, tone: "lilac", detail: "Unsolved & curious" },
+  { name: "Trending", icon: TrendingUp, tone: "mint", detail: "Viral & trending now" },
   { name: "Comedy", icon: AudioLines, tone: "yellow", detail: "Funny & entertaining" },
-  { name: "Fantasy", icon: Mountain, tone: "sky", detail: "Magic & adventure" },
+  { name: "Motivational", icon: Sparkles, tone: "mint", detail: "Inspiring moments" },
+  { name: "Horror", icon: Flame, tone: "coral", detail: "Spooky & thrilling" },
+  { name: "Educational", icon: Lightbulb, tone: "blue", detail: "Learn something new" },
+  { name: "Romance", icon: Flower2, tone: "pink", detail: "Love & emotion" },
+  { name: "Adventure", icon: Mountain, tone: "sky", detail: "Action & outdoors" },
+  { name: "Music", icon: Music2, tone: "lilac", detail: "Music & performance" },
+  { name: "Food", icon: WandSparkles, tone: "gold", detail: "Food & cooking" },
 ];
-
-const promptSeeds: Record<string, string> = {
-  ASMR: "Create a quiet, intimate ASMR story with delicate sensory details, gentle pacing, and a satisfying reveal.",
-  Horror: "Create a terrifying, atmospheric horror story with intense suspense and a shocking twist.",
-  Historical: "Create a rich, historically accurate narrative set in a fascinating era of the past.",
-  Motivational: "Create an uplifting, powerful story about overcoming adversity and finding inner strength.",
-  "Sci-Fi": "Create a futuristic science fiction story with mind-bending technology and vast worlds.",
-  Romance: "Create a heartfelt, deeply emotional romance story about unexpected love and connection.",
-  Mystery: "Create a suspenseful mystery story with clues, deductions, and a brilliant reveal.",
-  Comedy: "Create a lighthearted, humorous story with clever dialogue and a funny conclusion.",
-  Fantasy: "Create an epic fantasy story filled with magic, mythical creatures, and grand adventure.",
-  Food: "Create an appetizing food short with rich natural color, crisp preparation details, close-up texture, and a beautiful finished dish.",
-  "Study focus": "Create a calming study-focus short with a composed desk scene, soft daylight, gentle ambient motion, and a distraction-free feel.",
-};
 
 type Screen = "home" | "studio" | "library" | "settings";
 
@@ -119,109 +122,7 @@ function StyleImageCard({ s, isSelected, onClick }: { s: any, isSelected: boolea
 }
 
 export default function Home() {
-  const imageStylesOptions = [
-    {
-      id: "Realistic", label: "Realistic", desc: "Photorealistic",
-      img: "/thumbnails/realistic.png",
-      fallback: "linear-gradient(135deg,#1a3a5c,#4a7fb5)"
-    },
-    {
-      id: "Anime", label: "Anime", desc: "Illustrated",
-      img: "/thumbnails/anime.png",
-      fallback: "linear-gradient(135deg,#ff6b9d,#c9b3ff)"
-    },
-    {
-      id: "Cartoon", label: "Cartoon", desc: "Fun & Bold",
-      img: "/thumbnails/cartoon.png",
-      fallback: "linear-gradient(135deg,#f7971e,#21d4fd)"
-    },
-    {
-      id: "Ghibli", label: "Ghibli", desc: "Painterly",
-      img: "/thumbnails/ghibli.png",
-      fallback: "linear-gradient(135deg,#134e5e,#71b280)"
-    },
-    {
-      id: "Watercolor", label: "Watercolor", desc: "Soft Art",
-      img: "/thumbnails/watercolor.png",
-      fallback: "linear-gradient(160deg,#fce4ec,#e3f2fd)"
-    },
-    {
-      id: "3D Render", label: "3D Render", desc: "Volumetric",
-      img: "/thumbnails/3d.png",
-      fallback: "linear-gradient(135deg,#1f1c2c,#928dab)"
-    },
-  ];
-
-  const captionStylesOptions = [
-    { id: "Modern", label: "Modern", preview: { font: "'Inter', sans-serif", weight: 700, transform: "none", bg: "rgba(0,0,0,0.6)", color: "#fff", border: "none", shadow: "none" } },
-    { id: "Bold", label: "Bold", preview: { font: "'Inter', sans-serif", weight: 900, transform: "uppercase", bg: "rgba(0,0,0,0.85)", color: "#FFD700", border: "none", shadow: "2px 2px 0 #000" } },
-    { id: "Classic", label: "Classic", preview: { font: "'Georgia', serif", weight: 400, transform: "none", bg: "rgba(20,10,5,0.7)", color: "#f5e6c8", border: "1px solid #f5e6c8", shadow: "none" } },
-    { id: "Neon", label: "Neon", preview: { font: "'Inter', sans-serif", weight: 800, transform: "none", bg: "rgba(0,0,0,0.7)", color: "#00FFFF", border: "none", shadow: "0 0 8px #00FFFF, 0 0 20px #00FFFF" } },
-    { id: "Minimal", label: "Minimal", preview: { font: "'Inter', sans-serif", weight: 400, transform: "none", bg: "transparent", color: "#fff", border: "none", shadow: "1px 1px 3px rgba(0,0,0,0.9)" } },
-    { id: "Cinematic", label: "Cinematic", preview: { font: "'Georgia', serif", weight: 300, transform: "none", bg: "rgba(0,0,0,0.75)", color: "#fff", border: "2px solid rgba(255,255,255,0.3)", shadow: "none" } },
-  ];
-
-  const voiceOptions = [
-    { id: "Adam",    label: "Adam",    desc: "Deep · Narration",     emoji: "🎙️" },
-    { id: "Rachel",  label: "Rachel",  desc: "Calm · Clear Female",   emoji: "🎤" },
-    { id: "Josh",   label: "Josh",    desc: "Young · Casual Male",   emoji: "🧑" },
-    { id: "Bella",  label: "Bella",   desc: "Soft · Warm Female",    emoji: "🌸" },
-    { id: "Daniel", label: "Daniel",  desc: "British · Authoritative",emoji: "🇬🇧" },
-    { id: "Lily",   label: "Lily",    desc: "British · Warm Female", emoji: "🌷" },
-    { id: "Harry",  label: "Harry",   desc: "Anxious · Intense Male",emoji: "😰" },
-    { id: "Freya",  label: "Freya",   desc: "Strong · Confident",    emoji: "⚡" },
-    { id: "Liam",   label: "Liam",    desc: "Crisp · Articulate",    emoji: "🎯" },
-    { id: "Grace",  label: "Grace",   desc: "Southern · Warm",       emoji: "🌻" },
-    { id: "Ethan",  label: "Ethan",   desc: "Raspy · Dark Tone",     emoji: "🌑" },
-    { id: "Emily",  label: "Emily",   desc: "Gentle · Storyteller",  emoji: "📖" },
-    { id: "Clyde",  label: "Clyde",   desc: "Midwest · Gravelly",    emoji: "🤠" },
-    { id: "Matilda",label: "Matilda", desc: "Warm · Friendly AU",    emoji: "🦘" },
-    { id: "Sam",    label: "Sam",     desc: "Raspy · Mysterious",    emoji: "🕵️" },
-  ];
-
-  const voicePersonalities: Record<string, { pitch: number; rate: number }> = {
-    Adam:    { pitch: 0.7,  rate: 0.85 },
-    Rachel:  { pitch: 1.2,  rate: 0.95 },
-    Josh:    { pitch: 0.95, rate: 1.05 },
-    Bella:   { pitch: 1.15, rate: 0.9  },
-    Daniel:  { pitch: 0.8,  rate: 0.88 },
-    Lily:    { pitch: 1.1,  rate: 0.93 },
-    Harry:   { pitch: 0.85, rate: 0.92 },
-    Freya:   { pitch: 1.0,  rate: 1.0  },
-    Liam:    { pitch: 0.9,  rate: 0.97 },
-    Grace:   { pitch: 1.05, rate: 0.88 },
-    Ethan:   { pitch: 0.75, rate: 0.8  },
-    Emily:   { pitch: 1.2,  rate: 0.9  },
-    Clyde:   { pitch: 0.65, rate: 0.82 },
-    Matilda: { pitch: 1.15, rate: 1.0  },
-    Sam:     { pitch: 0.72, rate: 0.85 },
-  };
-
-  const playDemoVoice = (voiceId: string) => {
-    if (!('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    const p = voicePersonalities[voiceId] || { pitch: 1, rate: 1 };
-    const utterance = new SpeechSynthesisUtterance(
-      `Hi! I'm ${voiceId}. I'll be narrating your AI story video. How does my voice sound?`
-    );
-    utterance.pitch = p.pitch;
-    utterance.rate = p.rate;
-    utterance.volume = 1;
-    // Try to find a matching browser voice
-    const voices = window.speechSynthesis.getVoices();
-    const femaleIds = ['Amy', 'Emma', 'Joanna'];
-    const preferFemale = femaleIds.includes(voiceId);
-    const match = voices.find(v =>
-      preferFemale ? v.name.toLowerCase().includes('female') || v.name.includes('Samantha') || v.name.includes('Victoria') || v.name.includes('Karen')
-                   : v.name.toLowerCase().includes('male') || v.name.includes('Alex') || v.name.includes('Daniel')
-    );
-    if (match) utterance.voice = match;
-    window.speechSynthesis.speak(utterance);
-  };
-
-  const [screen, setScreen] = useState<Screen>(() =>
-    typeof window !== "undefined" && window.localStorage.getItem("loop-studio-generation-event") ? "library" : "home"
-  );
+  const [screen, setScreen] = useState<Screen>("home");
   const [signedIn, setSignedIn] = useState(false);
   const [displayName, setDisplayName] = useState("Creator");
   const [showAuth, setShowAuth] = useState(false);
@@ -229,69 +130,27 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
-  const [selectedFormat, setSelectedFormat] = useState("");
-  const [customFormat, setCustomFormat] = useState("");
-  const [ideaText, setIdeaText] = useState("");
-  const [videoDuration, setVideoDuration] = useState(0);
-  const [numImages, setNumImages] = useState(0);
-  const [imageStyle, setImageStyle] = useState("");
-  const [ttsLanguage, setTtsLanguage] = useState("");
-  const [captionStyle, setCaptionStyle] = useState("");
-  const [voiceType, setVoiceType] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("Trending");
+  const [videoUrl, setVideoUrl] = useState("");
+  const [clips, setClips] = useState<ClipMeta[]>([]);
+  const [clipResults, setClipResults] = useState<Record<number, ClipPublishResult>>({});
+  const [sourceTitle, setSourceTitle] = useState("");
+  const [isFinding, setIsFinding] = useState(false);
+  const [isSplitting, setIsSplitting] = useState(false);
+  const [splitStep, setSplitStep] = useState("");
+  const [splitProgress, setSplitProgress] = useState(0);
+  const [isPublishingAll, setIsPublishingAll] = useState(false);
   const [videos, setVideos] = useState<VideoRecord[]>([]);
   const [filter, setFilter] = useState("All videos");
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isGeneratingInBackground, setIsGeneratingInBackground] = useState(() =>
-    typeof window !== "undefined" && Boolean(window.localStorage.getItem("loop-studio-generation-event"))
-  );
-  const [generationEventId, setGenerationEventId] = useState<string | null>(() =>
-    typeof window === "undefined" ? null : window.localStorage.getItem("loop-studio-generation-event")
-  );
-  const [isBuildingPrompt, setIsBuildingPrompt] = useState(false);
-  const [generationStep, setGenerationStep] = useState("");
-  const [generatedScript, setGeneratedScript] = useState<GeneratedScript | null>(null);
-  const [generatedScriptContext, setGeneratedScriptContext] = useState("");
-  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [mobileNav, setMobileNav] = useState(false);
   const [connections, setConnections] = useState<string[]>([]);
   const [disconnectingPlatform, setDisconnectingPlatform] = useState<string | null>(null);
   const [platformTab, setPlatformTab] = useState("Self");
-  const [youtubeSubTab, setYoutubeSubTab] = useState("Shorts");
   const [videoToDelete, setVideoToDelete] = useState<VideoRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  function getMissingDetails() {
-    const missing: string[] = [];
-    if (!selectedFormat || (selectedFormat === "Custom" && !customFormat.trim())) missing.push("video type");
-    if (!videoDuration) missing.push("video duration");
-    if (!numImages) missing.push("number of images");
-    if (!imageStyle) missing.push("image style");
-    if (!captionStyle) missing.push("caption style");
-    if (!voiceType) missing.push("narration voice");
-    if (!ttsLanguage) missing.push("narration language");
-    return missing;
-  }
-
-  function getSelectedFormat() {
-    return selectedFormat === "Custom" ? customFormat.trim() : selectedFormat;
-  }
-
-  function getScriptContext() {
-    return JSON.stringify({
-      idea: ideaText.trim(),
-      format: getSelectedFormat(),
-      videoDuration,
-      numImages,
-      imageStyle,
-      captionStyle,
-      voiceType,
-      ttsLanguage
-    });
-  }
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -391,75 +250,7 @@ export default function Home() {
     return () => { active = false; };
   }, [connections, signedIn]);
 
-  useEffect(() => {
-    if (!generationEventId) return;
-    let active = true;
-    let timer: number | undefined;
-
-    const pollStatus = async () => {
-      try {
-        const response = await fetch(`/api/generation-status?eventId=${encodeURIComponent(generationEventId)}`, { cache: "no-store" });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Unable to check generation status.");
-        if (!active) return;
-
-        if (data.status === "completed") {
-          const result = data.result;
-          if (result?.success && result.video?.videoUrl) {
-            let video: VideoRecord = {
-              id: generationEventId,
-              ...result.video,
-              sessionOnly: true
-            };
-            const currentUser = auth?.currentUser;
-            if (currentUser && firebaseConfigured) {
-              try {
-                await saveVideo(currentUser.uid, { ...video, sessionOnly: false });
-                video = { ...video, sessionOnly: false };
-                const cachedVideos = JSON.parse(localStorage.getItem("loop-studio-session-videos") || "[]") as VideoRecord[];
-                localStorage.setItem("loop-studio-session-videos", JSON.stringify(cachedVideos.filter((item) => item.id !== video.id && item.id !== `session-${video.id}` && item.videoUrl !== video.videoUrl)));
-              } catch (error) {
-                console.error("Failed to save generated video link to Firestore:", error);
-                notify("Video is ready, but its link could not be saved to your cloud library. It is kept on this device.");
-              }
-            }
-            if (video.sessionOnly) {
-              const cachedVideos = JSON.parse(localStorage.getItem("loop-studio-session-videos") || "[]") as VideoRecord[];
-              localStorage.setItem("loop-studio-session-videos", JSON.stringify([video, ...cachedVideos.filter((item) => item.id !== video.id)]));
-            }
-            setVideos((current) => mergeVideoRecords([video], current.filter((item) => item.id !== video.id && item.id !== `session-${video.id}`)));
-            notify(result.deliveryMessage || "Video is ready. Its link is available in this session's library.");
-          } else {
-            notify(result?.error || "Video generation failed.");
-          }
-          setIsGeneratingInBackground(false);
-          window.localStorage.removeItem("loop-studio-generation-event");
-          setGenerationEventId(null);
-          return;
-        }
-
-        if (data.status === "failed") {
-          setIsGeneratingInBackground(false);
-          notify(data.error || "Video generation failed.");
-          window.localStorage.removeItem("loop-studio-generation-event");
-          setGenerationEventId(null);
-          return;
-        }
-
-        timer = window.setTimeout(pollStatus, 3000);
-      } catch (error) {
-        if (!active) return;
-        console.error("Generation status check failed:", error);
-        timer = window.setTimeout(pollStatus, 5000);
-      }
-    };
-
-    void pollStatus();
-    return () => {
-      active = false;
-      if (timer) window.clearTimeout(timer);
-    };
-  }, [generationEventId]);
+  
 
   function notify(message: string) {
     setToast(message);
@@ -511,153 +302,127 @@ export default function Home() {
     setVideos([]);
   }
 
-  async function buildPrompt() {
-    const missing = getMissingDetails();
-    if (missing.length) {
-      notify(`First fill all remaining details so AI can understand your vision: ${missing.join(", ")}.`);
-      return;
-    }
-    let format = selectedFormat;
-    if (selectedFormat === "Custom") {
-      format = customFormat.trim();
-      if (!format) {
-        notify("Please mention a format first.");
-        return;
-      }
-    }
-
-    setIsBuildingPrompt(true);
-    const idea = ideaText.trim() || `Invent a fresh, original ${format} story with a strong opening, coherent visual moments, and a satisfying ending.`;
-    
+    async function handleAutoFind() {
+    setIsFinding(true);
     try {
-      const response = await fetch("/api/generate-prompt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          idea,
-          details: {
-            format,
-            duration: videoDuration,
-            imageCount: numImages,
-            imageStyle,
-            captionStyle,
-            voice: voiceType,
-            language: ttsLanguage
-          }
-        })
-      });
-      const result = await response.json();
-      if (!response.ok || !result.success || typeof result.prompt !== "string") {
-        throw new Error(result.error || "AI prompt generation failed. Check the provider keys and try again.");
+      const res = await autoFindViralVideo(selectedCategory);
+      if (res.error) {
+        notify(res.error);
+      } else if (res.url) {
+        setVideoUrl(res.url);
+        notify("Found viral video: " + (res.title || "Ready to split"));
       }
-      setIdeaText(result.prompt);
-      notify("Your video prompt is ready to refine or copy.");
-    } catch (error: unknown) {
-      notify(error instanceof Error ? error.message : "AI prompt generation failed. Check the provider keys and try again.");
-    } finally {
-      setIsBuildingPrompt(false);
-    }
-  }
-
-  async function generateScript() {
-    const missing = getMissingDetails();
-    if (missing.length) {
-      notify(`First fill all remaining details so AI can understand your vision: ${missing.join(", ")}.`);
-      return;
-    }
-
-    const format = getSelectedFormat();
-    const scriptBrief = `${ideaText.trim() || `Invent a fresh, original ${format} story with a strong opening, emotional progression, and satisfying ending.`}\n\nProduction settings: ${videoDuration} seconds, exactly ${numImages} scenes, ${imageStyle} image style, ${captionStyle} subtitles, ${voiceType} narration in ${ttsLanguage}.`;
-    setIsGeneratingScript(true);
-    try {
-      const script = await generateVideoContent(scriptBrief, format, numImages, videoDuration);
-      setGeneratedScript(script);
-      setGeneratedScriptContext(getScriptContext());
-      notify("AI script generated. Regenerating will only replace this script.");
-    } catch (error: unknown) {
-      notify(error instanceof Error ? error.message : "Script generation failed. Check your AI provider settings.");
-    } finally {
-      setIsGeneratingScript(false);
-    }
-  }
-
-  async function handleGenerateVideo() {
-    const missing = getMissingDetails();
-    if (missing.length) {
-      notify(`First fill all remaining details so AI can understand your vision: ${missing.join(", ")}.`);
-      return;
-    }
-    let format = selectedFormat;
-    if (selectedFormat === "Custom") {
-      format = customFormat.trim();
-      if (!format) {
-        notify("Please mention a format first.");
-        return;
-      }
-    }
-
-    if (!generatedScript) {
-      notify("Generate the script first to review the story before making the video.");
-      return;
-    }
-    if (generatedScriptContext !== getScriptContext()) {
-      notify("Your settings changed. Regenerate the script to match them before making the video.");
-      return;
-    }
-
-    if (!auth?.currentUser && !firebaseConfigured) {
-      notify("Sign in to generate a video and upload its temporary assets for rendering.");
-      return;
-    }
-    setIsGenerating(true);
-    setGenerationStep("Starting background generation...");
-    setProgress(50);
-    
-    try {
-      const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : undefined;
-      const res = await fetch("/api/trigger-generation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: ideaText.trim() || generatedScript.description,
-          script: generatedScript,
-          format,
-          userId: auth?.currentUser?.uid || null,
-          connections,
-          userEmail: auth?.currentUser?.email || "",
-          idToken,
-          videoDuration,
-          numImages,
-          imageStyle,
-          ttsLanguage,
-          captionStyle,
-          voiceType
-        })
-      });
-      
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
-      if (!data.eventId) throw new Error("The background job started without returning its status ID.");
-
-      setProgress(100);
-      setGenerationEventId(data.eventId);
-      window.localStorage.setItem("loop-studio-generation-event", data.eventId);
-      setIsGeneratingInBackground(true);
-      setScreen("library");
-      setIdeaText("");
-      setIsGenerating(false);
-      setGenerationStep("");
-      setProgress(0);
-      notify("Video generation started. The finished link will appear in this session's library.");
-      
     } catch (err: any) {
-      console.error(err);
-      notify(err?.message || "Error starting background video generation.");
-      setIsGenerating(false);
-      setGenerationStep("");
-      setProgress(0);
+      notify("Failed to find video: " + err.message);
+    }
+    setIsFinding(false);
+  }
+
+  async function handleSplitVideo() {
+    if (!videoUrl.trim()) {
+      notify("Paste a viral video URL first.");
+      return;
+    }
+    setIsSplitting(true);
+    setSplitStep("Downloading video...");
+    setSplitProgress(20);
+    setClips([]);
+    setClipResults({});
+    setSourceTitle("");
+    try {
+      const res = await fetch("/api/viral-clips", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoUrl: videoUrl.trim(), contentCategory: selectedCategory }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Failed to process video.");
+      setClips(data.clips);
+      setSourceTitle(data.sourceTitle);
+      setSplitProgress(100);
+      setSplitStep(`✅ ${data.clips.length} clips ready!`);
+      notify(`Split into ${data.clips.length} clips! Review and publish below.`);
+    } catch (err: any) {
+      notify(err.message || "Failed to process video.");
+      setSplitStep("");
+      setSplitProgress(0);
+    } finally {
+      setIsSplitting(false);
     }
   }
+
+  async function handlePublishClip(clip: ClipMeta) {
+    const activePlatforms = connections.filter((c) => ["YouTube", "Facebook", "Instagram"].includes(c));
+    if (!activePlatforms.length) {
+      notify("Connect at least one platform in Settings before publishing.");
+      return;
+    }
+    setClipResults((prev) => ({ ...prev, [clip.partNumber]: { status: "publishing", logs: [] } }));
+    try {
+      const res = await fetch("/api/viral-clips/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clipPath: clip.clipPath,
+          partNumber: clip.partNumber,
+          totalParts: clips.length,
+          title: clip.title,
+          description: clip.description,
+          hashtags: clip.hashtags,
+          platforms: activePlatforms,
+          userEmail: auth?.currentUser?.email || "",
+          connections,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Publish failed.");
+      setClipResults((prev) => ({
+        ...prev,
+        [clip.partNumber]: {
+          status: "done",
+          youtubeUrl: data.youtubeUrl,
+          facebookUrl: data.facebookUrl,
+          instagramUrl: data.instagramUrl,
+          logs: data.logs || [],
+        },
+      }));
+      // Add to video library
+      const newRecord: VideoRecord = {
+        id: `clip-${clip.partNumber}-${Date.now()}`,
+        title: `${clip.title} — ${clip.description.slice(0, 50)}`,
+        description: clip.description,
+        captions: "",
+        hashtags: clip.hashtags.map((h) => `#${h}`),
+        videoUrl: data.youtubeUrl || "",
+        youtubeVideoId: data.youtubeVideoId || "",
+        facebookVideoId: data.facebookVideoId || "",
+        format: selectedCategory,
+        createdAt: new Date().toISOString().slice(0, 10),
+        status: "completed",
+        sessionOnly: !firebaseConfigured,
+      };
+      setVideos((prev) => [newRecord, ...prev]);
+      notify(`${clip.title} published successfully!`);
+    } catch (err: any) {
+      setClipResults((prev) => ({ ...prev, [clip.partNumber]: { status: "error", error: err.message, logs: [] } }));
+      notify(`Failed to publish ${clip.title}: ${err.message}`);
+    }
+  }
+
+  async function handlePublishAllClips() {
+    setIsPublishingAll(true);
+    for (const clip of clips) {
+      const existing = clipResults[clip.partNumber];
+      if (existing?.status === "done") continue;
+      await handlePublishClip(clip);
+      // Small delay between clips
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+    setIsPublishingAll(false);
+    notify("All clips published! Check your library for links.");
+    setScreen("library");
+  }
+
 
   function exportCsv() {
     if (!videos.length) {
@@ -759,16 +524,11 @@ export default function Home() {
 
     let matchesTab = true;
     if (platformTab === "YouTube") {
-      if (!video.youtubeVideoId) return false;
-      if (youtubeSubTab === "Shorts") {
-        matchesTab = true;
-      } else {
-        matchesTab = false; // We don't support regular videos or posts yet
-      }
+      matchesTab = !!video.youtubeVideoId;
     } else if (platformTab === "Instagram") {
-      matchesTab = false; // Add IG logic later
+      matchesTab = !!(video as any).instagramVideoId;
     } else if (platformTab === "Facebook") {
-      matchesTab = false; // Add FB logic later
+      matchesTab = !!video.facebookVideoId;
     }
 
     return matchesFormat && matchesQuery && matchesTab;
@@ -804,7 +564,7 @@ export default function Home() {
       <a className="brand" href="#studio" onClick={(event) => { event.preventDefault(); setScreen("studio"); }}><span className="brand-mark"><Play size={17} fill="currentColor" /></span><span>loop<span className="brand-dot">.</span></span></a>
       <div className="sidebar-label">WORKSPACE</div>
       <nav className="side-nav" aria-label="Workspace">
-        <button className={screen === "studio" ? "nav-item active" : "nav-item"} onClick={() => { setScreen("studio"); setMobileNav(false); }}><WandSparkles size={17} /> Create a short</button>
+        <button className={screen === "studio" ? "nav-item active" : "nav-item"} onClick={() => { setScreen("studio"); setMobileNav(false); }}><Scissors size={17} /> Create viral clips</button>
         <button className={screen === "library" ? "nav-item active" : "nav-item"} onClick={() => { setScreen("library"); setMobileNav(false); }}><FolderOpen size={17} /> My videos <span className="nav-count">{videos.length}</span></button>
         <button className={screen === "settings" ? "nav-item active" : "nav-item"} onClick={() => { setScreen("settings"); setMobileNav(false); }}><Settings2 size={17} /> Settings</button>
       </nav>
@@ -815,187 +575,132 @@ export default function Home() {
     </aside>
     {mobileNav && <button className="nav-scrim" aria-label="Close navigation" onClick={() => setMobileNav(false)} />}
     <main className="main-panel">
-      <header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Toggle menu"><Menu size={20} /></button><div className="breadcrumb"><span>Workspace</span><span className="crumb-divider">/</span><strong>{screen === "studio" ? "Create a short" : screen === "library" ? "My videos" : "Settings"}</strong></div><div className="topbar-actions"><span className={`connection-pill ${firebaseConfigured ? "connected" : "preview"}`}><span />{firebaseConfigured ? "Firebase connected" : "Preview mode"}</span><button className="help-button" onClick={() => notify("Connect Firebase and an AI video provider to enable production workflows.")}><CircleHelp size={16} /><span>Help</span></button></div></header>
+      <header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Toggle menu"><Menu size={20} /></button><div className="breadcrumb"><span>Workspace</span><span className="crumb-divider">/</span><strong>{screen === "studio" ? "Create viral clips" : screen === "library" ? "My clips" : "Settings"}</strong></div><div className="topbar-actions"><span className={`connection-pill ${firebaseConfigured ? "connected" : "preview"}`}><span />{firebaseConfigured ? "Firebase connected" : "Preview mode"}</span><button className="help-button" onClick={() => notify("Connect Firebase and platform accounts to enable production workflows.")}><CircleHelp size={16} /><span>Help</span></button></div></header>
       {screen === "studio" && <section className="studio-content">
-        <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR SHORT-FORM STUDIO</div><h1>Make something <em>scroll-stopping.</em></h1><p>Pick a format, add an idea, and shape your next 8-10 second short.</p></div><button className="secondary-button export-button" onClick={exportCsv}><ArrowDownToLine size={16} /> Export spreadsheet</button></div>
+        <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> VIRAL CLIPS STUDIO</div><h1>Turn viral videos into <em>your content.</em></h1><p>Paste a viral video URL, split it into clips, auto-generate descriptions &amp; hashtags, and post — all free.</p></div><button className="secondary-button export-button" onClick={exportCsv}><ArrowDownToLine size={16} /> Export spreadsheet</button></div>
         <div className="creator-layout">
           <div className="creator-form">
-            <div className="form-section"><div className="section-title"><span className="step-number">01</span><div><h2>Choose your format</h2><p>What kind of moment are we making?</p></div></div>
-              <div className="format-grid">{formats.map(({ name, icon: Icon, tone, detail }) => <button key={name} onClick={() => setSelectedFormat(name)} className={`format-option ${selectedFormat === name ? "selected" : ""}`}><span className={`format-icon ${tone}`}><Icon size={18} /></span><span className="format-copy"><strong>{name}</strong><small>{detail}</small></span>{selectedFormat === name && <Check className="format-check" size={16} />}</button>)}
-                <button onClick={() => setSelectedFormat("Custom")} className={`format-option custom-option ${selectedFormat === "Custom" ? "selected" : ""}`}><span className="format-icon custom-tone"><Plus size={19} /></span><span className="format-copy"><strong>Something else</strong><small>Bring your own format</small></span>{selectedFormat === "Custom" && <Check className="format-check" size={16} />}</button>
+            <div className="form-section"><div className="section-title"><span className="step-number">01</span><div><h2>Choose content category</h2><p>What type of viral content is this?</p></div></div>
+              <div className="format-grid">{formats.map(({ name, icon: Icon, tone, detail }) => <button key={name} onClick={() => setSelectedCategory(name)} className={`format-option ${selectedCategory === name ? "selected" : ""}`}><span className={`format-icon ${tone}`}><Icon size={18} /></span><span className="format-copy"><strong>{name}</strong><small>{detail}</small></span>{selectedCategory === name && <Check className="format-check" size={16} />}</button>)}
               </div>
-              {selectedFormat === "Custom" && <label className="field-label custom-field">Name your format<input value={customFormat} onChange={(event) => setCustomFormat(event.target.value)} placeholder="e.g. miniature pottery" maxLength={60} /></label>}
             </div>
-            <div className="form-section brief-section"><div className="section-title"><span className="step-number">02</span><div><h2>Story direction (optional)</h2><p>Leave blank to have AI create a story from your selected settings.</p></div></div>
-              <div style={{ padding: '4px 0 12px 37px' }}>
-                <button onClick={buildPrompt} disabled={isBuildingPrompt} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 16px', borderRadius: '24px', border: '1px solid rgba(34, 197, 94, 0.2)', background: 'linear-gradient(145deg, #f0fdf4 0%, #e6fceb 100%)', color: '#15803d', fontSize: '12px', fontWeight: 650, cursor: isBuildingPrompt ? 'wait' : 'pointer', transition: 'all 0.2s ease', boxShadow: '0 2px 6px rgba(34,197,94,0.08), inset 0 1px 0 rgba(255,255,255,0.8)' }}>
-                  {isBuildingPrompt ? <LoaderCircle className="spin" size={14} /> : <Sparkles size={14} color="#16a34a" fill="rgba(22, 163, 74, 0.2)" />}
-                  {isBuildingPrompt ? 'Crafting prompt...' : 'Build with AI'}
-                </button>
-              </div>
-              <div style={{ position: 'relative' }}>
-                <label className="brief-wrap" style={{ display: 'block', marginTop: 0 }}>
-                  <textarea value={ideaText} onChange={(event) => setIdeaText(event.target.value)} placeholder="A tiny glass garden growing in a raindrop..." />
-                </label>
-              </div>
-              <div className="advanced-controls" style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '16px', background: 'var(--paper)', padding: '20px', borderRadius: '14px', border: '1px solid var(--line)' }}>
-                {/* Row 1: Timer + Num Images */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
-                    ⏱ Video Duration
-                    <select value={videoDuration} onChange={(e) => setVideoDuration(Number(e.target.value))} style={{ padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--line)', background: '#fff', fontSize: '13px' }}>
-                      <option value={0}>Select duration</option>
-                      {[15, 30, 45, 60].map((seconds) => <option key={seconds} value={seconds}>{seconds} seconds</option>)}
-                    </select>
-                  </label>
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
-                    🖼 Number of Images
-                    <select value={numImages} onChange={(e) => setNumImages(Number(e.target.value))} style={{ padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--line)', background: '#fff', fontSize: '13px' }}>
-                      <option value={0}>Select image count</option>
-                      <option value={1}>1 Image</option>
-                      <option value={3}>3 Images</option>
-                      <option value={5}>5 Images</option>
-                      <option value={7}>7 Images</option>
-                      <option value={10}>10 Images</option>
-                    </select>
-                  </label>
-                </div>
-
-                {/* Image Style visual picker */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>🎨 Image Style</span>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                    {imageStylesOptions.map((s) => (
-                      <StyleImageCard key={s.id} s={s} isSelected={imageStyle === s.id} onClick={() => setImageStyle(s.id)} />
-                    ))}
+            <div className="form-section brief-section"><div className="section-title"><span className="step-number">02</span><div><h2>Paste a viral video URL</h2><p>YouTube, Twitter/X, TikTok, Instagram, or any direct .mp4 link.</p></div></div>
+              <div style={{ position: 'relative', marginTop: '8px' }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <div style={{ flex: 1, position: 'relative' }}>
+                    <Link size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }} />
+                    <input
+                      value={videoUrl}
+                      onChange={(e) => setVideoUrl(e.target.value)}
+                      placeholder="https://www.youtube.com/watch?v=..."
+                      style={{ width: '100%', padding: '12px 14px 12px 40px', borderRadius: '10px', border: '1.5px solid var(--line)', fontSize: '13px', background: '#fff', outline: 'none', boxSizing: 'border-box' }}
+                    />
                   </div>
-                </div>
-
-                {/* Caption Style visual picker */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>💬 Caption Style</span>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                    {captionStylesOptions.map((cs) => (
-                      <div key={cs.id} onClick={() => setCaptionStyle(cs.id)} style={{ cursor: 'pointer', borderRadius: '10px', overflow: 'hidden', border: captionStyle === cs.id ? '2.5px solid #22c55e' : '2.5px solid transparent', boxShadow: captionStyle === cs.id ? '0 0 0 3px rgba(34,197,94,0.2)' : '0 1px 4px rgba(0,0,0,0.12)', transition: 'all 0.2s' }}>
-                        <div style={{ background: 'linear-gradient(135deg,#1a1a2e,#16213e)', height: '60px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '8px' }}>
-                          <span style={{ fontFamily: cs.preview.font, fontWeight: cs.preview.weight, textTransform: cs.preview.transform as any, background: cs.preview.bg, color: cs.preview.color, border: cs.preview.border, textShadow: cs.preview.shadow, padding: '3px 8px', borderRadius: '4px', fontSize: '11px', display: 'inline-block' }}>Story Caption</span>
-                        </div>
-                        <div style={{ padding: '6px 8px', background: captionStyle === cs.id ? '#f0fdf4' : '#fafaf9', textAlign: 'center' }}>
-                          <div style={{ fontWeight: 700, fontSize: '12px', color: captionStyle === cs.id ? '#16a34a' : '#374151' }}>{cs.label}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Voice Type picker */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>🎙 Voice Type</span>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                    {voiceOptions.map((v) => (
-                      <div key={v.id} onClick={() => setVoiceType(v.id)} style={{ cursor: 'pointer', borderRadius: '10px', border: voiceType === v.id ? '2.5px solid #22c55e' : '2.5px solid var(--line)', background: voiceType === v.id ? '#f0fdf4' : '#fff', padding: '10px', display: 'flex', flexDirection: 'column', gap: '4px', boxShadow: voiceType === v.id ? '0 0 0 3px rgba(34,197,94,0.2)' : 'none', transition: 'all 0.18s' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '18px' }}>{v.emoji}</span>
-                          <button type="button" onClick={(e) => { e.stopPropagation(); playDemoVoice(v.id); }} style={{ background: voiceType === v.id ? '#22c55e' : '#e5e7eb', border: 'none', borderRadius: '50%', width: '22px', height: '22px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }} title="Play demo">
-                            <Play size={10} fill={voiceType === v.id ? '#fff' : '#374151'} color={voiceType === v.id ? '#fff' : '#374151'} />
-                          </button>
-                        </div>
-                        <div style={{ fontWeight: 700, fontSize: '12px', color: voiceType === v.id ? '#16a34a' : '#374151' }}>{v.label}</div>
-                        <div style={{ fontSize: '11px', color: '#9ca3af' }}>{v.desc}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Language */}
-                <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
-                  🌐 Narration Language
-                  <select value={ttsLanguage} onChange={(e) => setTtsLanguage(e.target.value)} style={{ padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--line)', background: '#fff', fontSize: '13px' }}>
-                    <option value="">Select language</option>
-                    <option value="en-US">English (US)</option>
-                    <option value="en-GB">English (UK)</option>
-                    <option value="en-AU">English (Australia)</option>
-                    <option value="hi">Hindi — हिन्दी</option>
-                    <option value="bn">Bengali — বাংলা</option>
-                    <option value="es">Spanish — Español</option>
-                    <option value="fr">French — Français</option>
-                    <option value="ja">Japanese — 日本語</option>
-                  </select>
-                </label>
-              </div>
-              <section className="story-script-panel" style={{ marginTop: '18px', padding: '16px', border: '1px solid var(--line)', borderRadius: '6px', background: '#fff' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: '14px' }}>AI story script</h3>
-                    <p style={{ margin: '4px 0 0', color: 'var(--muted)', fontSize: '11px' }}>Review the narration before rendering your video.</p>
-                  </div>
-                  <button className="secondary-button" onClick={generateScript} disabled={isGeneratingScript}>
-                    {isGeneratingScript ? <LoaderCircle className="spin" size={15} /> : generatedScript ? <RefreshCw size={15} /> : <WandSparkles size={15} />}
-                    {isGeneratingScript ? "Generating script..." : generatedScript ? "Regenerate script" : "Generate script with AI"}
+                  <button className="secondary-button" onClick={handleAutoFind} disabled={isFinding || isSplitting} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    {isFinding ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />}
+                    {isFinding ? 'Finding...' : 'Auto-Find'}
+                  </button>
+                  <button className="primary-button" onClick={handleSplitVideo} disabled={isSplitting} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    {isSplitting ? <LoaderCircle className="spin" size={16} /> : <Scissors size={16} />}
+                    {isSplitting ? 'Splitting...' : 'Split into Clips'}
                   </button>
                 </div>
-                {generatedScript && generatedScriptContext !== getScriptContext() && <p role="status" style={{ margin: '12px 0 0', color: '#9a5b12', fontSize: '11px' }}>Your settings changed. Regenerate the script before creating the video.</p>}
-                {generatedScript && <div style={{ marginTop: '14px', maxHeight: '280px', overflowY: 'auto', overflowWrap: 'anywhere' }}>
-                  <strong style={{ fontSize: '13px' }}>{generatedScript.title}</strong>
-                  <p style={{ margin: '5px 0 10px', color: 'var(--muted)', fontSize: '11px', lineHeight: 1.5 }}>{generatedScript.description}</p>
-                  <ol style={{ margin: 0, paddingLeft: '20px' }}>
-                    {generatedScript.scenes.map((scene, index) => <li key={`${index}-${scene.caption}`} style={{ padding: '4px 0', fontSize: '12px', lineHeight: 1.5 }}>{scene.caption}</li>)}
-                  </ol>
-                </div>}
-              </section>
-              <div className="prompt-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <button className="primary-button" onClick={handleGenerateVideo} disabled={isGenerating}>
-                  {isGenerating ? <LoaderCircle className="spin" size={16} /> : <Play size={16} fill="currentColor" />} 
-                  {isGenerating ? "Working..." : "Generate video"} <ArrowRight size={15} />
-                </button>
+                {isSplitting && (
+                  <div style={{ marginTop: '16px', padding: '16px', background: 'var(--paper)', borderRadius: '12px', border: '1px solid var(--line)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px', fontWeight: 600, color: 'var(--green-dark)' }}>
+                      <span>{splitStep}</span><span>{splitProgress}%</span>
+                    </div>
+                    <div style={{ height: '8px', background: '#e7e9e3', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${splitProgress}%`, background: 'var(--green)', transition: 'width 0.4s ease' }} />
+                    </div>
+                  </div>
+                )}
               </div>
-              {isGenerating && (
-                <div className="progress-container" style={{ marginTop: '20px', padding: '16px', background: 'var(--paper)', borderRadius: '12px', border: '1px solid var(--line)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px', fontWeight: 600, color: 'var(--green-dark)' }}>
-                    <span>{generationStep}</span>
-                    <span>{progress}%</span>
-                  </div>
-                  <div style={{ height: '8px', background: '#e7e9e3', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${progress}%`, background: 'var(--green)', transition: 'width 0.4s ease' }} />
-                  </div>
-                </div>
-              )}
             </div>
+
+            {clips.length > 0 && (
+              <div className="form-section">
+                <div className="section-title"><span className="step-number">03</span><div><h2>Review &amp; Publish Clips</h2><p>{clips.length} clips ready from &quot;{sourceTitle}&quot;. Each has auto-generated description &amp; hashtags.</p></div></div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '8px' }}>
+                  {clips.map((clip) => {
+                    const result = clipResults[clip.partNumber];
+                    return (
+                      <div key={clip.partNumber} style={{ border: '1.5px solid var(--line)', borderRadius: '14px', padding: '16px', background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                              <span style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: '#fff', fontWeight: 800, fontSize: '11px', padding: '3px 10px', borderRadius: '20px', letterSpacing: '0.05em' }}>{clip.title}</span>
+                              <span style={{ fontSize: '12px', color: '#9ca3af' }}>{Math.round(clip.duration)}s</span>
+                              {result?.status === 'done' && <span style={{ background: '#f0fdf4', color: '#16a34a', fontWeight: 700, fontSize: '11px', padding: '2px 8px', borderRadius: '20px' }}>✅ Published</span>}
+                              {result?.status === 'publishing' && <span style={{ background: '#fef9c3', color: '#a16207', fontWeight: 700, fontSize: '11px', padding: '2px 8px', borderRadius: '20px' }}>⏳ Publishing...</span>}
+                              {result?.status === 'error' && <span style={{ background: '#fef2f2', color: '#dc2626', fontWeight: 700, fontSize: '11px', padding: '2px 8px', borderRadius: '20px' }}>❌ Failed</span>}
+                            </div>
+                            <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#374151', lineHeight: 1.5 }}>{clip.description}</p>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                              {clip.hashtags.map((tag) => <span key={tag} style={{ background: '#f0fdf4', color: '#16a34a', fontSize: '11px', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>#{tag}</span>)}
+                            </div>
+                            {result?.status === 'done' && (
+                              <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                {result.youtubeUrl && <a href={result.youtubeUrl} target="_blank" rel="noreferrer" style={{ color: '#ff0000', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}>▶ YouTube</a>}
+                                {result.facebookUrl && <a href={result.facebookUrl} target="_blank" rel="noreferrer" style={{ color: '#1877F2', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}>📘 Facebook</a>}
+                                {result.instagramUrl && <a href={result.instagramUrl} target="_blank" rel="noreferrer" style={{ color: '#e1306c', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}>📸 Instagram</a>}
+                              </div>
+                            )}
+                            {result?.status === 'error' && <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '6px' }}>{result.error}</p>}
+                          </div>
+                          <button
+                            className="secondary-button"
+                            onClick={() => handlePublishClip(clip)}
+                            disabled={result?.status === 'publishing' || result?.status === 'done'}
+                            style={{ flexShrink: 0, opacity: result?.status === 'done' ? 0.5 : 1 }}
+                          >
+                            {result?.status === 'publishing' ? <LoaderCircle className="spin" size={14} /> : <Share2 size={14} />}
+                            {result?.status === 'done' ? 'Published' : result?.status === 'publishing' ? 'Publishing...' : 'Publish'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="prompt-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginTop: '20px' }}>
+                  <button className="primary-button" onClick={handlePublishAllClips} disabled={isPublishingAll || clips.every((c) => clipResults[c.partNumber]?.status === 'done')}>
+                    {isPublishingAll ? <LoaderCircle className="spin" size={16} /> : <Share2 size={16} />}
+                    {isPublishingAll ? 'Publishing All...' : 'Publish All Clips'} <ArrowRight size={15} />
+                  </button>
+                  <button className="secondary-button" onClick={() => setScreen('library')}><FolderOpen size={15} /> View Library</button>
+                </div>
+              </div>
+            )}
           </div>
           <aside className="preview-panel">
-            <div className="preview-head"><div><span className="preview-kicker">YOUR CANVAS</span><h3>Shorts, in the making</h3></div><span className="preview-status"><span /> READY</span></div>
-            <div className="phone-stage">
-              <div className="phone-frame">
-                <div className="phone-screen">
-                  {(() => {
-                    const selImg = imageStylesOptions.find(s => s.id === imageStyle);
-                    const selCap = captionStylesOptions.find(c => c.id === captionStyle)?.preview;
-                    return (
-                      <>
-                        <div className="phone-scene" style={{ backgroundImage: `url(${selImg?.img})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: '#f3f4f6' }}></div>
-                        <div className="phone-overlay">
-                  <span className="phone-tag">{selectedFormat === "Custom" ? customFormat || "YOUR FORMAT" : selectedFormat ? selectedFormat.toUpperCase() : "CHOOSE FORMAT"}</span>
-                          <div className="phone-play"><Play size={18} fill="currentColor" /></div>
-                          <span className="phone-caption" style={selCap ? { fontFamily: selCap.font, fontWeight: selCap.weight, textTransform: selCap.transform as any, background: selCap.bg, color: selCap.color, border: selCap.border, textShadow: selCap.shadow, padding: '5px 10px', borderRadius: '4px', display: 'inline-block' } : {}}>A little wonder,<br />in a little loop.</span>
-                          <div className="phone-side-icons"><span>♡</span><span>↗</span></div>
-                        </div>
-                      </>
-                    );
-                  })()}
-                  <span className="phone-timer">{Math.floor(videoDuration / 60)}:{String(videoDuration % 60).padStart(2, "0")}</span>
+            <div className="preview-head"><div><span className="preview-kicker">HOW IT WORKS</span><h3>Viral clips, instantly</h3></div><span className="preview-status"><span /> FREE</span></div>
+            <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {[
+                { step: '01', icon: '🔗', title: 'Paste any URL', desc: 'YouTube, TikTok, Twitter, Instagram, or direct .mp4 links' },
+                { step: '02', icon: '✂️', title: 'Auto-split into clips', desc: 'Short videos → 1-2 min clips. Long videos → 20 min clips' },
+                { step: '03', icon: '✍️', title: 'Smart descriptions & hashtags', desc: 'Part 1, Part 2... with 8-10 tailored hashtags' },
+                { step: '04', icon: '🚀', title: 'One-click publish', desc: 'Posts to YouTube, Facebook & Instagram simultaneously' },
+                { step: '05', icon: '📧', title: 'Gmail notification', desc: 'Get all post links delivered to your Gmail inbox' },
+                { step: '06', icon: '🗑️', title: 'Auto-cleanup', desc: 'Clip files deleted locally after publishing — saves space' },
+              ].map(({ step, icon, title, desc }) => (
+                <div key={step} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                  <span style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: '#fff', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 800, flexShrink: 0 }}>{step}</span>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>{icon} {title}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--muted)', lineHeight: 1.4, marginTop: '2px' }}>{desc}</div>
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
-            <div className="preview-caption"><span className="preview-caption-icon"><Sparkles size={15} /></span><p><strong>Made for the replay.</strong><br />Every short starts with a tiny idea.</p></div>
-            <div className="preview-bottom"><span><span className="quality-dot" /> Vertical format</span><span>9:16</span></div>
+            <div className="preview-bottom"><span><span className="quality-dot" /> 100% Free</span><span>Zero API costs · Forever free</span></div>
           </aside>
         </div>
-        <div className="below-stats"><div><span className="stat-icon"><Clapperboard size={16} /></span><strong>{videos.length}</strong><span>shorts in your library</span></div><div><span className="stat-icon warm"><BarChart3 size={16} /></span><strong>8-10s</strong><span>made for quick attention</span></div><button onClick={() => setScreen("library")}>See your library <ArrowRight size={15} /></button></div>
+        <div className="below-stats"><div><span className="stat-icon"><Clapperboard size={16} /></span><strong>{videos.length}</strong><span>clips in your library</span></div><div><span className="stat-icon warm"><TrendingUp size={16} /></span><strong>Viral</strong><span>content, repurposed</span></div><button onClick={() => setScreen("library")}>See your library <ArrowRight size={15} /></button></div>
       </section>}
-      {screen === "library" && <section className="library-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR VIDEO LIBRARY</div><h1>Ideas, <em>in motion.</em></h1><p>Your saved history and videos completed in this session.</p></div><button className="secondary-button" onClick={exportCsv}><ArrowDownToLine size={16} /> Export spreadsheet</button></div>
+      {screen === "library" && <section className="library-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR CLIPS LIBRARY</div><h1>Viral content, <em>in motion.</em></h1><p>Your published clips with links to YouTube, Facebook, and Instagram.</p></div><button className="secondary-button" onClick={exportCsv}><ArrowDownToLine size={16} /> Export spreadsheet</button></div>
       
-      <div className="library-tabber" style={{ display: 'flex', gap: '12px', borderBottom: '1px solid #e5e7eb', marginBottom: platformTab === "YouTube" ? '12px' : '24px', paddingBottom: '16px' }}>
-        {["Self", ...(connections.includes("YouTube") ? ["YouTube"] : []), ...(connections.includes("Instagram") ? ["Instagram"] : []), ...(connections.includes("Facebook") ? ["Facebook"] : [])].map(tab => (
+      <div className="library-tabber" style={{ display: 'flex', gap: '12px', borderBottom: '1px solid #e5e7eb', marginBottom: '24px', paddingBottom: '16px' }}>
+        {["All", ...(connections.includes("YouTube") ? ["YouTube"] : []), ...(connections.includes("Instagram") ? ["Instagram"] : []), ...(connections.includes("Facebook") ? ["Facebook"] : [])].map(tab => (
           <button 
             key={tab} 
             onClick={() => setPlatformTab(tab)}
@@ -1015,32 +720,8 @@ export default function Home() {
           </button>
         ))}
       </div>
-
-      {platformTab === "YouTube" && (
-        <div className="youtube-sub-tabber" style={{ display: 'flex', gap: '24px', marginBottom: '24px' }}>
-          {["Videos", "Shorts", "Posts"].map(subTab => (
-            <button
-              key={subTab}
-              onClick={() => setYoutubeSubTab(subTab)}
-              style={{
-                background: 'none', border: 'none', 
-                color: youtubeSubTab === subTab ? '#166534' : '#888',
-                fontWeight: youtubeSubTab === subTab ? 600 : 400, 
-                cursor: 'pointer', padding: 0,
-                borderBottom: youtubeSubTab === subTab ? '2px solid #166534' : '2px solid transparent',
-                paddingBottom: '6px',
-                fontSize: '14px',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              {subTab}
-            </button>
-          ))}
-        </div>
-      )}
       
-      <div className="library-toolbar"><div className="search-field"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your videos" /></div><label className="filter-select"><span className="sr-only">Filter by format</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option>All videos</option>{formats.map((item) => <option key={item.name}>{item.name}</option>)}</select><ChevronDown size={15} /></label><span className="result-count">{filteredVideos.length} videos</span></div>{filteredVideos.length || isGeneratingInBackground ? <div className="video-grid">
-  {isGeneratingInBackground && <article className="video-card"><div className="video-thumb" style={{ background: '#f5efdf', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><LoaderCircle className="spin" size={24} style={{ color: '#888' }} /></div><div className="video-details"><h3>Generating AI Video...</h3><p>Your video is currently being generated in the background. It will automatically appear here once finished.</p><div className="video-card-actions"><span>Just now</span></div></div></article>}
+      <div className="library-toolbar"><div className="search-field"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your clips" /></div><label className="filter-select"><span className="sr-only">Filter by category</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option>All videos</option>{formats.map((item) => <option key={item.name}>{item.name}</option>)}</select><ChevronDown size={15} /></label><span className="result-count">{filteredVideos.length} clips</span></div>{filteredVideos.length ? <div className="video-grid">
   {filteredVideos.map((video) => <article className="video-card" key={video.id}>
     {video.status === 'failed' ? (
       <div className="video-thumb" style={{ background: '#ffebee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ color: '#d32f2f', fontWeight: 'bold' }}>FAILED</span></div>
@@ -1049,25 +730,24 @@ export default function Home() {
         {video.videoUrl && !video.videoUrl.includes("youtube.com/") ? <video src={video.videoUrl} controls playsInline preload="metadata" aria-label={`Play ${video.title}`} onLoadedData={(event) => {
           const player = event.currentTarget;
           if (player.currentTime === 0 && Number.isFinite(player.duration) && player.duration > 0) player.currentTime = Math.min(0.1, player.duration / 2);
-        }} /> : video.youtubeVideoId ? <a href={`https://youtube.com/shorts/${video.youtubeVideoId}`} target="_blank" rel="noreferrer" aria-label={`Watch ${video.title} on YouTube`} style={{ backgroundImage: `url(https://i.ytimg.com/vi/${video.youtubeVideoId}/hqdefault.jpg)`, backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundSize: "contain" }} /> : <span className="thumb-unavailable">Video preview unavailable</span>}
+        }} /> : video.youtubeVideoId ? <a href={`https://youtube.com/watch?v=${video.youtubeVideoId}`} target="_blank" rel="noreferrer" aria-label={`Watch ${video.title} on YouTube`} style={{ backgroundImage: `url(https://i.ytimg.com/vi/${video.youtubeVideoId}/hqdefault.jpg)`, backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundSize: "contain" }} /> : <span className="thumb-unavailable">Preview unavailable</span>}
         <span className="thumb-tag">{video.format}</span>
       </div>
     )}
     <div className="video-details">
-      <div className="video-type-label"><Film size={11} /> {video.format || "Short"}</div>
+      <div className="video-type-label"><Film size={11} /> {video.format || "Viral Clip"}</div>
       <h3>{video.title}</h3>
       <p style={{ color: video.status === 'failed' ? '#d32f2f' : 'inherit' }}>{video.description}</p>
       {video.status !== 'failed' && <div className="hashtag-row">{video.hashtags.map((tag) => <span key={tag}>#{tag.replace(/^#/, "")}</span>)}</div>}
       <div className="video-card-actions">
         <span>{video.createdAt}</span>
         <div style={{display:'flex', gap:'8px', marginLeft:'auto'}}>
-        
-        {video.youtubeVideoId && <a href={`https://youtube.com/shorts/${video.youtubeVideoId}`} target="_blank" rel="noreferrer" className="secondary-button" style={{padding:'4px 8px', fontSize:'11px', color: '#ff0000', borderColor: '#ff000033', backgroundColor: '#ff000011'}} title="Watch on YouTube">YouTube</a>}
-        
-        {video.shotstackUrl && <a href={video.shotstackUrl} target="_blank" rel="noreferrer" className="secondary-button" style={{padding:'4px 8px', fontSize:'11px'}} title="Shotstack version">Shotstack</a>}{video.json2videoUrl && <a href={video.json2videoUrl} target="_blank" rel="noreferrer" className="secondary-button" style={{padding:'4px 8px', fontSize:'11px'}} title="JSON2Video version">JSON2Video</a>}{!video.shotstackUrl && !video.json2videoUrl && video.videoUrl && !video.videoUrl.includes("youtube.com/") && <a href={video.videoUrl} download className="icon-button" title="Download video"><Download size={16} /></a>}
+        {video.youtubeVideoId && <a href={`https://youtube.com/watch?v=${video.youtubeVideoId}`} target="_blank" rel="noreferrer" className="secondary-button" style={{padding:'4px 8px', fontSize:'11px', color: '#ff0000', borderColor: '#ff000033', backgroundColor: '#ff000011'}} title="Watch on YouTube">YouTube</a>}
+        {video.facebookVideoId && <a href={`https://www.facebook.com/video/${video.facebookVideoId}`} target="_blank" rel="noreferrer" className="secondary-button" style={{padding:'4px 8px', fontSize:'11px', color: '#1877F2', borderColor: '#1877F233', backgroundColor: '#1877F211'}} title="Watch on Facebook">Facebook</a>}
+        {!video.youtubeVideoId && !video.facebookVideoId && video.videoUrl && !video.videoUrl.includes("youtube.com/") && <a href={video.videoUrl} download className="icon-button" title="Download video"><Download size={16} /></a>}
         <button className="icon-button" style={{ color: '#ea4335' }} onClick={() => setVideoToDelete(video)} title="Delete video"><Trash2 size={16} /></button>
-        </div></div></div></article>)}</div> : <div className="empty-library"><div className="empty-art"><span /><span /><span /><Clapperboard size={27} /></div><h2>{query || filter !== "All videos" || platformTab !== "Self" ? "No matching media" : "Your next favorite starts here."}</h2><p>{query || filter !== "All videos" || platformTab !== "Self" ? "Try another search, format, or tab." : "Once your videos are generated, you'll find them here with their titles, descriptions, captions, hashtags, and links."}</p>{!query && filter === "All videos" && platformTab === "Self" && <button className="primary-button" onClick={() => setScreen("studio")}><Sparkles size={16} /> Create your first short</button>}</div>}</section>}
-      {screen === "settings" && <section className="settings-content"><div className="eyebrow"><span className="eyebrow-dot" /> WORKSPACE SETTINGS</div><h1>Your studio, <em>your way.</em></h1><p className="settings-intro">Manage the connections that power your workflow.</p><div className="settings-row"><div className="settings-icon youtube-icon"><Play size={18} /></div><div className="settings-copy"><h2>YouTube publishing</h2><p>Connect YouTube OAuth to publish videos and manage titles, descriptions, and hashtags.</p></div><button className={`secondary-button ${connections.includes("YouTube") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("YouTube")}>{connections.includes("YouTube") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon" style={{ background: '#f5efdf', color: '#e1306c', borderRadius: '50%', padding: '8px', display: 'flex' }}><Camera size={18} /></div><div className="settings-copy"><h2>Instagram publishing</h2><p>Connect Instagram to automatically post Reels directly from your studio.</p></div><button className={`secondary-button ${connections.includes("Instagram") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Instagram")}>{connections.includes("Instagram") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon" style={{ background: '#f5efdf', color: '#1877F2', borderRadius: '50%', padding: '8px', display: 'flex' }}><Users size={18} /></div><div className="settings-copy"><h2>Facebook publishing</h2><p>Connect Facebook to cross-post your shorts as Facebook Reels.</p></div><button className={`secondary-button ${connections.includes("Facebook") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Facebook")}>{connections.includes("Facebook") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon" style={{ background: '#f5efdf', color: '#EA4335', borderRadius: '50%', padding: '8px', display: 'flex' }}><Mail size={18} /></div><div className="settings-copy"><h2>Gmail notifications</h2><p>Connect Gmail to receive email notifications.</p></div><button className={`secondary-button ${connections.includes("Gmail") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Gmail")}>{connections.includes("Gmail") ? "Disconnect" : "Connect"}</button></div><div className="settings-note"><CircleHelp size={17} /><p>Firebase and AI Provider (Gemini) are securely configured via server environment variables.</p></div></section>}
+        </div></div></div></article>)}</div> : <div className="empty-library"><div className="empty-art"><span /><span /><span /><Clapperboard size={27} /></div><h2>{query || filter !== "All videos" ? "No matching clips" : "No clips published yet."}</h2><p>{query || filter !== "All videos" ? "Try another search or category." : "Published viral clips will appear here with YouTube, Facebook, and Instagram links."}</p>{!query && filter === "All videos" && <button className="primary-button" onClick={() => setScreen("studio")}><TrendingUp size={16} /> Create your first viral clip</button>}</div>}</section>}
+      {screen === "settings" && <section className="settings-content"><div className="eyebrow"><span className="eyebrow-dot" /> WORKSPACE SETTINGS</div><h1>Your studio, <em>your way.</em></h1><p className="settings-intro">Manage the connections that power your viral clips workflow.</p><div className="settings-row"><div className="settings-icon youtube-icon"><Play size={18} /></div><div className="settings-copy"><h2>YouTube publishing</h2><p>Connect YouTube to publish viral clips directly to your channel.</p></div><button className={`secondary-button ${connections.includes("YouTube") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("YouTube")}>{connections.includes("YouTube") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon" style={{ background: '#f5efdf', color: '#e1306c', borderRadius: '50%', padding: '8px', display: 'flex' }}><Camera size={18} /></div><div className="settings-copy"><h2>Instagram publishing</h2><p>Connect Instagram to automatically post viral clips as Reels.</p></div><button className={`secondary-button ${connections.includes("Instagram") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Instagram")}>{connections.includes("Instagram") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon" style={{ background: '#f5efdf', color: '#1877F2', borderRadius: '50%', padding: '8px', display: 'flex' }}><Users size={18} /></div><div className="settings-copy"><h2>Facebook publishing</h2><p>Connect Facebook to cross-post your viral clips as Facebook Reels.</p></div><button className={`secondary-button ${connections.includes("Facebook") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Facebook")}>{connections.includes("Facebook") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon" style={{ background: '#f5efdf', color: '#EA4335', borderRadius: '50%', padding: '8px', display: 'flex' }}><Mail size={18} /></div><div className="settings-copy"><h2>Gmail notifications</h2><p>Connect Gmail to receive post links (YouTube, Facebook, Instagram) after each clip is published.</p></div><button className={`secondary-button ${connections.includes("Gmail") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Gmail")}>{connections.includes("Gmail") ? "Disconnect" : "Connect"}</button></div><div className="settings-note"><CircleHelp size={17} /><p>100% free workflow: local yt-dlp + ffmpeg for splitting, smart rule-based descriptions &amp; hashtags, direct posting to your connected platforms. No paid services or API keys needed.</p></div></section>}
     </main>
     {toast && <div className="toast-message"><span className="toast-check"><Check size={14} /></span>{toast}</div>}
     {disconnectingPlatform && (
@@ -1116,10 +796,10 @@ export default function Home() {
 
 function Landing({ onStart, onLogin }: { onStart: () => void; onLogin: () => void }) {
   return <main className="landing-page"><nav className="landing-nav"><a className="brand landing-brand" href="#top"><span className="brand-mark"><Play size={17} fill="currentColor" /></span><span>loop<span className="brand-dot">.</span></span></a><div className="landing-links"><a href="#how-it-works">How it works</a><a href="#formats">Formats</a></div><div className="landing-actions"><button className="text-button" onClick={onLogin}>Log in</button><button className="nav-cta" onClick={onStart}>Start creating <ArrowRight size={15} /></button></div></nav>
-    <section className="landing-hero" id="top"><div className="hero-copy"><div className="hero-kicker"><span className="live-dot" /> THE LITTLE STUDIO FOR BIG IDEAS</div><h1>Your next short<br />starts with <em>a spark.</em></h1><p>Turn a tiny idea into a scroll-stopping 9-second story. Pick a vibe, shape the prompt, and make something worth replaying.</p><div className="hero-actions"><button className="hero-cta" onClick={onStart}>Make your first short <ArrowRight size={17} /></button><span className="hero-meta"><span className="hero-avatars"><i>J</i><i>M</i><i>A</i></span>Made for curious creators</span></div><div className="hero-proof"><span><Check size={14} /> Vertical-first ideas</span><span><Check size={14} /> Your style, your story</span></div></div><div className="hero-art"><div className="art-orbit orbit-one" /><div className="art-orbit orbit-two" /><div className="hero-poster poster-back"><span className="poster-label">TINY MOMENTS</span><div className="poster-flower"><i /><i /><i /><i /><i /><b /></div><span className="poster-bottom">somewhere<br />between seconds</span></div><div className="hero-poster poster-front"><div className="poster-image image-ceramic" /><div className="poster-gradient" /><span className="poster-topline">LOOP STUDIO <i>✳</i></span><span className="poster-caption">little things<br /><em>feel big.</em></span><span className="poster-play"><Play size={16} fill="currentColor" /></span><span className="poster-duration">0:09</span></div><div className="float-note note-top"><span><Sparkles size={15} /></span><div><strong>One little idea</strong><small>Endless ways to loop</small></div></div><div className="float-note note-bottom"><span className="note-music"><Music2 size={16} /></span><div><strong>Made to be replayed</strong><small>9 seconds · feels like more</small></div></div><span className="art-spark spark-a">✳</span><span className="art-spark spark-b">✳</span></div><div className="hero-scroll">SCROLL TO MAKE SOMETHING <span>↓</span></div></section>
+    <section className="landing-hero" id="top"><div className="hero-copy"><div className="hero-kicker"><span className="live-dot" /> VIRAL CLIPS & SOCIAL AUTOMATION</div><h1>Turn viral videos into<br /><em>your content.</em></h1><p>Paste any viral video URL or auto-find trending videos. Split them into parts, generate tailored descriptions & hashtags, and post across socials — 100% free.</p><div className="hero-actions"><button className="hero-cta" onClick={onStart}>Create your first clip <ArrowRight size={17} /></button><span className="hero-meta"><span className="hero-avatars"><i>J</i><i>M</i><i>A</i></span>Made for curious creators</span></div><div className="hero-proof"><span><Check size={14} /> Vertical-first ideas</span><span><Check size={14} /> Your style, your story</span></div></div><div className="hero-art"><div className="art-orbit orbit-one" /><div className="art-orbit orbit-two" /><div className="hero-poster poster-back"><span className="poster-label">TINY MOMENTS</span><div className="poster-flower"><i /><i /><i /><i /><i /><b /></div><span className="poster-bottom">somewhere<br />between seconds</span></div><div className="hero-poster poster-front"><div className="poster-image image-ceramic" /><div className="poster-gradient" /><span className="poster-topline">LOOP STUDIO <i>✳</i></span><span className="poster-caption">little things<br /><em>feel big.</em></span><span className="poster-play"><Play size={16} fill="currentColor" /></span><span className="poster-duration">0:09</span></div><div className="float-note note-top"><span><Sparkles size={15} /></span><div><strong>One little idea</strong><small>Endless ways to loop</small></div></div><div className="float-note note-bottom"><span className="note-music"><Music2 size={16} /></span><div><strong>Made to be replayed</strong><small>9 seconds · feels like more</small></div></div><span className="art-spark spark-a">✳</span><span className="art-spark spark-b">✳</span></div><div className="hero-scroll">SCROLL TO MAKE SOMETHING <span>↓</span></div></section>
     <section className="format-strip" id="formats"><div className="strip-label">A FORMAT FOR<br />EVERY LITTLE OBSESSION</div><div className="strip-items">{formats.slice(0, 6).map(({ name, icon: Icon, tone }) => <div className="strip-item" key={name}><span className={`format-icon ${tone}`}><Icon size={17} /></span><span>{name}</span></div>)}<div className="strip-item more-formats"><span className="format-icon custom-tone"><Plus size={17} /></span><span>And your own</span></div></div></section>
-    <section className="how-section" id="how-it-works"><div className="how-heading"><div className="eyebrow"><span className="eyebrow-dot" /> FROM SPARK TO SHORT</div><h2>A tiny process.<br /><em>A whole lot of possibility.</em></h2></div><div className="how-steps"><article><span className="how-number">01</span><span className="how-icon icon-pick"><Film size={20} /></span><h3>Pick a feeling</h3><p>ASMR, mini stories, nature, or the niche only you could dream up.</p></article><article><span className="how-number">02</span><span className="how-icon icon-shape"><Sparkles size={20} /></span><h3>Shape the idea</h3><p>Bring a thought. We&apos;ll help turn it into a short-form video prompt.</p></article><article><span className="how-number">03</span><span className="how-icon icon-loop"><Play size={20} /></span><h3>Make it a loop</h3><p>Keep your shorts, captions, and creative details together in one studio.</p></article></div></section>
-    <section className="landing-end"><span className="end-star">✳</span><div className="eyebrow">THE NEXT NINE SECONDS ARE YOURS</div><h2>What will you <em>make loop?</em></h2><button className="hero-cta" onClick={onStart}>Start your studio <ArrowRight size={17} /></button><p>Free to explore · Your ideas stay yours</p></section><footer className="landing-footer"><a className="brand landing-brand" href="#top"><span className="brand-mark"><Play size={15} fill="currentColor" /></span><span>loop<span className="brand-dot">.</span></span></a><span>A little studio for the next big thing.</span><span>© 2026 loop studio</span></footer></main>;
+    <section className="how-section" id="how-it-works"><div className="how-heading"><div className="eyebrow"><span className="eyebrow-dot" /> FROM SPARK TO SHORT</div><h2>A tiny process.<br /><em>A whole lot of possibility.</em></h2></div><div className="how-steps"><article><span className="how-number">01</span><span className="how-icon icon-pick"><Film size={20} /></span><h3>Pick a feeling</h3><p>ASMR, mini stories, nature, or the niche only you could dream up.</p></article><article><span className="how-number">02</span><span className="how-icon icon-shape"><Sparkles size={20} /></span><h3>Auto-split into clips</h3><p>Automatically cut videos into parts with tailored descriptions and 8-10 hashtags.</p></article><article><span className="how-number">03</span><span className="how-icon icon-loop"><Play size={20} /></span><h3>Publish across socials</h3><p>One-click publish to YouTube, Facebook, and Instagram with Gmail delivery.</p></article></div></section>
+    <section className="landing-end"><span className="end-star">✳</span><div className="eyebrow">THE NEXT NINE SECONDS ARE YOURS</div><h2>What will you <em>make loop?</em></h2><button className="hero-cta" onClick={onStart}>Start your studio <ArrowRight size={17} /></button><p>Free to explore · Your ideas stay yours</p></section><footer className="landing-footer"><a className="brand landing-brand" href="#top"><span className="brand-mark"><Play size={15} fill="currentColor" /></span><span>loop<span className="brand-dot">.</span></span></a><span>Viral clip repurposing studio for modern creators.</span><span>© 2026 loop studio</span></footer></main>;
 }
 
 function AuthDialog({ mode, setMode, email, setEmail, password, setPassword, error, loading, configured, onClose, onSubmit, onPreview }: {
