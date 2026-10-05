@@ -16,6 +16,9 @@ export const metadata: Metadata = {
   title: "The Viral Desk | Viral Clips & Social Automation Studio",
   description: "The Viral Desk — Repurpose viral videos into multi-part clips with custom video outros, and auto-publish to YouTube, Facebook, and Instagram.",
   icons: { icon: "/assets/logo.png" },
+  verification: {
+    google: "NjSfpACEk9YBKqZJJ_B2o8y0XESWmNHwdqQr4ECMNL0",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
