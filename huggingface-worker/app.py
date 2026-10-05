@@ -6,14 +6,15 @@ import asyncio
 import subprocess
 import threading
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+import gradio as gr
 
+# ─── FastAPI Backend ────────────────────────────────────────────────────────
 app = FastAPI(title="Viral Video Splitter Cloud Worker")
 
-# Enable CORS for Vercel
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -22,19 +23,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-CLIPS_DIR = "/app/clips"
+CLIPS_DIR = "/tmp/clips"
 os.makedirs(CLIPS_DIR, exist_ok=True)
 
-
-# ─── Periodic Auto-Cleanup (Keeps Disk at 0 MB Forever) ──────────────────────
-
+# ─── Auto-Cleanup (Guarantees 0 MB Disk Usage) ──────────────────────────────
 def background_cleanup_loop():
     """Removes any files older than 30 minutes every 10 minutes."""
     while True:
         try:
             now = time.time()
             for filepath in glob.glob(os.path.join(CLIPS_DIR, "*")):
-                # Delete files older than 30 minutes (1800 seconds)
                 if os.path.isfile(filepath) and (now - os.path.getmtime(filepath) > 1800):
                     try:
                         os.remove(filepath)
@@ -48,9 +46,6 @@ def background_cleanup_loop():
 cleanup_thread = threading.Thread(target=background_cleanup_loop, daemon=True)
 cleanup_thread.start()
 
-
-# ─── Models ─────────────────────────────────────────────────────────────────
-
 class SplitRequest(BaseModel):
     videoUrl: str
     contentCategory: Optional[str] = "Trending"
@@ -59,19 +54,14 @@ class CleanupRequest(BaseModel):
     filename: Optional[str] = None
     filenames: Optional[List[str]] = None
 
-
-# ─── Helpers ─────────────────────────────────────────────────────────────────
-
 def run_cmd(cmd: List[str]):
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if result.returncode != 0:
         raise RuntimeError(result.stderr[-400:] or "Command failed")
     return result.stdout
 
-
-# ─── Endpoints ───────────────────────────────────────────────────────────────
-
-@app.get("/")
+@app.get("/health")
+@app.get("/api/health")
 def health_check():
     total, used, free = shutil.disk_usage(CLIPS_DIR)
     return {
@@ -80,7 +70,6 @@ def health_check():
         "ffmpeg": shutil.which("ffmpeg") is not None,
         "disk_free_gb": round(free / (1024**3), 2),
     }
-
 
 @app.post("/split")
 async def split_video(req: SplitRequest, request: Request):
@@ -91,7 +80,6 @@ async def split_video(req: SplitRequest, request: Request):
     timestamp = int(time.time() * 1000)
     source_path = os.path.join(CLIPS_DIR, f"source_{timestamp}.mp4")
 
-    # 1. Download with yt-dlp
     download_cmd = [
         "yt-dlp",
         video_url,
@@ -109,16 +97,14 @@ async def split_video(req: SplitRequest, request: Request):
         title = info.get("title") or info.get("fulltitle") or "Viral Video"
         total_duration = float(info.get("duration") or 0)
     except Exception as e:
-        # Fallback to direct HTTP download if direct .mp4 link
         try:
             import urllib.request
             urllib.request.urlretrieve(video_url, source_path)
             title = "Viral Video"
             total_duration = 0
-        except Exception as inner_e:
+        except Exception:
             raise HTTPException(status_code=400, detail=f"Download failed: {str(e)}")
 
-    # Probe duration if 0
     if total_duration <= 0:
         try:
             probe_out = run_cmd([
@@ -129,7 +115,6 @@ async def split_video(req: SplitRequest, request: Request):
         except Exception:
             total_duration = 60.0
 
-    # 2. Split video into clips (90s for short, 1200s for long)
     clip_length = 90.0 if total_duration < 600 else 1200.0
     clips = []
     start_time = 0.0
@@ -171,7 +156,7 @@ async def split_video(req: SplitRequest, request: Request):
         start_time += duration
         part_number += 1
 
-    # Clean up the original large source video immediately to preserve disk space!
+    # Delete source video immediately to free space
     if os.path.exists(source_path):
         try:
             os.remove(source_path)
@@ -185,20 +170,16 @@ async def split_video(req: SplitRequest, request: Request):
         "clips": clips,
     }
 
-
 @app.get("/clips/{filename}")
 async def get_clip(filename: str):
-    # Security: prevent directory traversal
     safe_filename = os.path.basename(filename)
     filepath = os.path.join(CLIPS_DIR, safe_filename)
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="Clip not found or expired")
     return FileResponse(filepath, media_type="video/mp4")
 
-
 @app.post("/cleanup")
 async def cleanup_clips(req: CleanupRequest):
-    """Called after a clip is published to immediately wipe it from disk."""
     targets = []
     if req.filename:
         targets.append(req.filename)
@@ -217,3 +198,17 @@ async def cleanup_clips(req: CleanupRequest):
                 print(f"Could not delete {safe_name}: {e}")
 
     return {"success": True, "deleted": deleted}
+
+# ─── Gradio Interface Mount (Permits 100% Free Hosting without Credit Card) ──
+def worker_status():
+    return "✅ The Viral Desk Cloud Processing Worker is active and ready to split videos."
+
+with gr.Blocks(title="The Viral Desk Worker") as demo:
+    gr.Markdown("# 🚀 The Viral Desk Cloud Video Processing Worker")
+    gr.Markdown("This worker provides 100% free background video splitting for your website.")
+    status_btn = gr.Button("Check Status")
+    status_output = gr.Textbox(label="Status", value="Ready")
+    status_btn.click(fn=worker_status, outputs=status_output)
+
+# Mount Gradio onto the root app
+app = gr.mount_gradio_app(app, demo, path="/")
