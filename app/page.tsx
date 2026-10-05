@@ -363,40 +363,84 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || "Failed to process video.");
 
-      if (data.cloudMode === "github" && data.jobId && database) {
-        setSplitStep("GitHub Actions cloud runner started...");
+      if (data.cloudMode === "github" && data.jobId) {
+        setSplitStep("GitHub Actions cloud runner starting...");
         setSplitProgress(18);
 
-        const unsub = onSnapshot(doc(database, "jobs", data.jobId), (snap) => {
-          if (!snap.exists()) return;
-          const job = snap.data();
-          if (job.progress) setSplitProgress(job.progress);
-          if (job.step) setSplitStep(job.step);
-          if (job.sourceTitle) setSourceTitle(job.sourceTitle);
+        let finished = false;
 
-          if (job.status === "done" && job.clips) {
-            unsub();
-            setSplitProgress(100);
-            setSplitStep(`✅ ${job.clips.length} clips ready from cloud!`);
-            setClips(job.clips);
-            setIsSplitting(false);
-            notify(`Cloud split complete: ${job.clips.length} clips ready! Review and publish below.`);
-          } else if (job.status === "failed") {
-            unsub();
-            setIsSplitting(false);
-            setSplitProgress(0);
-            setSplitStep("");
-            notify(job.error || "GitHub cloud runner failed.");
-          }
-        });
+        // 1. HTTP polling to /api/viral-clips/status (always works regardless of Firestore rules)
+        const pollInterval = setInterval(async () => {
+          if (finished) return;
+          try {
+            const sRes = await fetch(`/api/viral-clips/status?jobId=${data.jobId}`);
+            if (sRes.ok) {
+              const job = await sRes.json();
+              if (job.progress && !finished) setSplitProgress(job.progress);
+              if (job.step && !finished) setSplitStep(job.step);
+              if (job.sourceTitle && !finished) setSourceTitle(job.sourceTitle);
+
+              if (job.status === "done" && Array.isArray(job.clips) && !finished) {
+                finished = true;
+                clearInterval(pollInterval);
+                setSplitProgress(100);
+                setSplitStep(`✅ ${job.clips.length} clips ready from cloud!`);
+                setClips(job.clips);
+                if (job.sourceTitle) setSourceTitle(job.sourceTitle);
+                setIsSplitting(false);
+                notify(`Cloud split complete: ${job.clips.length} clips ready! Review and publish below.`);
+              } else if (job.status === "failed" && !finished) {
+                finished = true;
+                clearInterval(pollInterval);
+                setIsSplitting(false);
+                setSplitProgress(0);
+                setSplitStep("");
+                notify(job.error || "GitHub cloud runner failed.");
+              }
+            }
+          } catch {}
+        }, 2500);
+
+        // 2. Real-time Firestore listener as fast backup
+        if (database) {
+          try {
+            const unsub = onSnapshot(doc(database, "jobs", data.jobId), (snap) => {
+              if (!snap.exists() || finished) return;
+              const job = snap.data();
+              if (job.progress) setSplitProgress(job.progress);
+              if (job.step) setSplitStep(job.step);
+              if (job.sourceTitle) setSourceTitle(job.sourceTitle);
+
+              if (job.status === "done" && Array.isArray(job.clips)) {
+                finished = true;
+                clearInterval(pollInterval);
+                unsub();
+                setSplitProgress(100);
+                setSplitStep(`✅ ${job.clips.length} clips ready from cloud!`);
+                setClips(job.clips);
+                setIsSplitting(false);
+                notify(`Cloud split complete: ${job.clips.length} clips ready! Review and publish below.`);
+              } else if (job.status === "failed") {
+                finished = true;
+                clearInterval(pollInterval);
+                unsub();
+                setIsSplitting(false);
+                setSplitProgress(0);
+                setSplitStep("");
+                notify(job.error || "GitHub cloud runner failed.");
+              }
+            });
+          } catch {}
+        }
         return;
       }
 
+      const receivedClips = Array.isArray(data.clips) ? data.clips : [];
       setSplitProgress(100);
-      setSplitStep(`✅ ${data.clips.length} clips ready!`);
-      setClips(data.clips);
-      setSourceTitle(data.sourceTitle);
-      notify(`Split into ${data.clips.length} clips! Review and publish below.`);
+      setSplitStep(`✅ ${receivedClips.length} clips ready!`);
+      setClips(receivedClips);
+      if (data.sourceTitle) setSourceTitle(data.sourceTitle);
+      notify(`Split into ${receivedClips.length} clips! Review and publish below.`);
       setIsSplitting(false);
     } catch (err: any) {
       clearInterval(progressInterval);

@@ -62,5 +62,6 @@ jobs:
           FIREBASE_API_KEY: ${{ inputs.firebaseApiKey || secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
           FIREBASE_PROJECT_ID: ${{ inputs.firebaseProjectId || secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
           FIREBASE_STORAGE_BUCKET: ${{ inputs.firebaseStorageBucket || secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          APP_URL: "https://the-viral-desk.vercel.app"
         run: |
           python scripts/cloud_splitter.py

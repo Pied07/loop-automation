@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import time
+import urllib.parse
 import urllib.request
 import subprocess
 from pathlib import Path
@@ -9,7 +10,8 @@ from pathlib import Path
 VIDEO_URL = os.environ.get("VIDEO_URL", "").strip()
 CONTENT_CATEGORY = os.environ.get("CONTENT_CATEGORY", "Trending").strip()
 JOB_ID = os.environ.get("JOB_ID", f"job_{int(time.time())}").strip()
-USER_ID = os.environ.get("USER_ID", "guest").strip()
+USER_ID = os.environ.get("USER_ID", "creator").strip()
+APP_URL = os.environ.get("APP_URL", "https://the-viral-desk.vercel.app").rstrip("/")
 
 API_KEY = os.environ.get("FIREBASE_API_KEY", "")
 PROJECT_ID = os.environ.get("FIREBASE_PROJECT_ID", "")
@@ -20,60 +22,88 @@ CLIPS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def update_job_status(status="processing", progress=0, step="", clips=None, source_title="", total_duration=0, error=""):
-    """Updates the Firestore job document via Firebase REST API."""
-    if not PROJECT_ID or not API_KEY:
-        print(f"[Status Update] {progress}% - {step}")
-        return
-
-    fields = {
-        "status": {"stringValue": status},
-        "progress": {"integerValue": str(int(progress))},
-        "step": {"stringValue": step},
-        "updatedAt": {"stringValue": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())},
+    """Updates job status on both Vercel API and Firestore."""
+    payload_data = {
+        "jobId": JOB_ID,
+        "status": status,
+        "progress": int(progress),
+        "step": step,
+        "sourceTitle": source_title or None,
+        "totalDuration": total_duration or None,
+        "clips": clips or None,
+        "error": error or None,
     }
-    if error:
-        fields["error"] = {"stringValue": str(error)}
-    if source_title:
-        fields["sourceTitle"] = {"stringValue": source_title}
-    if total_duration > 0:
-        fields["totalDuration"] = {"doubleValue": float(total_duration)}
-    if clips:
-        clip_values = []
-        for c in clips:
-            clip_values.append({
-                "mapValue": {
-                    "fields": {
-                        "partNumber": {"integerValue": str(c.get("partNumber", 1))},
-                        "title": {"stringValue": c.get("title", "")},
-                        "description": {"stringValue": c.get("description", "")},
-                        "hashtags": {"arrayValue": {"values": [{"stringValue": h} for h in c.get("hashtags", [])]}},
-                        "duration": {"doubleValue": float(c.get("duration", 0))},
-                        "startTime": {"doubleValue": float(c.get("startTime", 0))},
-                        "clipPath": {"stringValue": c.get("url", "")},
-                        "publicUrl": {"stringValue": c.get("url", "")},
-                        "storagePath": {"stringValue": c.get("storagePath", "")},
-                    }
-                }
-            })
-        fields["clips"] = {"arrayValue": {"values": clip_values}}
 
-    url = f"https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/(default)/documents/jobs/{JOB_ID}?key={API_KEY}"
-    payload = json.dumps({"fields": fields}).encode("utf-8")
-    req = urllib.request.Request(url, data=payload, method="PATCH", headers={"Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            pass
-    except Exception as e:
-        print(f"Warning: Could not update Firestore job: {e}")
+    # 1. Update Vercel Job Status Cache via HTTP
+    if APP_URL:
+        try:
+            req = urllib.request.Request(
+                f"{APP_URL}/api/viral-clips/status",
+                data=json.dumps(payload_data).encode("utf-8"),
+                headers={"Content-Type": "application/json", "User-Agent": "The-Viral-Desk-Runner"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as r:
+                pass
+        except Exception as e:
+            print(f"Notice: Could not post status to {APP_URL}: {e}")
+
+    # 2. Update Firestore document (if configured)
+    if PROJECT_ID and API_KEY:
+        fields = {
+            "status": {"stringValue": status},
+            "progress": {"integerValue": str(int(progress))},
+            "step": {"stringValue": step},
+            "updatedAt": {"stringValue": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())},
+        }
+        if error:
+            fields["error"] = {"stringValue": str(error)}
+        if source_title:
+            fields["sourceTitle"] = {"stringValue": source_title}
+        if total_duration > 0:
+            fields["totalDuration"] = {"doubleValue": float(total_duration)}
+        if clips:
+            clip_values = []
+            for c in clips:
+                clip_values.append({
+                    "mapValue": {
+                        "fields": {
+                            "partNumber": {"integerValue": str(c.get("partNumber", 1))},
+                            "title": {"stringValue": c.get("title", "")},
+                            "description": {"stringValue": c.get("description", "")},
+                            "hashtags": {"arrayValue": {"values": [{"stringValue": h} for h in c.get("hashtags", [])]}},
+                            "duration": {"doubleValue": float(c.get("duration", 0))},
+                            "startTime": {"doubleValue": float(c.get("startTime", 0))},
+                            "clipPath": {"stringValue": c.get("url", "")},
+                            "publicUrl": {"stringValue": c.get("url", "")},
+                            "storagePath": {"stringValue": c.get("storagePath", "")},
+                        }
+                    }
+                })
+            fields["clips"] = {"arrayValue": {"values": clip_values}}
+
+        fs_url = f"https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/(default)/documents/jobs/{JOB_ID}?key={API_KEY}"
+        try:
+            fs_req = urllib.request.Request(
+                fs_url,
+                data=json.dumps({"fields": fields}).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="PATCH",
+            )
+            with urllib.request.urlopen(fs_req, timeout=10) as resp:
+                pass
+        except Exception as e:
+            print(f"Notice: Firestore direct update: {e}")
 
 
 def upload_to_firebase_storage(file_path: Path, storage_name: str) -> str:
     """Uploads a clip to Firebase Storage and returns its public URL."""
     if not STORAGE_BUCKET:
+        print("Warning: No STORAGE_BUCKET configured.")
         return ""
     encoded_name = urllib.parse.quote(storage_name, safe="")
     upload_url = f"https://firebasestorage.googleapis.com/v0/b/{STORAGE_BUCKET}/o?uploadType=media&name={encoded_name}"
-    
+
     with open(file_path, "rb") as f:
         file_bytes = f.read()
 
@@ -90,12 +120,12 @@ def run():
         sys.exit(1)
 
     print(f"Starting cloud video pipeline for: {VIDEO_URL}")
-    update_job_status(status="processing", progress=15, step="Downloading video in GitHub cloud...")
+    update_job_status(status="processing", progress=20, step="Downloading video in GitHub cloud...")
 
     timestamp = int(time.time())
     source_file = CLIPS_DIR / f"source_{timestamp}.mp4"
 
-    # 1. Download using yt-dlp
+    # 1. Download using yt-dlp with anti-blocking parameters
     download_cmd = [
         "yt-dlp",
         VIDEO_URL,
@@ -104,19 +134,31 @@ def run():
         "--recode-video", "mp4",
         "--no-playlist",
         "--no-warnings",
+        "--extractor-args", "youtube:player_client=android,web",
+        "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         "--print-json",
     ]
     try:
-        proc = subprocess.run(download_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+        proc = subprocess.run(download_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if proc.returncode != 0:
+            raise RuntimeError(proc.stderr or "yt-dlp failed")
         info = json.loads(proc.stdout.strip().split("\n")[-1] or "{}")
         title = info.get("title") or info.get("fulltitle") or "Viral Video"
         total_duration = float(info.get("duration") or 0)
     except Exception as e:
-        print(f"yt-dlp failed: {e}")
-        update_job_status(status="failed", error=f"Download failed: {str(e)}")
-        sys.exit(1)
+        print(f"Primary yt-dlp failed: {e}. Trying direct/fallback download...")
+        try:
+            # Fallback download without custom formats
+            fallback_cmd = ["yt-dlp", VIDEO_URL, "--output", str(source_file), "--no-playlist", "--no-warnings"]
+            proc2 = subprocess.run(fallback_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+            title = "Viral Video"
+            total_duration = 0.0
+        except Exception as inner_e:
+            print(f"Download error: {inner_e}")
+            update_job_status(status="failed", error=f"Download failed: {str(e)}")
+            sys.exit(1)
 
-    update_job_status(status="processing", progress=45, step="Analyzing video and splitting clips...", source_title=title, total_duration=total_duration)
+    update_job_status(status="processing", progress=50, step="Cutting 9:16 vertical clips with FFmpeg...", source_title=title, total_duration=total_duration)
 
     # Probe duration if missing
     if total_duration <= 0:
@@ -166,7 +208,7 @@ def run():
             "storagePath": storage_dest,
         })
 
-        # Remove local slice immediately
+        # Remove local slice immediately to keep disk at 0 MB
         if clip_path.exists():
             clip_path.unlink()
 
@@ -177,7 +219,7 @@ def run():
     if source_file.exists():
         source_file.unlink()
 
-    # 4. Finish job in Firestore
+    # 4. Finish job
     update_job_status(status="done", progress=100, step=f"✅ {len(clips)} clips ready!", clips=clips, source_title=title, total_duration=total_duration)
     print("SUCCESS: Pipeline complete.")
 
