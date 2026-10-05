@@ -18,13 +18,39 @@ export async function POST(req: NextRequest) {
     // 1. Check if Hugging Face Cloud Worker is configured (100% free cloud video processing)
     const workerUrl = process.env.HUGGINGFACE_WORKER_URL;
     if (workerUrl) {
-      const cleanWorkerUrl = workerUrl.replace(/\/$/, "");
+      let cleanWorkerUrl = workerUrl.replace(/\/$/, "");
+      // Auto-convert browser URL (https://huggingface.co/spaces/owner/space) to Direct API (https://owner-space.hf.space)
+      const hfWebMatch = cleanWorkerUrl.match(/huggingface\.co\/spaces\/([^/]+)\/([^/]+)/);
+      if (hfWebMatch) {
+        cleanWorkerUrl = `https://${hfWebMatch[1].toLowerCase()}-${hfWebMatch[2].toLowerCase()}.hf.space`;
+      }
+
       const workerRes = await fetch(`${cleanWorkerUrl}/split`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ videoUrl, contentCategory }),
       });
-      const workerData = await workerRes.json();
+
+      const resText = await workerRes.text();
+      let workerData: any;
+      try {
+        workerData = JSON.parse(resText);
+      } catch {
+        if (resText.includes("<!DOCTYPE") || resText.includes("<html")) {
+          return NextResponse.json(
+            {
+              error:
+                "Cloud worker returned a webpage instead of API JSON. In your Hugging Face Space README.md, make sure 'sdk: docker' and 'app_port: 7860' are set so Hugging Face activates Docker instead of static HTML.",
+            },
+            { status: 502 }
+          );
+        }
+        return NextResponse.json(
+          { error: `Cloud worker returned invalid response: ${resText.slice(0, 150)}` },
+          { status: 502 }
+        );
+      }
+
       if (!workerRes.ok || !workerData.success) {
         return NextResponse.json(
           { error: workerData.detail || workerData.error || "Hugging Face worker failed to process video." },
