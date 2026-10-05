@@ -464,13 +464,30 @@ export async function publishClipAndCleanup(params: {
   const { clipPath, partNumber, title, description, hashtags, platforms, userEmail } = params;
   const logs: string[] = [];
 
-  // Verify clip file exists
-  const absolutePath = clipPath.startsWith("/")
-    ? path.join(process.cwd(), "public", clipPath)
-    : clipPath;
+  // Verify clip file exists (supports local files or remote Hugging Face cloud URLs)
+  const isRemote = clipPath.startsWith("http://") || clipPath.startsWith("https://");
+  let absolutePath = "";
 
-  if (!fs.existsSync(absolutePath)) {
-    return { success: false, error: "Clip file not found on disk.", logs };
+  if (isRemote) {
+    const os = require("os");
+    const tempFile = path.join(os.tmpdir(), `publish_${Date.now()}_part${partNumber}.mp4`);
+    try {
+      const resp = await fetch(clipPath);
+      if (!resp.ok) return { success: false, error: `Failed to download clip from cloud worker: HTTP ${resp.status}`, logs };
+      const arrBuf = await resp.arrayBuffer();
+      fs.writeFileSync(tempFile, Buffer.from(arrBuf));
+      absolutePath = tempFile;
+    } catch (fetchErr: any) {
+      return { success: false, error: `Cloud clip download failed: ${fetchErr.message}`, logs };
+    }
+  } else {
+    absolutePath = clipPath.startsWith("/")
+      ? path.join(process.cwd(), "public", clipPath)
+      : clipPath;
+
+    if (!fs.existsSync(absolutePath)) {
+      return { success: false, error: "Clip file not found on disk.", logs };
+    }
   }
 
   const fullTitle = `${title} — ${description.slice(0, 40)}`;
@@ -488,7 +505,8 @@ export async function publishClipAndCleanup(params: {
   const { readTokens } = await import("@/app/lib/tokens");
   const tokens: any = await readTokens();
 
-  // ─ YouTube ─
+  try {
+    // ─ YouTube ─
   if (platforms.includes("YouTube")) {
     try {
       const { google } = require("googleapis");
@@ -676,12 +694,33 @@ export async function publishClipAndCleanup(params: {
     }
   }
 
-  // ─ Auto-delete clip from disk after publishing ─
-  try {
-    if (fs.existsSync(absolutePath)) fs.unlinkSync(absolutePath);
-    logs.push("🗑️ Local clip file deleted after publishing.");
-  } catch (e: any) {
-    logs.push(`⚠️ Could not delete local clip: ${e.message}`);
+  } finally {
+    // ─ GUARANTEED VIDEO DELETION: Runs NO MATTER WHAT (success or failure) ─
+    // 1. Delete local or downloaded tmp clip file
+    try {
+      if (absolutePath && fs.existsSync(absolutePath)) {
+        fs.unlinkSync(absolutePath);
+        logs.push("🗑️ Video clip file deleted from storage.");
+      }
+    } catch (e: any) {
+      console.warn("Could not delete local/tmp clip file:", e.message);
+    }
+
+    // 2. Delete clip from Hugging Face Cloud Worker to keep disk at 0 MB forever
+    const workerUrl = process.env.HUGGINGFACE_WORKER_URL;
+    if (isRemote && workerUrl) {
+      try {
+        const filename = path.basename(new URL(clipPath).pathname);
+        await fetch(`${workerUrl.replace(/\/$/, "")}/cleanup`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename }),
+        });
+        logs.push("🗑️ Cloud worker storage deleted.");
+      } catch (cleanupErr: any) {
+        console.warn("Cloud worker cleanup error:", cleanupErr.message);
+      }
+    }
   }
 
   return {
