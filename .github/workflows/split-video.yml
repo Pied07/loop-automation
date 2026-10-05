@@ -48,10 +48,15 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install yt-dlp & FFmpeg
+      - name: Start Proof-of-Origin Token Provider
+        run: |
+          docker run --name bgutil-provider -d --init -p 127.0.0.1:4416:4416 brainicism/bgutil-ytdlp-pot-provider
+          sleep 5
+
+      - name: Install yt-dlp, POT Plugin & FFmpeg
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
-          pip install --upgrade yt-dlp
+          pip install --upgrade "yt-dlp[default,curl-cffi]" bgutil-ytdlp-pot-provider
 
       - name: Setup YouTube Cookies if configured
         env:

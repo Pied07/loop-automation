@@ -125,12 +125,13 @@ def run():
     timestamp = int(time.time())
     source_file = CLIPS_DIR / f"source_{timestamp}.mp4"
 
-    # 1. Download using yt-dlp with anti-blocking client fallback
-    clients_to_try = ["tv_embedded", "ios", "mweb", "android_creator"]
+    # 1. Download using yt-dlp with Proof-of-Origin Token provider and anti-bot clients
+    clients_to_try = ["web", "mweb", "android", "tv", "ios"]
     title = "Viral Video"
     total_duration = 0.0
     download_success = False
     last_error = ""
+    cookie_file = Path("cookies.txt")
 
     for client in clients_to_try:
         print(f"Attempting download with player_client={client}...")
@@ -138,15 +139,15 @@ def run():
             "yt-dlp",
             VIDEO_URL,
             "--output", str(source_file),
-            "-f", "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
+            "-f", "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best",
             "--recode-video", "mp4",
             "--no-playlist",
             "--no-warnings",
-            "--extractor-args", f"youtube:player_client={client}",
+            "--extractor-args", "youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416",
+            "--extractor-args", f"youtube:player-client={client}",
             "--print-json",
         ]
 
-        cookie_file = Path("cookies.txt")
         if cookie_file.exists() and cookie_file.stat().st_size > 10:
             download_cmd.extend(["--cookies", str(cookie_file)])
 
@@ -154,34 +155,58 @@ def run():
             proc = subprocess.run(download_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if proc.returncode == 0 and source_file.exists() and source_file.stat().st_size > 1000:
                 try:
-                    info = json.loads(proc.stdout.strip().split("\n")[-1] or "{}")
-                    title = info.get("title") or info.get("fulltitle") or "Viral Video"
-                    total_duration = float(info.get("duration") or 0)
+                    for line in reversed(proc.stdout.strip().split("\n")):
+                        if line.strip().startswith("{") and line.strip().endswith("}"):
+                            info = json.loads(line.strip())
+                            title = info.get("title") or info.get("fulltitle") or "Viral Video"
+                            total_duration = float(info.get("duration") or 0)
+                            break
                 except Exception:
                     pass
                 download_success = True
-                print(f"Download succeeded with {client}: {title}")
+                print(f"Download succeeded with client={client}: {title}")
                 break
             else:
-                last_error = proc.stderr or f"Exit code {proc.returncode}"
+                last_error = proc.stderr.strip() if proc.stderr else f"Exit code {proc.returncode}"
                 print(f"Client {client} failed: {last_error[:200]}")
         except Exception as e:
             last_error = str(e)
             print(f"Client {client} exception: {e}")
 
     if not download_success:
-        # Final fallback: generic download
+        # Final fallback: generic download with simple format
+        print("Attempting single-format fallback...")
         try:
-            fallback_cmd = ["yt-dlp", VIDEO_URL, "--output", str(source_file), "--no-playlist", "--no-warnings"]
-            proc2 = subprocess.run(fallback_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
-            if source_file.exists() and source_file.stat().st_size > 1000:
+            fallback_cmd = [
+                "yt-dlp",
+                VIDEO_URL,
+                "--output", str(source_file),
+                "-f", "b/best",
+                "--no-playlist",
+                "--extractor-args", "youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416",
+            ]
+            if cookie_file.exists() and cookie_file.stat().st_size > 10:
+                fallback_cmd.extend(["--cookies", str(cookie_file)])
+            proc2 = subprocess.run(fallback_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if proc2.returncode == 0 and source_file.exists() and source_file.stat().st_size > 1000:
                 download_success = True
+                print("Single-format fallback succeeded!")
+            else:
+                if proc2.stderr:
+                    err_lines = [l for l in proc2.stderr.splitlines() if "ERROR:" in l]
+                    if err_lines:
+                        last_error = err_lines[0]
+                    else:
+                        last_error = proc2.stderr.strip()[:250]
         except Exception as fe:
             last_error = str(fe)
 
     if not download_success:
         print(f"All download attempts failed: {last_error}")
-        update_job_status(status="failed", error=f"Download failed: {last_error[:250]}")
+        friendly_error = last_error
+        if "confirm you’re not a bot" in last_error or "bot" in last_error.lower():
+            friendly_error = "YouTube bot detection triggered. Add YOUTUBE_COOKIES secret to GitHub repo to authenticate."
+        update_job_status(status="failed", error=f"Download failed: {friendly_error[:200]}")
         sys.exit(1)
 
     update_job_status(status="processing", progress=50, step="Cutting 9:16 vertical clips with FFmpeg...", source_title=title, total_duration=total_duration)
