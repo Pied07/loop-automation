@@ -320,6 +320,13 @@ async function processJob(job) {
     // Default duration if probe failed
     if (duration <= 0) duration = 180.0;
 
+    // Check if outro video is present
+    const outroPath = path.join(ROOT_DIR, "public", "assets", "video-outro.mp4");
+    const hasOutro = fs.existsSync(outroPath);
+    if (hasOutro) {
+      console.log(`[WORKER] 🎬 Outro video detected: ${outroPath} (Will append to the end of every clip)`);
+    }
+
     while (startTime < duration) {
       const remaining = duration - startTime;
       const curDuration = Math.min(clipLength, remaining);
@@ -327,6 +334,8 @@ async function processJob(job) {
 
       const clipFileName = `clip_${timestamp}_part${partNum}.mp4`;
       const clipFilePath = path.join(TEMP_DIR, clipFileName);
+      const tempSlicePath = path.join(TEMP_DIR, `temp_${timestamp}_part${partNum}.mp4`);
+      const targetCutPath = hasOutro ? tempSlicePath : clipFilePath;
 
       console.log(`[WORKER] ✂️  Cutting PART ${partNum} (${startTime.toFixed(1)}s -> ${(startTime + curDuration).toFixed(1)}s)...`);
       await runCommand(FFMPEG_BIN, [
@@ -341,8 +350,49 @@ async function processJob(job) {
         "-c:a", "aac",
         "-b:a", "96k",
         "-movflags", "+faststart",
-        clipFilePath,
+        targetCutPath,
       ]);
+
+      let finalClipDuration = curDuration;
+
+      // Merge outro if present
+      if (hasOutro) {
+        console.log(`[WORKER] 🎬 Merging outro onto PART ${partNum}...`);
+        const filterStr =
+          "[0:v]scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v0];" +
+          "[1:v]scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v1];" +
+          "[0:a]aformat=sample_rates=48000:channel_layouts=stereo[a0];" +
+          "[1:a]aformat=sample_rates=48000:channel_layouts=stereo[a1];" +
+          "[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]";
+
+        try {
+          await runCommand(FFMPEG_BIN, [
+            "-y",
+            "-i", tempSlicePath,
+            "-i", outroPath,
+            "-filter_complex", filterStr,
+            "-map", "[v]",
+            "-map", "[a]",
+            "-c:v", "libx264",
+            "-preset", "veryfast",
+            "-crf", "28",
+            "-c:a", "aac",
+            "-b:a", "96k",
+            "-movflags", "+faststart",
+            clipFilePath,
+          ]);
+          finalClipDuration += 10.01;
+        } catch (err) {
+          console.warn(`[WORKER] Warning: Outro merge failed (${err.message}), falling back to cut slice.`);
+          if (fs.existsSync(tempSlicePath)) {
+            fs.renameSync(tempSlicePath, clipFilePath);
+          }
+        } finally {
+          if (fs.existsSync(tempSlicePath)) {
+            try { fs.unlinkSync(tempSlicePath); } catch {}
+          }
+        }
+      }
 
       const clipSize = fs.statSync(clipFilePath).size;
       if (clipSize > MAX_CLOUDINARY_UPLOAD_BYTES) {
@@ -355,7 +405,7 @@ async function processJob(job) {
       clipsMeta.push({
         partNumber: partNum,
         fileName: clipFileName,
-        duration: Math.round(curDuration * 100) / 100,
+        duration: Math.round(finalClipDuration * 100) / 100,
         startTime: Math.round(startTime * 100) / 100,
         title: `PART ${partNum} | ${title.slice(0, 45)}`,
         description: `📌 PART ${partNum}\n${title}\n\nShared under Fair Use. Like & subscribe for more!`,

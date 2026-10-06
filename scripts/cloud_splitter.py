@@ -414,7 +414,14 @@ def run():
             print(f"Notice: Could not determine source duration with ffprobe: {e}")
             total_duration = 60.0
 
-    # 2. Split with FFmpeg
+    # 2. Split with FFmpeg & merge outro
+    outro_path = ROOT_DIR / "public" / "assets" / "video-outro.mp4"
+    has_outro = outro_path.exists()
+    if has_outro:
+        print(f"🎬 Outro video detected: {outro_path} (Will append to the end of every clip)")
+    else:
+        print("Notice: No outro video found at public/assets/video-outro.mp4")
+
     clip_length = SHORT_CLIP_LENGTH_SECONDS
     max_clips = int(os.environ.get("MAX_CLIPS", "5"))
     total_parts = min(max_clips, max(1, int(total_duration // clip_length) + (1 if total_duration % clip_length >= 3.0 else 0)))
@@ -430,16 +437,19 @@ def run():
 
         clip_filename = f"clip_{timestamp}_part{part_num}.mp4"
         clip_path = CLIPS_DIR / clip_filename
+        temp_slice_path = CLIPS_DIR / f"temp_{timestamp}_part{part_num}.mp4"
+        target_cut_path = temp_slice_path if has_outro else clip_path
 
         current_progress = 50 + int(((part_num - 1) / max(1, total_parts)) * 30)
         update_job_status(
             status="processing",
             progress=current_progress,
-            step=f"Cutting clip {part_num} of {total_parts}...",
+            step=f"Cutting and merging clip {part_num} of {total_parts}...",
             source_title=title,
             total_duration=total_duration,
         )
 
+        # 1. Cut the segment
         split_cmd = [
             FFMPEG_BIN, "-y",
             "-threads", "0",
@@ -453,9 +463,49 @@ def run():
             "-c:a", "aac",
             "-b:a", "96k",
             "-movflags", "+faststart",
-            str(clip_path)
+            str(target_cut_path)
         ]
         subprocess.run(split_cmd, check=True)
+
+        final_clip_duration = duration
+
+        # 2. Append outro if present
+        if has_outro:
+            print(f"Merging outro onto Part {part_num}...")
+            filter_str = (
+                "[0:v]scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v0];"
+                "[1:v]scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v1];"
+                "[0:a]aformat=sample_rates=48000:channel_layouts=stereo[a0];"
+                "[1:a]aformat=sample_rates=48000:channel_layouts=stereo[a1];"
+                "[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]"
+            )
+            merge_cmd = [
+                FFMPEG_BIN, "-y",
+                "-threads", "0",
+                "-i", str(temp_slice_path),
+                "-i", str(outro_path),
+                "-filter_complex", filter_str,
+                "-map", "[v]",
+                "-map", "[a]",
+                "-c:v", "libx264",
+                "-preset", "ultrafast",
+                "-crf", "28",
+                "-c:a", "aac",
+                "-b:a", "96k",
+                "-movflags", "+faststart",
+                str(clip_path)
+            ]
+            try:
+                subprocess.run(merge_cmd, check=True)
+                final_clip_duration += 10.01
+            except Exception as e:
+                print(f"Warning: Outro merge failed ({e}), falling back to cut slice.")
+                if temp_slice_path.exists():
+                    shutil.move(str(temp_slice_path), str(clip_path))
+            finally:
+                if temp_slice_path.exists():
+                    try: temp_slice_path.unlink()
+                    except: pass
 
         file_size = clip_path.stat().st_size
         if file_size > MAX_CLOUDINARY_UPLOAD_BYTES:
@@ -472,7 +522,7 @@ def run():
             "title": f"PART {part_num} | {title[:45]}",
             "description": f"📌 PART {part_num}\n{title}\n\nShared under Fair Use. Like & subscribe for more!",
             "hashtags": hashtags,
-            "duration": round(duration, 2),
+            "duration": round(final_clip_duration, 2),
             "startTime": round(start_time, 2),
         })
 
