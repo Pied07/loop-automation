@@ -523,15 +523,16 @@ export async function generateClipMetadata(params: {
     creditBlock,
   ].join("\n");
 
-  // Build hashtags: category-specific + universal + words from title
-  const bankTags = (HASHTAG_BANK[contentCategory] || HASHTAG_BANK["Motivational"]).slice(0, 8);
+  // Build hashtags: category-specific + universal + words from title (guaranteed 8 to 10)
+  const bankTags = (HASHTAG_BANK[contentCategory] || HASHTAG_BANK["Motivational"] || []).slice(0, 10);
   const titleWords = sourceTitle.match(/[a-zA-Z]{4,}/g) || [];
   const titleTags = titleWords
     .map((w) => w.toLowerCase())
     .filter((w) => !bankTags.includes(w) && !UNIVERSAL_HASHTAGS.includes(w))
-    .slice(0, 3);
-  const universalPick = UNIVERSAL_HASHTAGS.slice(0, 3);
-  const hashtags = [...new Set([...bankTags.slice(0, 5), ...titleTags, ...universalPick, ...bankTags.slice(5)])].slice(0, 10);
+    .slice(0, 4);
+  const universalPick = UNIVERSAL_HASHTAGS.slice(0, 6);
+  const combined = [...new Set([...bankTags.slice(0, 5), ...titleTags, ...universalPick, ...bankTags.slice(5)])];
+  const hashtags = combined.slice(0, Math.min(10, Math.max(8, combined.length)));
 
   return { description, hashtags };
 }

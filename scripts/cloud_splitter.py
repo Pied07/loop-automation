@@ -61,6 +61,37 @@ YTDLP_BIN = resolve_binary("yt-dlp", "yt-dlp.exe")
 FFMPEG_BIN = resolve_binary("ffmpeg", "ffmpeg.exe")
 FFPROBE_BIN = resolve_binary("ffprobe", "ffprobe.exe")
 
+HASHTAG_BANK = {
+    "Motivational": ["motivation", "mindset", "success", "inspiration", "hustle", "grind", "nevergiveup", "goals", "growth", "discipline", "bestadvice", "selfdevelopment"],
+    "Funny": ["funny", "humor", "comedy", "laugh", "hilarious", "memes", "trynottolaugh", "funnyclips", "funnymoments", "fails", "jokes", "comedycentral"],
+    "Comedy": ["comedy", "humor", "standup", "hilarious", "laugh", "memes", "funnyclips", "funnymoments", "jokes", "comedian", "prank", "lol"],
+    "Educational": ["education", "learning", "knowledge", "facts", "didyouknow", "science", "history", "interestingfacts", "funfacts", "mindblowing", "discovery", "learnmore"],
+    "Nature": ["nature", "wildlife", "earth", "beautiful", "naturelover", "outdoors", "wilderness", "animals", "landscape", "planet", "stunning", "amazingnature"],
+    "Sports": ["sports", "athlete", "fitness", "training", "workout", "champions", "winning", "highlights", "sportsmotivation", "passion", "legendary", "records"],
+    "Music": ["music", "viralmusic", "hiphop", "pop", "beats", "banger", "playlist", "vibe", "musiclover", "artist", "dance", "song"],
+    "Gaming": ["gaming", "gamer", "gameplay", "videogames", "twitch", "gamerlife", "ps5", "xbox", "pcgaming", "clutch", "esports", "satisfying"],
+    "Travel": ["travel", "explore", "adventure", "wanderlust", "vacation", "travelblogger", "beautifulplaces", "destination", "tourism", "globetrotter", "mustvisit", "trip"],
+    "Food": ["food", "foodie", "delicious", "cooking", "recipe", "foodlover", "yummy", "chef", "tasty", "streetfood", "instafood", "mealprep"],
+    "Fashion": ["fashion", "style", "outfit", "ootd", "streetstyle", "trendy", "fashionista", "aesthetic", "outfitinspo", "stylish", "drip", "look"],
+    "Trending": ["trending", "viral", "fyp", "foryou", "explore", "shorts", "reels", "mustwatch", "viralvideo", "watchthis", "entertainment", "curiosity"],
+}
+
+UNIVERSAL_HASHTAGS = ["shorts", "viral", "trending", "foryou", "fyp", "explore", "mustwatch", "reels", "viralvideo", "watchthis"]
+
+
+def generate_clip_hashtags(title: str, category: str) -> list:
+    cat_clean = (category or "Trending").strip().title()
+    bank = HASHTAG_BANK.get(cat_clean) or HASHTAG_BANK.get("Trending", [])
+    words = re.findall(r"[a-zA-Z]{4,}", title.lower())
+    title_tags = [w for w in words if w not in bank and w not in UNIVERSAL_HASHTAGS][:3]
+    combined = []
+    for tag in bank[:5] + title_tags + UNIVERSAL_HASHTAGS[:5] + bank[5:]:
+        clean = tag.lower().replace("#", "").strip()
+        if clean and clean not in combined:
+            combined.append(clean)
+    return combined[:10] if len(combined) >= 10 else combined[:max(8, len(combined))]
+
+
 
 def update_job_status(status="processing", progress=0, step="", clips=None, source_title="", total_duration=0, error=""):
     """Posts job progress to the app's HTTP status endpoint."""
@@ -515,7 +546,7 @@ def run():
 
         created_clip_files.append(clip_path)
 
-        hashtags = ["shorts", "viral", "trending", CONTENT_CATEGORY.lower()]
+        hashtags = generate_clip_hashtags(title, CONTENT_CATEGORY)
         clips_meta.append({
             "partNumber": part_num,
             "filename": clip_filename,

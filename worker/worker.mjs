@@ -48,6 +48,36 @@ const FFMPEG_BIN = fs.existsSync(path.join(ROOT_DIR, "ffmpeg.exe"))
   ? path.join(ROOT_DIR, "ffmpeg.exe")
   : "ffmpeg";
 
+const HASHTAG_BANK = {
+  Motivational: ["motivation", "mindset", "success", "inspiration", "hustle", "grind", "nevergiveup", "goals", "growth", "discipline", "bestadvice", "selfdevelopment"],
+  Funny: ["funny", "humor", "comedy", "laugh", "hilarious", "memes", "trynottolaugh", "funnyclips", "funnymoments", "fails", "jokes", "comedycentral"],
+  Comedy: ["comedy", "humor", "standup", "hilarious", "laugh", "memes", "funnyclips", "funnymoments", "jokes", "comedian", "prank", "lol"],
+  Educational: ["education", "learning", "knowledge", "facts", "didyouknow", "science", "history", "interestingfacts", "funfacts", "mindblowing", "discovery", "learnmore"],
+  Nature: ["nature", "wildlife", "earth", "beautiful", "naturelover", "outdoors", "wilderness", "animals", "landscape", "planet", "stunning", "amazingnature"],
+  Sports: ["sports", "athlete", "fitness", "training", "workout", "champions", "winning", "highlights", "sportsmotivation", "passion", "legendary", "records"],
+  Music: ["music", "viralmusic", "hiphop", "pop", "beats", "banger", "playlist", "vibe", "musiclover", "artist", "dance", "song"],
+  Gaming: ["gaming", "gamer", "gameplay", "videogames", "twitch", "gamerlife", "ps5", "xbox", "pcgaming", "clutch", "esports", "satisfying"],
+  Travel: ["travel", "explore", "adventure", "wanderlust", "vacation", "travelblogger", "beautifulplaces", "destination", "tourism", "globetrotter", "mustvisit", "trip"],
+  Food: ["food", "foodie", "delicious", "cooking", "recipe", "foodlover", "yummy", "chef", "tasty", "streetfood", "instafood", "mealprep"],
+  Fashion: ["fashion", "style", "outfit", "ootd", "streetstyle", "trendy", "fashionista", "aesthetic", "outfitinspo", "stylish", "drip", "look"],
+  Trending: ["trending", "viral", "fyp", "foryou", "explore", "shorts", "reels", "mustwatch", "viralvideo", "watchthis", "entertainment", "curiosity"],
+};
+
+const UNIVERSAL_HASHTAGS = ["shorts", "viral", "trending", "foryou", "fyp", "explore", "mustwatch", "reels", "viralvideo", "watchthis"];
+
+function generateClipHashtags(title, category) {
+  const cat = (category || "Trending").trim();
+  const bank = HASHTAG_BANK[cat] || HASHTAG_BANK["Trending"] || [];
+  const words = (title.match(/[a-zA-Z]{4,}/g) || []).map((w) => w.toLowerCase());
+  const titleTags = words.filter((w) => !bank.includes(w) && !UNIVERSAL_HASHTAGS.includes(w)).slice(0, 3);
+  const combined = [];
+  for (const tag of [...bank.slice(0, 5), ...titleTags, ...UNIVERSAL_HASHTAGS.slice(0, 5), ...bank.slice(5)]) {
+    const clean = tag.toLowerCase().replace(/^#/, "").trim();
+    if (clean && !combined.includes(clean)) combined.push(clean);
+  }
+  return combined.slice(0, Math.min(10, Math.max(8, combined.length)));
+}
+
 console.log("=================================================");
 console.log("      🚀 THE VIRAL DESK — DESKTOP WORKER         ");
 console.log("=================================================");
@@ -402,6 +432,7 @@ async function processJob(job) {
       }
 
       clipFiles.push(clipFilePath);
+      const clipHashtags = generateClipHashtags(title, contentCategory);
       clipsMeta.push({
         partNumber: partNum,
         fileName: clipFileName,
@@ -409,7 +440,7 @@ async function processJob(job) {
         startTime: Math.round(startTime * 100) / 100,
         title: `PART ${partNum} | ${title.slice(0, 45)}`,
         description: `📌 PART ${partNum}\n${title}\n\nShared under Fair Use. Like & subscribe for more!`,
-        hashtags: ["shorts", "viral", "trending", (contentCategory || "trending").toLowerCase()],
+        hashtags: clipHashtags,
       });
 
       startTime += curDuration;
