@@ -449,6 +449,7 @@ export async function publishClipAndCleanup(params: {
   platforms: string[];
   userEmail: string;
   connections: string[];
+  cloudinaryPublicId?: string;
 }): Promise<{
   success: boolean;
   youtubeUrl?: string;
@@ -719,6 +720,47 @@ export async function publishClipAndCleanup(params: {
         logs.push("🗑️ Cloud worker storage deleted.");
       } catch (cleanupErr: any) {
         console.warn("Cloud worker cleanup error:", cleanupErr.message);
+      }
+    }
+
+    // 3. Delete clip from Cloudinary (Auto-cleanup to keep storage at 0 MB)
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+    let targetPublicId = params.cloudinaryPublicId;
+    if (!targetPublicId && clipPath.includes("res.cloudinary.com")) {
+      const match = clipPath.match(/\/video\/upload\/(?:v\d+\/)?([^.]+)/);
+      if (match) targetPublicId = match[1];
+    }
+
+    if (targetPublicId && cloudName && apiKey && apiSecret) {
+      try {
+        const timestamp = Math.floor(Date.now() / 1000);
+        const crypto = await import("crypto");
+        const signature = crypto
+          .createHash("sha1")
+          .update(`public_id=${targetPublicId}&timestamp=${timestamp}${apiSecret}`)
+          .digest("hex");
+
+        const formData = new FormData();
+        formData.append("public_id", targetPublicId);
+        formData.append("api_key", apiKey);
+        formData.append("timestamp", timestamp.toString());
+        formData.append("signature", signature);
+
+        const destroyRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/video/destroy`, {
+          method: "POST",
+          body: formData,
+        });
+        const destroyData = await destroyRes.json();
+        if (destroyData.result === "ok") {
+          logs.push(`🗑️ Cloudinary storage cleaned up (${targetPublicId}).`);
+        } else {
+          console.warn("Cloudinary destroy response:", destroyData);
+        }
+      } catch (cErr: any) {
+        console.warn("Could not delete clip from Cloudinary:", cErr.message);
       }
     }
   }

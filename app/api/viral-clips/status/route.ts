@@ -24,6 +24,29 @@ export async function GET(req: NextRequest) {
 
   if (githubPat) {
     try {
+      // 1. Check if worker published a completed release for this job
+      const relRes = await fetch(`https://api.github.com/repos/${githubRepo}/releases/tags/clips-${jobId}`, {
+        headers: {
+          Authorization: `Bearer ${githubPat}`,
+          Accept: "application/vnd.github.v3+json",
+          "User-Agent": "The-Viral-Desk-App",
+        },
+      });
+      if (relRes.ok) {
+        const relData = await relRes.json();
+        if (relData.body) {
+          try {
+            const parsed = JSON.parse(relData.body);
+            if (parsed.status === "done" && Array.isArray(parsed.clips)) {
+              jobCache.set(jobId, { ...parsed, updatedAt: Date.now() });
+              return NextResponse.json(parsed);
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+
+    try {
       const runsRes = await fetch(`https://api.github.com/repos/${githubRepo}/actions/runs?per_page=5`, {
         headers: {
           Authorization: `Bearer ${githubPat}`,

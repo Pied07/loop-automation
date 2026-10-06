@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "worker": "node worker/worker.mjs"
   },
   "dependencies": {
     "@distube/ytdl-core": "^4.16.12",

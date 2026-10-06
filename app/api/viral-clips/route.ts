@@ -15,46 +15,63 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Video URL is required." }, { status: 400 });
     }
 
-    // 1. Check if GitHub Actions Cloud Runner is configured (100% free, 2000 mins/mo, preinstalled FFmpeg)
+    const jobId = `job_${Date.now()}`;
+
+    // Add job to worker queue so desktop worker can pick it up immediately
+    try {
+      const queueUrl = new URL("/api/viral-clips/queue", req.url).toString();
+      await fetch(queueUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobId,
+          videoUrl,
+          contentCategory: contentCategory || "Trending",
+          status: "pending",
+        }),
+      });
+    } catch (e) {
+      console.warn("Queue registration error:", e);
+    }
+
+    // 1. Also trigger GitHub Actions Cloud Runner if configured
     const githubPat = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
     const githubRepo = process.env.GITHUB_REPO || "Pied07/loop-automation";
 
     if (githubPat) {
-      const jobId = `job_${Date.now()}`;
       const dispatchUrl = `https://api.github.com/repos/${githubRepo}/actions/workflows/split-video.yml/dispatches`;
 
-      const ghRes = await fetch(dispatchUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${githubPat}`,
-          Accept: "application/vnd.github.v3+json",
-          "Content-Type": "application/json",
-          "User-Agent": "The-Viral-Desk-App",
-        },
-        body: JSON.stringify({
-          ref: "main",
-          inputs: {
-            videoUrl,
-            contentCategory: contentCategory || "Trending",
-            jobId,
-            userId: body.userId || "creator",
-            firebaseApiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
-            firebaseProjectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "",
-            firebaseStorageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
+      try {
+        await fetch(dispatchUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${githubPat}`,
+            Accept: "application/vnd.github.v3+json",
+            "Content-Type": "application/json",
+            "User-Agent": "The-Viral-Desk-App",
           },
-        }),
-      });
-
-      if (!ghRes.ok) {
-        const ghErr = await ghRes.text();
-        return NextResponse.json({ error: `Failed to trigger GitHub cloud runner: ${ghErr}` }, { status: ghRes.status });
+          body: JSON.stringify({
+            ref: "main",
+            inputs: {
+              videoUrl,
+              contentCategory: contentCategory || "Trending",
+              jobId,
+              userId: body.userId || "creator",
+              firebaseApiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
+              firebaseProjectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "",
+              firebaseStorageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
+            },
+          }),
+        });
+      } catch (ghErr) {
+        console.warn("GitHub dispatch notice:", ghErr);
       }
 
       return NextResponse.json({
         success: true,
-        cloudMode: "github",
+        cloudMode: "hybrid",
         jobId,
-        message: "Cloud video processor started on GitHub Actions!",
+        message: "Video splitting job queued for processor!",
       });
     }
 

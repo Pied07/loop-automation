@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { clipPath, partNumber, totalParts, title, description, hashtags, platforms, userEmail, connections } = body;
+    const { clipPath, partNumber, totalParts, title, description, hashtags, platforms, userEmail, connections, cloudinaryPublicId } = body;
 
     if (!clipPath || !platforms?.length) {
       return NextResponse.json({ error: "Clip path and platforms are required." }, { status: 400 });
@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
       platforms,
       userEmail,
       connections,
+      cloudinaryPublicId,
     });
 
     return NextResponse.json(result);

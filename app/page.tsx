@@ -363,8 +363,8 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || "Failed to process video.");
 
-      if (data.cloudMode === "github" && data.jobId) {
-        setSplitStep("GitHub Actions cloud runner starting...");
+      if (data.jobId) {
+        setSplitStep("Processing started (queued for worker)...");
         setSplitProgress(18);
 
         let finished = false;
