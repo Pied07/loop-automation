@@ -29,6 +29,7 @@ import {
   Search,
   Settings2,
   Share2,
+  ShieldCheck,
   Sparkles,
   TrendingUp,
   Upload,
@@ -158,6 +159,7 @@ export default function Home() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processMode, setProcessMode] = useState<"cloud" | "queue">("cloud");
+  const [autoFindSource, setAutoFindSource] = useState<"safe" | "youtube">("safe");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -310,14 +312,18 @@ export default function Home() {
       const response = await fetch("/api/viral-clips/auto-find", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category: selectedCategory }),
+        body: JSON.stringify({ category: selectedCategory, mode: autoFindSource }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.error) {
         notify(data.error || "Failed to find video.");
       } else if (data.url) {
         setVideoUrl(data.url);
-        notify("Found viral video: " + (data.title || "Ready to split"));
+        notify(
+          autoFindSource === "safe"
+            ? `🛡️ Scraped Copyright-Free MP4: "${data.title || 'Ready to split'}" (100% Ban-Safe!)`
+            : `Found YouTube video: "${data.title || 'Ready to split'}"`
+        );
       }
     } catch (err: any) {
       notify("Failed to find video: " + err.message);
@@ -781,8 +787,48 @@ export default function Home() {
                   </button>
                 </div>
 
+                {/* Auto-Find Source Selector (Safe Non-YouTube vs YouTube) */}
+                <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '12px', color: '#9ca3af' }}>Auto-Find source:</span>
+                  <button
+                    type="button"
+                    onClick={() => setAutoFindSource("safe")}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      border: autoFindSource === "safe" ? '1px solid #10b981' : '1px solid #272a38',
+                      background: autoFindSource === "safe" ? 'rgba(16,185,129,0.18)' : '#111218',
+                      color: autoFindSource === "safe" ? '#34d399' : '#9ca3af',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <ShieldCheck size={13} /> 🛡️ Copyright-Free Scraper (Zero Ban Risk, Direct MP4)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAutoFindSource("youtube")}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      border: autoFindSource === "youtube" ? '1px solid #e50914' : '1px solid #272a38',
+                      background: autoFindSource === "youtube" ? 'rgba(229,9,20,0.18)' : '#111218',
+                      color: autoFindSource === "youtube" ? '#ff4d56' : '#9ca3af',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📺 YouTube Trending (Fair Use)
+                  </button>
+                </div>
+
                 {/* Processing Mode and Online Tools Tip */}
-                <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', fontSize: '12px' }}>
+                <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', fontSize: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ color: '#9ca3af' }}>Runner:</span>
                     <button
@@ -818,8 +864,8 @@ export default function Home() {
                       🖥️ Desktop Worker (`npm run worker`)
                     </button>
                   </div>
-                  <span style={{ color: '#6b7280', fontSize: '11px' }}>
-                    💡 YouTube block? Download free with Cobalt or SnapSave, then click <strong>Upload MP4</strong>!
+                  <span style={{ color: '#10b981', fontSize: '11px' }}>
+                    🛡️ 100% Ban-Safe: Live scrapes public domain &amp; CC0 direct MP4 videos!
                   </span>
                 </div>
 

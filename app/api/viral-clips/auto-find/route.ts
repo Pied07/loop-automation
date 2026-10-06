@@ -7,7 +7,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const category = typeof body.category === "string" ? body.category.trim() : "Trending";
-    const result = await autoFindViralVideo(category);
+    const mode = body.mode === "youtube" ? "youtube" : "safe";
+    const result = await autoFindViralVideo(category, mode);
     return NextResponse.json(result);
   } catch (err: any) {
     return NextResponse.json(
@@ -21,7 +22,8 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get("category")?.trim() || "Trending";
-    const result = await autoFindViralVideo(category);
+    const mode = searchParams.get("mode") === "youtube" ? "youtube" : "safe";
+    const result = await autoFindViralVideo(category, mode);
     return NextResponse.json(result);
   } catch (err: any) {
     return NextResponse.json(
