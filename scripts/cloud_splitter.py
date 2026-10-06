@@ -96,10 +96,95 @@ def update_job_status(status="processing", progress=0, step="", clips=None, sour
             print(f"Notice: Firestore direct update: {e}")
 
 
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_PAT", "").strip()
+GITHUB_REPO = os.environ.get("GITHUB_REPOSITORY", "Pied07/loop-automation").strip()
+
+
+def upload_clips_to_github(job_id: str, title: str, clip_paths: list) -> dict:
+    """Uploads clip files to a GitHub Release and returns { filename: download_url }."""
+    url_map = {}
+    tag_name = f"clips-{job_id}"
+    print(f"Creating GitHub Release {tag_name} in {GITHUB_REPO}...")
+
+    # 1. Try using GitHub CLI (gh is preinstalled on GitHub Actions runner)
+    if GITHUB_TOKEN:
+        try:
+            env = os.environ.copy()
+            env["GH_TOKEN"] = GITHUB_TOKEN
+            cmd = ["gh", "release", "create", tag_name] + [str(p) for p in clip_paths] + [
+                "--title", f"Clips: {title[:40]}",
+                "--notes", f"Auto-generated viral vertical clips for job {job_id}",
+            ]
+            res = subprocess.run(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if res.returncode == 0:
+                print("GitHub CLI release creation successful!")
+                for p in clip_paths:
+                    url_map[p.name] = f"https://github.com/{GITHUB_REPO}/releases/download/{tag_name}/{p.name}"
+                return url_map
+            else:
+                print(f"gh CLI release notice: {res.stderr[:200]}")
+        except Exception as e:
+            print(f"Notice: gh command failed: {e}")
+
+    # 2. Fallback to GitHub REST API directly
+    if GITHUB_TOKEN:
+        try:
+            create_url = f"https://api.github.com/repos/{GITHUB_REPO}/releases"
+            req = urllib.request.Request(
+                create_url,
+                data=json.dumps({"tag_name": tag_name, "name": f"Clips: {title[:40]}", "body": f"Job {job_id}"}).encode("utf-8"),
+                headers={
+                    "Authorization": f"Bearer {GITHUB_TOKEN}",
+                    "Accept": "application/vnd.github.v3+json",
+                    "Content-Type": "application/json",
+                    "User-Agent": "ViralDesk-Runner",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=15) as r:
+                rel_data = json.loads(r.read().decode("utf-8"))
+                upload_url_template = rel_data.get("upload_url", "").split("{")[0]
+
+            for p in clip_paths:
+                asset_url = f"{upload_url_template}?name={urllib.parse.quote(p.name)}"
+                with open(p, "rb") as af:
+                    asset_bytes = af.read()
+                areq = urllib.request.Request(
+                    asset_url,
+                    data=asset_bytes,
+                    headers={
+                        "Authorization": f"Bearer {GITHUB_TOKEN}",
+                        "Content-Type": "video/mp4",
+                        "User-Agent": "ViralDesk-Runner",
+                    },
+                    method="POST",
+                )
+                with urllib.request.urlopen(areq, timeout=60) as ar:
+                    ar_data = json.loads(ar.read().decode("utf-8"))
+                    url_map[p.name] = ar_data.get("browser_download_url") or f"https://github.com/{GITHUB_REPO}/releases/download/{tag_name}/{p.name}"
+
+            if url_map:
+                print(f"Uploaded {len(url_map)} clips via GitHub REST API.")
+                return url_map
+        except Exception as e:
+            print(f"Notice: GitHub REST API release failed: {e}")
+
+    # 3. Fallback: Firebase Storage if configured
+    if STORAGE_BUCKET:
+        for p in clip_paths:
+            storage_dest = f"clips/{USER_ID}/{p.name}"
+            url_map[p.name] = upload_to_firebase_storage(p, storage_dest)
+        return url_map
+
+    # 4. Final fallback: Direct Release URL convention
+    for p in clip_paths:
+        url_map[p.name] = f"https://github.com/{GITHUB_REPO}/releases/download/{tag_name}/{p.name}"
+    return url_map
+
+
 def upload_to_firebase_storage(file_path: Path, storage_name: str) -> str:
     """Uploads a clip to Firebase Storage and returns its public URL."""
     if not STORAGE_BUCKET:
-        print("Warning: No STORAGE_BUCKET configured.")
         return ""
     encoded_name = urllib.parse.quote(storage_name, safe="")
     upload_url = f"https://firebasestorage.googleapis.com/v0/b/{STORAGE_BUCKET}/o?uploadType=media&name={encoded_name}"
@@ -219,7 +304,8 @@ def run():
 
     # 2. Split with FFmpeg
     clip_length = 90.0 if total_duration < 600 else 1200.0
-    clips = []
+    clips_meta = []
+    created_clip_files = []
     start_time = 0.0
     part_num = 1
 
@@ -242,31 +328,45 @@ def run():
             str(clip_path)
         ]
         subprocess.run(split_cmd, check=True)
-
-        # 3. Upload to Firebase Storage
-        storage_dest = f"clips/{USER_ID}/{clip_filename}"
-        public_url = upload_to_firebase_storage(clip_path, storage_dest)
+        created_clip_files.append(clip_path)
 
         hashtags = ["shorts", "viral", "trending", CONTENT_CATEGORY.lower()]
-        clips.append({
+        clips_meta.append({
             "partNumber": part_num,
+            "filename": clip_filename,
             "title": f"PART {part_num} | {title[:45]}",
             "description": f"📌 PART {part_num}\n{title}\n\nShared under Fair Use. Like & subscribe for more!",
             "hashtags": hashtags,
             "duration": round(duration, 2),
             "startTime": round(start_time, 2),
-            "url": public_url,
-            "storagePath": storage_dest,
         })
-
-        # Remove local slice immediately to keep disk at 0 MB
-        if clip_path.exists():
-            clip_path.unlink()
 
         start_time += duration
         part_num += 1
 
-    # Remove source file
+    # 3. Upload all clips to GitHub Releases (free CDN, no Firebase required)
+    update_job_status(status="processing", progress=85, step="Uploading clips to GitHub storage...", source_title=title, total_duration=total_duration)
+    url_map = upload_clips_to_github(JOB_ID, title, created_clip_files)
+
+    clips = []
+    for meta in clips_meta:
+        fname = meta["filename"]
+        pub_url = url_map.get(fname, "")
+        clips.append({
+            "partNumber": meta["partNumber"],
+            "title": meta["title"],
+            "description": meta["description"],
+            "hashtags": meta["hashtags"],
+            "duration": meta["duration"],
+            "startTime": meta["startTime"],
+            "url": pub_url,
+            "storagePath": f"releases/{JOB_ID}/{fname}",
+        })
+
+    # Clean up local disk
+    for cp in created_clip_files:
+        if cp.exists():
+            cp.unlink()
     if source_file.exists():
         source_file.unlink()
 

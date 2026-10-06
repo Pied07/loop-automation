@@ -38,6 +38,8 @@ jobs:
   split-and-upload:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -77,5 +79,7 @@ jobs:
           FIREBASE_PROJECT_ID: ${{ inputs.firebaseProjectId || secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
           FIREBASE_STORAGE_BUCKET: ${{ inputs.firebaseStorageBucket || secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
           APP_URL: "https://the-viral-desk.vercel.app"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           python scripts/cloud_splitter.py
