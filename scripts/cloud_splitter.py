@@ -217,6 +217,13 @@ def run():
     download_success = False
     last_error = ""
     cookie_file = Path("cookies.txt")
+    has_cookies = cookie_file.exists() and cookie_file.stat().st_size > 10
+
+    if has_cookies:
+        print("Using authenticated session with cookies.txt")
+
+    # If cookies are present, try standard client first
+    clients_to_try = ["default", "web", "mweb", "android"] if has_cookies else ["web", "mweb", "android", "tv", "ios"]
 
     for client in clients_to_try:
         print(f"Attempting download with player_client={client}...")
@@ -224,16 +231,20 @@ def run():
             "yt-dlp",
             VIDEO_URL,
             "--output", str(source_file),
-            "-f", "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best",
-            "--recode-video", "mp4",
+            "-f", "bestvideo[height<=1080]+bestaudio/bestvideo+bestaudio/best",
+            "--merge-output-format", "mp4",
             "--no-playlist",
             "--no-warnings",
-            "--extractor-args", "youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416",
-            "--extractor-args", f"youtube:player-client={client}",
             "--print-json",
         ]
 
-        if cookie_file.exists() and cookie_file.stat().st_size > 10:
+        if not has_cookies:
+            download_cmd.extend(["--extractor-args", "youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416"])
+
+        if client != "default":
+            download_cmd.extend(["--extractor-args", f"youtube:player-client={client}"])
+
+        if has_cookies:
             download_cmd.extend(["--cookies", str(cookie_file)])
 
         try:
@@ -259,8 +270,8 @@ def run():
             print(f"Client {client} exception: {e}")
 
     if not download_success:
-        # Final fallback: generic download with simple format
-        print("Attempting single-format fallback...")
+        # Final fallback: simplest download with any format
+        print("Attempting simplest fallback download...")
         try:
             fallback_cmd = [
                 "yt-dlp",
@@ -268,14 +279,16 @@ def run():
                 "--output", str(source_file),
                 "-f", "b/best",
                 "--no-playlist",
-                "--extractor-args", "youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416",
             ]
-            if cookie_file.exists() and cookie_file.stat().st_size > 10:
+            if has_cookies:
                 fallback_cmd.extend(["--cookies", str(cookie_file)])
+            else:
+                fallback_cmd.extend(["--extractor-args", "youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416"])
+
             proc2 = subprocess.run(fallback_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if proc2.returncode == 0 and source_file.exists() and source_file.stat().st_size > 1000:
                 download_success = True
-                print("Single-format fallback succeeded!")
+                print("Fallback download succeeded!")
             else:
                 if proc2.stderr:
                     err_lines = [l for l in proc2.stderr.splitlines() if "ERROR:" in l]
