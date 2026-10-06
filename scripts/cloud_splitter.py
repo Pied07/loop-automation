@@ -222,8 +222,8 @@ def run():
     if has_cookies:
         print("Using authenticated session with cookies.txt")
 
-    # VisionOS and Android clients reliably return video and audio streams
-    clients_to_try = ["visionos,android", "android", "mweb", "web"]
+    # When cookies are present, use web client (matches browser session). Otherwise use visionos,android
+    clients_to_try = ["web", "mweb"] if has_cookies else ["visionos,android", "android"]
 
     for client in clients_to_try:
         print(f"Attempting download with player_client={client}...")
@@ -267,15 +267,16 @@ def run():
             print(f"Client {client} exception: {e}")
 
     if not download_success:
-        # Final fallback: simplest download with -f b
-        print("Attempting fallback download with -f b...")
+        # Final fallback: simplest download
+        print("Attempting simplest fallback download...")
         try:
+            fallback_client = "web" if has_cookies else "visionos,android"
             fallback_cmd = [
                 "yt-dlp",
                 VIDEO_URL,
                 "--output", str(source_file),
-                "-f", "b",
-                "--extractor-args", "youtube:player-client=visionos,android",
+                "-f", "b/best",
+                "--extractor-args", f"youtube:player-client={fallback_client}",
                 "--no-playlist",
             ]
             if has_cookies:
