@@ -6,6 +6,8 @@ import { exec, spawn } from "child_process";
 import { promisify } from "util";
 
 const execAsync = promisify(exec);
+const SHORT_CLIP_LENGTH_SECONDS = 90;
+const MAX_CLIP_BYTES = Number(process.env.CLOUDINARY_MAX_UPLOAD_BYTES || 100 * 1024 * 1024);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -65,75 +67,129 @@ async function downloadWithYtDlp(
   outputPath: string,
   ffmpegBin: string
 ): Promise<{ title: string; duration?: number }> {
-  return new Promise((resolve, reject) => {
-    const localExe = path.join(process.cwd(), process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp");
-    const ytDlpCmd = fs.existsSync(localExe) ? localExe : (process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp");
+  const localExe = path.join(process.cwd(), process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp");
+  const ytDlpCmd = fs.existsSync(localExe) ? localExe : (process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp");
 
-    const cookiePath = path.join(process.cwd(), "cookies.txt");
-    const hasCookies = fs.existsSync(cookiePath);
-
-    const args = [
-      videoUrl,
-      "--output", outputPath,
-      "--format", "best[height<=720][ext=mp4]/bestvideo[height<=720]+bestaudio/best",
-      "--recode-video", "mp4",
-      "--no-playlist",
-      "--ffmpeg-location", ffmpegBin,
-      "--js-runtimes", "node",
-      ...(hasCookies ? ["--cookies", cookiePath] : []),
-      "--print-json",
-      "--no-warnings",
-    ];
-
-    const proc = spawn(ytDlpCmd, args, { shell: false });
-    let jsonOutput = "";
-    let errOutput = "";
-
-    proc.stdout.on("data", (d: Buffer) => { jsonOutput += d.toString(); });
-    proc.stderr.on("data", (d: Buffer) => { errOutput += d.toString(); });
-
-    proc.on("close", (code: number | null) => {
-      // Check if file was saved under a slightly different name (e.g. extension difference)
-      if (!fs.existsSync(outputPath)) {
-        const dir = path.dirname(outputPath);
-        const base = path.basename(outputPath, path.extname(outputPath));
-        try {
-          const matching = fs.readdirSync(dir).find((f) => f.startsWith(base) && !f.endsWith(".part"));
-          if (matching) {
-            fs.renameSync(path.join(dir, matching), outputPath);
-          }
-        } catch {}
+  const runAttempt = (format: string, extraArgs: string[] = []) =>
+    new Promise<{ title: string; duration: number }>((resolve, reject) => {
+      const cookiesFile = path.join(process.cwd(), "cookies.txt");
+      const args = [
+        videoUrl,
+        "--output", outputPath,
+        "--format", format,
+        "--merge-output-format", "mp4",
+        "--postprocessor-args", "ffmpeg:-strict -2",
+        "--no-playlist",
+        "--retries", "3",
+        "--fragment-retries", "5",
+        "--ffmpeg-location", ffmpegBin,
+        "--js-runtimes", "node",
+        "--print-json",
+        "--no-warnings",
+        ...extraArgs,
+      ];
+      if (fs.existsSync(cookiesFile)) {
+        args.push("--cookies", cookiesFile);
       }
 
-      if (code === 0 && fs.existsSync(outputPath)) {
-        let title = "Viral Video";
-        let duration = 0;
-        try {
-          const parsed = JSON.parse(jsonOutput.trim().split("\n").pop() || "{}");
-          title = parsed.title || parsed.fulltitle || "Viral Video";
-          if (parsed.duration && typeof parsed.duration === "number") {
-            duration = parsed.duration;
-          }
-        } catch {}
-        resolve({ title, duration });
-      } else {
-        let msg = `Download failed (code ${code}): ${errOutput.slice(0, 300)}`;
-        if (
-          errOutput.includes("Instagram sent an empty media response") ||
-          errOutput.includes("API is not granting access") ||
-          errOutput.toLowerCase().includes("login") ||
-          errOutput.toLowerCase().includes("cannot parse data")
-        ) {
-          msg = "Meta (Instagram/Facebook) requires authentication for this video. To download IG/FB videos, save your browser cookies to a cookies.txt file in the project folder, or use YouTube, TikTok, or direct .mp4 links.";
+      const proc = spawn(ytDlpCmd, args, { shell: false });
+      let jsonOutput = "";
+      let errOutput = "";
+      proc.stdout.on("data", (d: Buffer) => { jsonOutput += d.toString(); });
+      proc.stderr.on("data", (d: Buffer) => { errOutput += d.toString(); });
+
+      proc.on("close", (code: number | null) => {
+        if (!fs.existsSync(outputPath)) {
+          const dir = path.dirname(outputPath);
+          const base = path.basename(outputPath, path.extname(outputPath));
+          try {
+            const matching = fs.readdirSync(dir).find((f) => f.startsWith(base) && !f.endsWith(".part"));
+            if (matching) fs.renameSync(path.join(dir, matching), outputPath);
+          } catch {}
         }
-        reject(new Error(msg));
-      }
+
+        if (code === 0 && fs.existsSync(outputPath)) {
+          try {
+            const parsed = JSON.parse(jsonOutput.trim().split("\n").pop() || "{}");
+            resolve({ title: parsed.title || parsed.fulltitle || "Viral Video", duration: Number(parsed.duration) || 0 });
+          } catch {
+            resolve({ title: "Viral Video", duration: 0 });
+          }
+          return;
+        }
+
+        reject(new Error(`Download failed (code ${code}): ${errOutput.slice(-1200)}`));
+      });
+
+      proc.on("error", (e: Error) => reject(new Error(`Could not start yt-dlp: ${e.message}`)));
     });
 
-    proc.on("error", (e: Error) => {
-      reject(new Error(`Could not start yt-dlp: ${e.message}`));
-    });
-  });
+  const isYouTubeUrl = /(^|\.)youtube\.com$|(^|\.)youtu\.be$/i.test(new URL(videoUrl).hostname);
+
+  const cleanPartials = () => {
+    for (const partialPath of [outputPath, `${outputPath}.part`]) {
+      try { fs.unlinkSync(partialPath); } catch {}
+    }
+    try {
+      const dir = path.dirname(outputPath);
+      const base = path.basename(outputPath, path.extname(outputPath));
+      for (const f of fs.readdirSync(dir)) {
+        if (f.startsWith(base)) {
+          try { fs.unlinkSync(path.join(dir, f)); } catch {}
+        }
+      }
+    } catch {}
+  };
+
+  const attempts: { name: string; format: string; extraArgs: string[] }[] = isYouTubeUrl
+    ? [
+        {
+          name: "Standard MP4 merged",
+          format: "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/bv*[ext=mp4]+ba[ext=m4a]/bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b/best",
+          extraArgs: [],
+        },
+        {
+          name: "Auto-select client (VisionOS)",
+          format: "bv*+ba/b/best",
+          extraArgs: ["--extractor-args", "youtube:player-client=visionos,android"],
+        },
+        {
+          name: "Android client single stream",
+          format: "b/18/best",
+          extraArgs: ["--extractor-args", "youtube:player-client=android"],
+        },
+        {
+          name: "HLS fallback",
+          format: "95/best",
+          extraArgs: ["--extractor-args", "youtube:player-client=web"],
+        },
+      ]
+    : [
+        {
+          name: "Default best",
+          format: "bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b/best",
+          extraArgs: [],
+        },
+      ];
+
+  let lastError: Error | null = null;
+  for (const attempt of attempts) {
+    try {
+      cleanPartials();
+      return await runAttempt(attempt.format, attempt.extraArgs);
+    } catch (err: any) {
+      lastError = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (isYouTubeUrl && /sign in to confirm|not a bot/i.test(msg)) {
+        throw new Error(
+          "YouTube is requiring sign-in from this network. This downloader uses no cookies and cannot proceed until YouTube allows the request. Try again later or use a video file/direct media URL you are authorized to process."
+        );
+      }
+      console.warn(`yt-dlp attempt (${attempt.name}) failed:`, msg.slice(0, 300));
+    }
+  }
+
+  throw lastError || new Error("Failed to download video with yt-dlp.");
 }
 
 
@@ -178,10 +234,11 @@ async function appendOutroToClip(
       "-map", "[v]",
       "-map", "[a]",
       "-c:v", "libx264",
-      "-preset", "ultrafast",
-      "-crf", "23",
+      "-preset", "veryfast",
+      "-crf", "28",
       "-c:a", "aac",
-      "-b:a", "128k",
+      "-b:a", "96k",
+      "-movflags", "+faststart",
       outputPath,
     ];
 
@@ -208,8 +265,8 @@ async function splitVideo(
   totalDuration: number,
   timestamp: number
 ): Promise<{ clipPath: string; duration: number; startTime: number }[]> {
-  // Determine clip length: short (< 10 min) → 90s clips, long (≥ 10 min) → 1200s (20 min) clips
-  const clipLength = totalDuration < 600 ? 90 : 1200;
+  // Keep each output short enough for short-form platforms and Cloudinary's default upload cap.
+  const clipLength = SHORT_CLIP_LENGTH_SECONDS;
   const clips: { clipPath: string; duration: number; startTime: number }[] = [];
   const outroPath = path.join(process.cwd(), "public", "assets", "video-outro.mp4");
   const hasOutro = fs.existsSync(outroPath);
@@ -230,7 +287,7 @@ async function splitVideo(
 
     // 1. Cut the segment from source
     await new Promise<void>((resolve, reject) => {
-      const args = [
+      const copyArgs = [
         "-y",
         "-ss", String(startTime),
         "-i", sourcePath,
@@ -240,6 +297,21 @@ async function splitVideo(
         "-avoid_negative_ts", "make_zero",
         targetSlicePath,
       ];
+      const verticalEncodeArgs = [
+        "-y",
+        "-ss", String(startTime),
+        "-i", sourcePath,
+        "-t", String(duration),
+        "-vf", "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30",
+        "-c:v", "libx264",
+        "-preset", "veryfast",
+        "-crf", "28",
+        "-c:a", "aac",
+        "-b:a", "96k",
+        "-movflags", "+faststart",
+        targetSlicePath,
+      ];
+      const args = hasOutro ? copyArgs : verticalEncodeArgs;
       const proc = spawn(ffmpegBin, args, { shell: false });
       let errOut = "";
       proc.stderr.on("data", (d: Buffer) => { errOut += d.toString(); });
@@ -268,6 +340,13 @@ async function splitVideo(
       }
     }
 
+    const clipSize = fs.existsSync(clipPath) ? fs.statSync(clipPath).size : 0;
+    if (clipSize > MAX_CLIP_BYTES) {
+      const mb = (clipSize / 1024 / 1024).toFixed(1);
+      const maxMb = (MAX_CLIP_BYTES / 1024 / 1024).toFixed(0);
+      throw new Error(`Generated clip part ${partIndex} is ${mb} MB, above the ${maxMb} MB Cloudinary limit. Try a lower-resolution source or raise CLOUDINARY_MAX_UPLOAD_BYTES only if your Cloudinary plan allows it.`);
+    }
+
     clips.push({ clipPath, duration: Math.round(finalDuration * 100) / 100, startTime });
     startTime += duration;
     partIndex++;
@@ -293,7 +372,7 @@ export async function downloadAndSplitVideo(
     const timestamp = Date.now();
     sourceFilePath = path.join(clipsDir, `source_${timestamp}.mp4`);
 
-    // Try yt-dlp first, then ytdl-core as fallback
+    const isYouTubeUrl = /(^|\.)youtube\.com$|(^|\.)youtu\.be$/i.test(new URL(videoUrl).hostname);
     let sourceTitle = "Viral Video";
     let probedDuration = 0;
     try {
@@ -301,13 +380,14 @@ export async function downloadAndSplitVideo(
       sourceTitle = result.title;
       if (result.duration && result.duration > 0) probedDuration = result.duration;
     } catch (ytdlpErr: any) {
+      if (isYouTubeUrl) throw ytdlpErr;
       console.warn("yt-dlp failed, trying ytdl-core:", ytdlpErr.message);
       try {
         const result = await downloadWithYtdlCore(videoUrl, sourceFilePath);
         sourceTitle = result.title;
       } catch (ytdlErr: any) {
-        // Last resort: direct HTTP download (works for direct .mp4 links)
-        console.warn("ytdl-core failed, trying direct download:", ytdlErr.message);
+        // Direct HTTP download is only appropriate for media URLs, not webpage URLs.
+        console.warn("ytdl-core failed, trying direct media download:", ytdlErr.message);
         const res = await fetch(videoUrl, { signal: AbortSignal.timeout(120000) });
         if (!res.ok) throw new Error(`Direct download failed: HTTP ${res.status}`);
         const contentDisp = res.headers.get("content-disposition") || "";
@@ -734,7 +814,7 @@ export async function publishClipAndCleanup(params: {
       if (match) targetPublicId = match[1];
     }
 
-    if (targetPublicId && cloudName && apiKey && apiSecret) {
+    if (targetPublicId && cloudName && apiKey && apiSecret && process.env.CLOUDINARY_DELETE_AFTER_PUBLISH === "true") {
       try {
         const timestamp = Math.floor(Date.now() / 1000);
         const crypto = await import("crypto");
@@ -843,6 +923,11 @@ const SAFE_CATEGORY_QUERIES: Record<string, string[]> = {
   "Motivational": ["best motivational speech shorts", "podcast life advice wisdom shorts", "discipline mindset powerful speech shorts"],
   "Educational":   ["interesting facts educational shorts", "science facts did you know shorts", "eye opening history lesson shorts"],
   "Funny":         ["funny podcast moments shorts", "stand up comedy hilarious clean shorts", "epic funny moment shorts"],
+  "Comedy":        ["stand up comedy hilarious clean shorts", "funny comedy moments shorts", "epic funny clips shorts"],
+  "Horror":        ["scary urban legends stories shorts", "spooky horror mystery narration shorts", "creepy paranormal true stories shorts"],
+  "Romance":       ["touching romantic story shorts", "wholesome love relationship advice shorts", "sweet emotional love stories shorts"],
+  "Adventure":     ["extreme sports outdoor adventure shorts", "hiking wilderness exploration shorts", "action travel adventure shorts"],
+  "Music":         ["amazing street musician performance shorts", "talented instrumental piano guitar solo shorts", "impressive vocal performance shorts"],
   "Nature":        ["breathtaking nature wildlife shorts", "amazing earth planet discovery shorts", "peaceful nature landscape shorts"],
   "Sports":        ["athlete discipline motivation speech shorts", "legendary sports moment highlights shorts", "unstoppable athlete mindset shorts"],
   "Gaming":        ["epic gaming moment clutch shorts", "funny gaming moments clips shorts"],
@@ -893,4 +978,3 @@ export async function autoFindViralVideo(category: string): Promise<{ url?: stri
     return { error: error.message || "Failed to search for viral video." };
   }
 }
-

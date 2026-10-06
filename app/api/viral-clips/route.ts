@@ -1,188 +1,225 @@
 import { NextRequest, NextResponse } from "next/server";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "path";
-import fs from "fs";
+import { randomUUID } from "node:crypto";
 import { downloadAndSplitVideo, generateClipMetadata } from "@/app/viral-actions";
+import { assertCloudinaryConfigured, deleteCloudinaryVideo, uploadVideoToCloudinary } from "@/app/cloudinary-upload";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
+type ProcessingMode = "local" | "cloud" | "queue";
+
+async function readJsonBody(req: NextRequest) {
   try {
-    const body = await req.json();
+    return await req.json() as { videoUrl?: unknown; contentCategory?: unknown; userId?: unknown };
+  } catch {
+    return null;
+  }
+}
+
+function getProcessingMode(req: NextRequest): ProcessingMode {
+  const configuredMode = process.env.VIRAL_CLIPS_PROCESSOR?.toLowerCase();
+  if (configuredMode === "local" || configuredMode === "cloud" || configuredMode === "queue") {
+    return configuredMode;
+  }
+
+  const hostname = new URL(req.url).hostname;
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return "local";
+  }
+
+  return "cloud";
+}
+
+async function registerQueuedJob(req: NextRequest, params: { jobId: string; videoUrl: string; contentCategory: string }) {
+  try {
+    const queueUrl = new URL("/api/viral-clips/queue", req.url).toString();
+    const response = await fetch(queueUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...params, status: "pending" }),
+    });
+    if (!response.ok) {
+      console.warn("Queue registration failed:", await response.text());
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.warn("Queue registration error:", error);
+    return false;
+  }
+}
+
+async function initializeJobStatus(req: NextRequest, jobId: string) {
+  try {
+    const statusUrl = new URL("/api/viral-clips/status", req.url).toString();
+    await fetch(statusUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jobId,
+        status: "processing",
+        progress: 12,
+        step: "Queued for video processing...",
+      }),
+    });
+  } catch (error) {
+    console.warn("Initial status update failed:", error);
+  }
+}
+
+async function dispatchGitHubWorkflow(params: {
+  videoUrl: string;
+  contentCategory: string;
+  jobId: string;
+  userId: string;
+}) {
+  const githubPat = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
+  if (!githubPat) return false;
+
+  const githubRepo = process.env.GITHUB_REPO || "Pied07/loop-automation";
+  const response = await fetch(`https://api.github.com/repos/${githubRepo}/actions/workflows/split-video.yml/dispatches`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${githubPat}`,
+      Accept: "application/vnd.github.v3+json",
+      "Content-Type": "application/json",
+      "User-Agent": "The-Viral-Desk-App",
+    },
+    body: JSON.stringify({
+      ref: "main",
+      inputs: params,
+    }),
+  });
+
+  if (!response.ok) {
+    console.warn("GitHub workflow dispatch failed:", response.status, await response.text());
+    return false;
+  }
+
+  return true;
+}
+
+export async function POST(req: NextRequest) {
+  const jobId = randomUUID();
+  const clipsDir = path.join(tmpdir(), "viral-clips", jobId);
+  const uploadedPublicIds: string[] = [];
+
+  try {
+    const body = await readJsonBody(req);
+    if (!body) {
+      return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
+    }
+
     const { videoUrl, contentCategory } = body;
 
     if (!videoUrl || typeof videoUrl !== "string") {
       return NextResponse.json({ error: "Video URL is required." }, { status: 400 });
     }
-
-    const jobId = `job_${Date.now()}`;
-
-    // Add job to worker queue so desktop worker can pick it up immediately
     try {
-      const queueUrl = new URL("/api/viral-clips/queue", req.url).toString();
-      await fetch(queueUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jobId,
-          videoUrl,
-          contentCategory: contentCategory || "Trending",
-          status: "pending",
-        }),
-      });
-    } catch (e) {
-      console.warn("Queue registration error:", e);
+      new URL(videoUrl);
+    } catch {
+      return NextResponse.json({ error: "Enter a valid video URL." }, { status: 400 });
     }
 
-    // 1. Also trigger GitHub Actions Cloud Runner if configured
-    const githubPat = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
-    const githubRepo = process.env.GITHUB_REPO || "Pied07/loop-automation";
+    const normalizedCategory = typeof contentCategory === "string" && contentCategory.trim() ? contentCategory.trim() : "Trending";
+    const userId = typeof body.userId === "string" && body.userId.trim() ? body.userId.trim() : "creator";
+    const processingMode = getProcessingMode(req);
 
-    if (githubPat) {
-      const dispatchUrl = `https://api.github.com/repos/${githubRepo}/actions/workflows/split-video.yml/dispatches`;
-
-      try {
-        await fetch(dispatchUrl, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${githubPat}`,
-            Accept: "application/vnd.github.v3+json",
-            "Content-Type": "application/json",
-            "User-Agent": "The-Viral-Desk-App",
-          },
-          body: JSON.stringify({
-            ref: "main",
-            inputs: {
-              videoUrl,
-              contentCategory: contentCategory || "Trending",
-              jobId,
-              userId: body.userId || "creator",
-              firebaseApiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
-              firebaseProjectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "",
-              firebaseStorageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
-            },
-          }),
-        });
-      } catch (ghErr) {
-        console.warn("GitHub dispatch notice:", ghErr);
+    if (processingMode === "queue") {
+      const queueRegistered = await registerQueuedJob(req, { jobId, videoUrl, contentCategory: normalizedCategory });
+      if (!queueRegistered) {
+        return NextResponse.json({ error: "Could not queue the job for the desktop worker." }, { status: 500 });
       }
 
+      await initializeJobStatus(req, jobId);
       return NextResponse.json({
         success: true,
-        cloudMode: "hybrid",
+        cloudMode: "desktop-worker",
         jobId,
-        message: "Video splitting job queued for processor!",
+        message: "Video splitting job queued for the desktop worker.",
       });
     }
 
-    // 2. Check if Hugging Face Cloud Worker is configured
-    const workerUrl = process.env.HUGGINGFACE_WORKER_URL;
-    if (workerUrl) {
-      let cleanWorkerUrl = workerUrl.replace(/\/$/, "");
-      // Auto-convert browser URL (https://huggingface.co/spaces/owner/space) to Direct API (https://owner-space.hf.space)
-      const hfWebMatch = cleanWorkerUrl.match(/huggingface\.co\/spaces\/([^/]+)\/([^/]+)/);
-      if (hfWebMatch) {
-        cleanWorkerUrl = `https://${hfWebMatch[1].toLowerCase()}-${hfWebMatch[2].toLowerCase()}.hf.space`;
+    if (processingMode === "cloud") {
+      await initializeJobStatus(req, jobId);
+      const githubDispatched = await dispatchGitHubWorkflow({ videoUrl, contentCategory: normalizedCategory, jobId, userId });
+      if (!githubDispatched) {
+        return NextResponse.json({ error: "Could not start the GitHub cloud runner. Set VIRAL_CLIPS_PROCESSOR=local to process on this machine." }, { status: 502 });
       }
-
-      const workerRes = await fetch(`${cleanWorkerUrl}/split`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ videoUrl, contentCategory }),
-      });
-
-      const resText = await workerRes.text();
-      let workerData: any;
-      try {
-        workerData = JSON.parse(resText);
-      } catch {
-        if (resText.includes("<!DOCTYPE") || resText.includes("<html")) {
-          return NextResponse.json(
-            {
-              error:
-                "Cloud worker returned a webpage instead of API JSON. In your Hugging Face Space README.md, change 'sdk: static' to 'sdk: gradio' so Hugging Face starts Python instead of a static webpage.",
-            },
-            { status: 502 }
-          );
-        }
-        return NextResponse.json(
-          { error: `Cloud worker returned invalid response: ${resText.slice(0, 150)}` },
-          { status: 502 }
-        );
-      }
-
-      if (!workerRes.ok || !workerData.success) {
-        return NextResponse.json(
-          { error: workerData.detail || workerData.error || "Hugging Face worker failed to process video." },
-          { status: 400 }
-        );
-      }
-
-      const clipsWithMeta = await Promise.all(
-        workerData.clips.map(async (clip: any, index: number) => {
-          const meta = await generateClipMetadata({
-            partNumber: index + 1,
-            totalParts: workerData.clips.length,
-            sourceTitle: workerData.sourceTitle,
-            totalDuration: workerData.totalDuration,
-            contentCategory: contentCategory || "viral",
-            clipDuration: clip.duration,
-          });
-          return {
-            partNumber: index + 1,
-            title: workerData.clips.length === 1 ? workerData.sourceTitle : `PART ${index + 1} | ${workerData.sourceTitle.slice(0, 45)}`,
-            description: meta.description,
-            hashtags: meta.hashtags,
-            duration: clip.duration,
-            startTime: clip.startTime,
-            clipPath: clip.url, // Full HTTPS URL hosted on Hugging Face
-            publicUrl: clip.url,
-            cloudFilename: clip.filename,
-          };
-        })
-      );
 
       return NextResponse.json({
         success: true,
-        sourceTitle: workerData.sourceTitle,
-        totalDuration: workerData.totalDuration,
-        clips: clipsWithMeta,
+        cloudMode: "github",
+        jobId,
+        message: "Video splitting job started in GitHub Actions.",
       });
     }
 
-    // 2. Fallback: Local processing (when running on localhost)
-    const clipsDir = path.join(process.cwd(), "public", "clips");
-    if (!fs.existsSync(clipsDir)) fs.mkdirSync(clipsDir, { recursive: true });
+    assertCloudinaryConfigured();
+    await mkdir(clipsDir, { recursive: true, mode: 0o700 });
 
-    // Download and split the video
     const splitResult = await downloadAndSplitVideo(videoUrl, clipsDir);
     if ("error" in splitResult) {
       return NextResponse.json({ error: splitResult.error }, { status: 400 });
     }
 
     const { clips, sourceTitle, totalDuration } = splitResult;
-
-    // Generate metadata for each clip
-    const clipsWithMeta = await Promise.all(
+    const clipsWithMetadata = await Promise.all(
       clips.map(async (clip, index) => {
         const meta = await generateClipMetadata({
           partNumber: index + 1,
           totalParts: clips.length,
           sourceTitle,
           totalDuration,
-          contentCategory: contentCategory || "viral",
+          contentCategory: normalizedCategory,
           clipDuration: clip.duration,
         });
+
         return {
-          ...clip,
+          clipPath: clip.clipPath,
           partNumber: index + 1,
           title: clips.length === 1 ? sourceTitle : `PART ${index + 1} | ${sourceTitle.slice(0, 45)}`,
           description: meta.description,
           hashtags: meta.hashtags,
-          publicUrl: `/clips/${path.basename(clip.clipPath)}`,
+          duration: clip.duration,
+          startTime: clip.startTime,
         };
       })
     );
+
+    const clipsWithMeta: Array<{
+      clipPath: string;
+      publicUrl: string;
+      partNumber: number;
+      title: string;
+      description: string;
+      hashtags: string[];
+      duration: number;
+      startTime: number;
+      storagePath: string;
+      cloudinaryPublicId: string;
+    }> = [];
+    try {
+      for (const clip of clipsWithMetadata) {
+        const filename = path.basename(clip.clipPath);
+        const publicId = `viral_clips/${jobId}/${path.parse(filename).name}`;
+        uploadedPublicIds.push(publicId);
+        const uploaded = await uploadVideoToCloudinary(clip.clipPath, publicId);
+        clipsWithMeta.push({
+          ...clip,
+          clipPath: uploaded.secureUrl,
+          publicUrl: uploaded.secureUrl,
+          storagePath: uploaded.publicId,
+          cloudinaryPublicId: uploaded.publicId,
+        });
+      }
+    } catch (uploadError) {
+      await Promise.all(uploadedPublicIds.map(deleteCloudinaryVideo));
+      throw uploadError;
+    }
 
     return NextResponse.json({
       success: true,
@@ -190,8 +227,13 @@ export async function POST(req: NextRequest) {
       totalDuration,
       clips: clipsWithMeta,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to process video.";
     console.error("Viral clips error:", err);
-    return NextResponse.json({ error: err.message || "Failed to process video." }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
+  } finally {
+    await rm(clipsDir, { recursive: true, force: true }).catch((cleanupError) => {
+      console.warn("Could not clean temporary clip directory:", cleanupError);
+    });
   }
 }

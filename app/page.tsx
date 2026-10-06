@@ -38,7 +38,7 @@ import {
 } from "lucide-react";
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { useEffect, useState, useRef, type FormEvent } from "react";
-import { auth, firebaseConfigured, database, listenToVideos, deleteVideo, deleteVideosByYouTubeId, deleteVideosByFacebookId, saveVideo, type VideoRecord } from "./firebase";
+import { auth, firebaseConfigured, database, type VideoRecord } from "./firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 import { deleteFromYouTube, deleteFromFacebook, getPublishedAutomationVideos } from "./actions";
 import { autoFindViralVideo } from "./viral-actions";
@@ -54,6 +54,7 @@ type ClipMeta = {
   hashtags: string[];
   duration: number;
   startTime: number;
+  cloudinaryPublicId?: string;
 };
 
 type PublishStatus = "idle" | "publishing" | "done" | "error";
@@ -219,36 +220,30 @@ export default function Home() {
 
   useEffect(() => {
     if (!auth) return;
-    let unsubscribeVideos: () => void;
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        if (unsubscribeVideos) unsubscribeVideos();
-        return;
-      }
+      if (!user) return;
       setDisplayName(user.displayName || user.email?.split("@")[0] || "Creator");
       setSignedIn(true);
       setScreen("studio");
-      unsubscribeVideos = listenToVideos(user.uid, (vids) => {
-        setVideos((current) => mergeVideoRecords(current.filter((video) => video.sessionOnly), vids));
-      });
     });
-    return () => {
-      unsubscribeAuth();
-      if (unsubscribeVideos) unsubscribeVideos();
-    };
+    return () => unsubscribeAuth();
   }, []);
 
   useEffect(() => {
     if (!connections.includes("YouTube") || !signedIn || !auth?.currentUser) return;
-    const userId = auth.currentUser.uid;
     let active = true;
     void getPublishedAutomationVideos().then(async (recovered) => {
       if (!active) return;
       let hiddenVideoIds: string[] = [];
       try { hiddenVideoIds = JSON.parse(localStorage.getItem("tvd-studio-hidden-youtube-videos") || "[]"); } catch { hiddenVideoIds = []; }
-      const records = (recovered as VideoRecord[]).filter((video) => !hiddenVideoIds.includes(video.youtubeVideoId || ""));
-      await Promise.allSettled(records.map((video) => saveVideo(userId, video)));
-      if (active) setVideos((current) => mergeVideoRecords(current, records.map((video) => ({ ...video, sessionOnly: false }))));
+      const records = (recovered as VideoRecord[])
+        .filter((video) => !hiddenVideoIds.includes(video.youtubeVideoId || ""))
+        .map((video) => ({ ...video, sessionOnly: true }));
+      if (active) {
+        setVideos((current) => mergeVideoRecords(current, records));
+        const cached = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]") as VideoRecord[];
+        localStorage.setItem("tvd-studio-session-videos", JSON.stringify(mergeVideoRecords(records, cached)));
+      }
     }).catch((error) => console.warn("Could not recover videos from YouTube:", error));
     return () => { active = false; };
   }, [connections, signedIn]);
@@ -360,7 +355,13 @@ export default function Home() {
         body: JSON.stringify({ videoUrl: videoUrl.trim(), contentCategory: selectedCategory }),
       });
       clearInterval(progressInterval);
-      const data = await res.json();
+      const responseText = await res.text();
+      let data: { success?: boolean; error?: string; jobId?: string; clips?: ClipMeta[]; sourceTitle?: string } = {};
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        data = { error: responseText.slice(0, 180) || "The server returned an invalid response." };
+      }
       if (!res.ok || !data.success) throw new Error(data.error || "Failed to process video.");
 
       if (data.jobId) {
@@ -401,8 +402,8 @@ export default function Home() {
           } catch {}
         }, 2500);
 
-        // 2. Real-time Firestore listener as fast backup
-        if (database) {
+        // Firestore job updates are opt-in; HTTP polling is the default status source.
+        if (database && process.env.NEXT_PUBLIC_ENABLE_FIRESTORE_JOB_LISTENER === "true") {
           try {
             const unsub = onSnapshot(doc(database, "jobs", data.jobId), (snap) => {
               if (!snap.exists() || finished) return;
@@ -474,6 +475,7 @@ export default function Home() {
           platforms: activePlatforms,
           userEmail: auth?.currentUser?.email || "",
           connections,
+          cloudinaryPublicId: clip.cloudinaryPublicId,
         }),
       });
       const data = await res.json();
@@ -501,9 +503,11 @@ export default function Home() {
         format: selectedCategory,
         createdAt: new Date().toISOString().slice(0, 10),
         status: "completed",
-        sessionOnly: !firebaseConfigured,
+        sessionOnly: true,
       };
       setVideos((prev) => [newRecord, ...prev]);
+      const cached = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]") as VideoRecord[];
+      localStorage.setItem("tvd-studio-session-videos", JSON.stringify(mergeVideoRecords([newRecord], cached)));
       notify(`${clip.title} published successfully!`);
     } catch (err: any) {
       setClipResults((prev) => ({ ...prev, [clip.partNumber]: { status: "error", error: err.message, logs: [] } }));
@@ -584,17 +588,6 @@ export default function Home() {
       }
       if (deleteFromYouTubeToo && target.facebookVideoId) {
         await deleteFromFacebook(target.facebookVideoId);
-      }
-
-      if (target.youtubeVideoId && firebaseConfigured && auth?.currentUser) {
-        await deleteVideosByYouTubeId(auth.currentUser.uid, target.youtubeVideoId);
-      }
-      if (target.facebookVideoId && firebaseConfigured && auth?.currentUser) {
-        await deleteVideosByFacebookId(auth.currentUser.uid, target.facebookVideoId);
-      }
-      
-      if (!target.youtubeVideoId && !target.facebookVideoId && !target.sessionOnly && auth?.currentUser) {
-        await deleteVideo(auth.currentUser.uid, target.id);
       }
 
       if (target.sessionOnly || target.youtubeVideoId || target.facebookVideoId) {
@@ -952,4 +945,3 @@ function AuthDialog({ mode, setMode, email, setEmail, password, setPassword, err
 }) {
   return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title"><button className="icon-button modal-close" onClick={onClose} aria-label="Close"><X size={19} /></button><span className="modal-mark"><Play size={19} fill="currentColor" /></span><div className="eyebrow"><span className="eyebrow-dot" /> YOUR CREATOR SPACE</div><h2 id="auth-title">{mode === "signup" ? "Let's make a little magic." : "Welcome back."}</h2><p>{mode === "signup" ? "Create your studio and keep all your shorts in one place." : "Pick up right where your next idea left off."}</p><form onSubmit={onSubmit}><label className="field-label">Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required autoComplete="email" /></label><label className="field-label">Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 6 characters" required minLength={6} autoComplete={mode === "signup" ? "new-password" : "current-password"} /></label>{error && <p className="auth-error">{error}</p>}<button className="primary-button auth-submit" disabled={loading}>{loading ? <LoaderCircle className="spin" size={16} /> : <>{mode === "signup" ? "Create my studio" : "Log in"}<ArrowRight size={16} /></>}</button></form><div className="auth-switch">{mode === "signup" ? "Already have a studio?" : "New around here?"} <button onClick={() => setMode(mode === "signup" ? "login" : "signup")}>{mode === "signup" ? "Log in" : "Create an account"}</button></div>{!configured && <><div className="modal-divider"><span>OR</span></div><button className="preview-button" onClick={onPreview}>Explore the studio preview <ArrowRight size={15} /></button><div className="preview-caption-modal">Firebase isn't configured yet. Preview mode won't save your work.</div></>}</section></div>;
 }
-

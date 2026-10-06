@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   }
 
   const job = jobCache.get(jobId);
-  if (job) {
+  if (job && (job.status === "done" || job.status === "failed")) {
     return NextResponse.json(job);
   }
 
@@ -74,6 +74,10 @@ export async function GET(req: NextRequest) {
         }
       }
     } catch {}
+  }
+
+  if (job) {
+    return NextResponse.json(job);
   }
 
   return NextResponse.json({

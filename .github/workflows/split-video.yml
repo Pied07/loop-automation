@@ -13,7 +13,7 @@ on:
         default: 'Trending'
         type: string
       jobId:
-        description: 'Firestore Job ID for real-time progress tracking'
+        description: 'Job ID for progress tracking'
         required: true
         type: string
       userId:
@@ -21,19 +21,6 @@ on:
         required: false
         default: 'creator'
         type: string
-      firebaseApiKey:
-        description: 'Firebase API Key'
-        required: false
-        type: string
-      firebaseProjectId:
-        description: 'Firebase Project ID'
-        required: false
-        type: string
-      firebaseStorageBucket:
-        description: 'Firebase Storage Bucket'
-        required: false
-        type: string
-
 jobs:
   split-and-upload:
     runs-on: ubuntu-latest
@@ -50,24 +37,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Start Proof-of-Origin Token Provider
-        run: |
-          docker run --name bgutil-provider -d --init -p 127.0.0.1:4416:4416 brainicism/bgutil-ytdlp-pot-provider
-          sleep 5
-
-      - name: Install yt-dlp, POT Plugin & FFmpeg
+      - name: Install yt-dlp & FFmpeg
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
-          pip install --upgrade "yt-dlp[default,curl-cffi]" bgutil-ytdlp-pot-provider
-
-      - name: Setup YouTube Cookies if configured
-        env:
-          YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
-        run: |
-          if [ -n "$YOUTUBE_COOKIES" ]; then
-            printf "%s\n" "$YOUTUBE_COOKIES" > cookies.txt
-            echo "Loaded YouTube authentication cookies ($(wc -l < cookies.txt) lines)."
-          fi
+          pip install --upgrade "yt-dlp[default,curl-cffi]"
 
       - name: Run Cloud Video Processing
         env:
@@ -75,9 +48,9 @@ jobs:
           CONTENT_CATEGORY: ${{ inputs.contentCategory }}
           JOB_ID: ${{ inputs.jobId }}
           USER_ID: ${{ inputs.userId }}
-          FIREBASE_API_KEY: ${{ inputs.firebaseApiKey || secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
-          FIREBASE_PROJECT_ID: ${{ inputs.firebaseProjectId || secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
-          FIREBASE_STORAGE_BUCKET: ${{ inputs.firebaseStorageBucket || secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
           APP_URL: "https://the-viral-desk.vercel.app"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}

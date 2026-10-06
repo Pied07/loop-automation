@@ -33,6 +33,8 @@ const GITHUB_REPO = process.env.GITHUB_REPO || env.GITHUB_REPO || "Pied07/loop-a
 const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || env.CLOUDINARY_CLOUD_NAME || "";
 const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || env.CLOUDINARY_API_KEY || "";
 const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET || env.CLOUDINARY_API_SECRET || "";
+const SHORT_CLIP_LENGTH_SECONDS = 90.0;
+const MAX_CLOUDINARY_UPLOAD_BYTES = Number(process.env.CLOUDINARY_MAX_UPLOAD_BYTES || env.CLOUDINARY_MAX_UPLOAD_BYTES || 100 * 1024 * 1024);
 
 const TEMP_DIR = path.join(ROOT_DIR, "temp_worker");
 if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
@@ -89,6 +91,13 @@ async function updateJobStatus(payload) {
 
 // Uploads clip to Cloudinary
 async function uploadToCloudinary(filePath, publicId) {
+  const fileSize = fs.statSync(filePath).size;
+  if (fileSize > MAX_CLOUDINARY_UPLOAD_BYTES) {
+    const mb = (fileSize / 1024 / 1024).toFixed(1);
+    const maxMb = (MAX_CLOUDINARY_UPLOAD_BYTES / 1024 / 1024).toFixed(0);
+    throw new Error(`Clip is ${mb} MB, which exceeds the Cloudinary upload limit of ${maxMb} MB.`);
+  }
+
   const timestamp = Math.floor(Date.now() / 1000);
   const crypto = await import("crypto");
   const signature = crypto
@@ -110,7 +119,13 @@ async function uploadToCloudinary(filePath, publicId) {
     body: formData,
   });
 
-  const data = await res.json();
+  const text = await res.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { error: { message: text.slice(0, 300) } };
+  }
   if (data.secure_url) {
     return { url: data.secure_url, publicId: data.public_id };
   }
@@ -285,7 +300,7 @@ async function processJob(job) {
     });
 
     // 2. Split with FFmpeg
-    const clipLength = duration > 0 && duration < 600 ? 90.0 : 1200.0;
+    const clipLength = SHORT_CLIP_LENGTH_SECONDS;
     const clipFiles = [];
     const clipsMeta = [];
     let startTime = 0.0;
@@ -308,11 +323,22 @@ async function processJob(job) {
         "-ss", startTime.toString(),
         "-i", sourcePath,
         "-t", curDuration.toString(),
-        "-c:v", "copy",
-        "-c:a", "copy",
-        "-avoid_negative_ts", "make_zero",
+        "-vf", "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30",
+        "-c:v", "libx264",
+        "-preset", "veryfast",
+        "-crf", "28",
+        "-c:a", "aac",
+        "-b:a", "96k",
+        "-movflags", "+faststart",
         clipFilePath,
       ]);
+
+      const clipSize = fs.statSync(clipFilePath).size;
+      if (clipSize > MAX_CLOUDINARY_UPLOAD_BYTES) {
+        const mb = (clipSize / 1024 / 1024).toFixed(1);
+        const maxMb = (MAX_CLOUDINARY_UPLOAD_BYTES / 1024 / 1024).toFixed(0);
+        throw new Error(`Generated clip part ${partNum} is ${mb} MB, above the ${maxMb} MB Cloudinary limit.`);
+      }
 
       clipFiles.push(clipFilePath);
       clipsMeta.push({
