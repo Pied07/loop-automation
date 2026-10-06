@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { database } from "@/app/firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 // In-memory job state cache (with 1 hour TTL)
-const jobCache = new Map<string, { status: string; progress: number; step: string; clips?: any[]; sourceTitle?: string; error?: string; updatedAt: number }>();
+const jobCache = new Map<string, { status: string; progress: number; step: string; clips?: any[]; sourceTitle?: string; totalDuration?: number; error?: string; updatedAt: number }>();
 
 export const dynamic = "force-dynamic";
 
@@ -18,13 +20,29 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(job);
   }
 
-  // If not in cache, check GitHub Actions status directly
+  // Check persistent Firestore state
+  if (database) {
+    try {
+      const snap = await getDoc(doc(database, "jobs", jobId));
+      if (snap.exists()) {
+        const firestoreJob = snap.data() as any;
+        jobCache.set(jobId, { ...firestoreJob, updatedAt: Date.now() });
+        if (firestoreJob.status === "done" || firestoreJob.status === "failed") {
+          return NextResponse.json(firestoreJob);
+        }
+      }
+    } catch (err: any) {
+      console.warn("Firestore status check notice:", err.message);
+    }
+  }
+
+  // If not completed yet, check GitHub Actions status directly
   const githubPat = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
   const githubRepo = process.env.GITHUB_REPO || "Pied07/loop-automation";
 
   if (githubPat) {
     try {
-      // 1. Check if worker published a completed release for this job
+      // 1. Check if runner published a completed release for this job
       const relRes = await fetch(`https://api.github.com/repos/${githubRepo}/releases/tags/clips-${jobId}`, {
         headers: {
           Authorization: `Bearer ${githubPat}`,
@@ -39,6 +57,11 @@ export async function GET(req: NextRequest) {
             const parsed = JSON.parse(relData.body);
             if (parsed.status === "done" && Array.isArray(parsed.clips)) {
               jobCache.set(jobId, { ...parsed, updatedAt: Date.now() });
+              if (database) {
+                try {
+                  await setDoc(doc(database, "jobs", jobId), parsed, { merge: true });
+                } catch {}
+              }
               return NextResponse.json(parsed);
             }
           } catch {}
@@ -83,30 +106,41 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     status: "processing",
     progress: 25,
-    step: "Processing in GitHub cloud runner...",
+    step: "Processing video...",
   });
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { jobId, status, progress, step, clips, sourceTitle, error } = body;
+    const { jobId, status, progress, step, clips, sourceTitle, totalDuration, error } = body;
 
     if (!jobId) {
       return NextResponse.json({ error: "jobId is required" }, { status: 400 });
     }
 
-    jobCache.set(jobId, {
+    const payload = {
       status: status || "processing",
       progress: progress || 0,
       step: step || "",
       clips: clips || undefined,
       sourceTitle: sourceTitle || undefined,
+      totalDuration: totalDuration || undefined,
       error: error || undefined,
       updatedAt: Date.now(),
-    });
+    };
 
-    // Cleanup jobs older than 1 hour
+    jobCache.set(jobId, payload);
+
+    if (database) {
+      try {
+        await setDoc(doc(database, "jobs", jobId), payload, { merge: true });
+      } catch (err: any) {
+        console.warn("Failed to write status to Firestore:", err.message);
+      }
+    }
+
+    // Cleanup memory cache entries older than 1 hour
     const now = Date.now();
     for (const [k, v] of jobCache.entries()) {
       if (now - v.updatedAt > 3600000) jobCache.delete(k);

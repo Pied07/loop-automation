@@ -13,13 +13,17 @@ type ProcessingMode = "local" | "cloud" | "queue";
 
 async function readJsonBody(req: NextRequest) {
   try {
-    return await req.json() as { videoUrl?: unknown; contentCategory?: unknown; userId?: unknown };
+    return await req.json() as { videoUrl?: unknown; contentCategory?: unknown; userId?: unknown; mode?: unknown };
   } catch {
     return null;
   }
 }
 
-function getProcessingMode(req: NextRequest): ProcessingMode {
+function getProcessingMode(req: NextRequest, clientMode?: unknown): ProcessingMode {
+  if (clientMode === "local" || clientMode === "cloud" || clientMode === "queue") {
+    return clientMode;
+  }
+
   const configuredMode = process.env.VIRAL_CLIPS_PROCESSOR?.toLowerCase();
   if (configuredMode === "local" || configuredMode === "cloud" || configuredMode === "queue") {
     return configuredMode;
@@ -126,7 +130,7 @@ export async function POST(req: NextRequest) {
 
     const normalizedCategory = typeof contentCategory === "string" && contentCategory.trim() ? contentCategory.trim() : "Trending";
     const userId = typeof body.userId === "string" && body.userId.trim() ? body.userId.trim() : "creator";
-    const processingMode = getProcessingMode(req);
+    const processingMode = getProcessingMode(req, body.mode);
 
     if (processingMode === "queue") {
       const queueRegistered = await registerQueuedJob(req, { jobId, videoUrl, contentCategory: normalizedCategory });

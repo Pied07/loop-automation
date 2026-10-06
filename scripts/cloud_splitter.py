@@ -253,10 +253,25 @@ def run():
     timestamp = int(time.time())
     source_file = CLIPS_DIR / f"source_{timestamp}.mp4"
 
+    # 0. Check if direct media URL (e.g. Cloudinary uploaded video or direct MP4)
+    is_direct = "cloudinary.com" in VIDEO_URL or any(VIDEO_URL.lower().split("?")[0].endswith(ext) for ext in [".mp4", ".mov", ".m4v", ".webm"])
+    if is_direct:
+        print(f"Direct media link detected: {VIDEO_URL}")
+        try:
+            req = urllib.request.Request(VIDEO_URL, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+            with urllib.request.urlopen(req, timeout=120) as resp, open(source_file, "wb") as out_f:
+                shutil.copyfileobj(resp, out_f)
+            if source_file.exists() and source_file.stat().st_size > 1000:
+                download_success = True
+                parsed_name = Path(urllib.parse.urlparse(VIDEO_URL).path).stem
+                title = re.sub(r"[_\-]+", " ", parsed_name).strip() or "Uploaded Viral Video"
+                print(f"Direct media download succeeded: {source_file} ({source_file.stat().st_size} bytes)")
+        except Exception as direct_err:
+            print(f"Direct download notice: {direct_err}")
+
     # 1. Download with yt-dlp's default unauthenticated YouTube client.
-    title = "Viral Video"
+    title = title if download_success else "Viral Video"
     total_duration = 0.0
-    download_success = False
     last_error = ""
 
     ffmpeg_location = None

@@ -260,25 +260,36 @@ async function processJob(job) {
   const sourcePath = path.join(TEMP_DIR, `source_${timestamp}.mp4`);
 
   try {
-    // 1. Download via yt-dlp on residential connection
-    console.log(`[WORKER] ⬇️ Downloading: ${videoUrl}`);
-    const dlArgs = [
-      videoUrl,
-      "-o", sourcePath,
-      "--merge-output-format", "mp4",
-      "--no-playlist",
-      "--no-warnings",
-      "--print-json",
-    ];
-
+    const isDirect = videoUrl.includes("cloudinary.com") || [".mp4", ".mov", ".m4v", ".webm"].some(ext => videoUrl.toLowerCase().split("?")[0].endsWith(ext));
     let infoJson = {};
-    try {
-      const { stdout } = await runCommand(YTDLP_BIN, dlArgs);
-      const lastLine = stdout.trim().split("\n").filter((l) => l.trim().startsWith("{")).pop();
-      if (lastLine) infoJson = JSON.parse(lastLine);
-    } catch {
-      // Fallback download if json parsing fails
-      await runCommand(YTDLP_BIN, [videoUrl, "-o", sourcePath, "--no-playlist"]);
+    if (isDirect) {
+      console.log(`[WORKER] ⬇️ Direct media link detected: ${videoUrl}`);
+      const res = await fetch(videoUrl);
+      if (!res.ok) throw new Error(`Direct download failed: HTTP ${res.status}`);
+      const arrayBuffer = await res.arrayBuffer();
+      fs.writeFileSync(sourcePath, Buffer.from(arrayBuffer));
+      const parsed = path.basename(new URL(videoUrl).pathname, path.extname(new URL(videoUrl).pathname));
+      infoJson = { title: parsed.replace(/[_\-]+/g, " ").trim() || "Uploaded Video" };
+    } else {
+      // 1. Download via yt-dlp on residential connection
+      console.log(`[WORKER] ⬇️ Downloading: ${videoUrl}`);
+      const dlArgs = [
+        videoUrl,
+        "-o", sourcePath,
+        "--merge-output-format", "mp4",
+        "--no-playlist",
+        "--no-warnings",
+        "--print-json",
+      ];
+
+      try {
+        const { stdout } = await runCommand(YTDLP_BIN, dlArgs);
+        const lastLine = stdout.trim().split("\n").filter((l) => l.trim().startsWith("{")).pop();
+        if (lastLine) infoJson = JSON.parse(lastLine);
+      } catch {
+        // Fallback download if json parsing fails
+        await runCommand(YTDLP_BIN, [videoUrl, "-o", sourcePath, "--no-playlist"]);
+      }
     }
 
     if (!fs.existsSync(sourcePath) || fs.statSync(sourcePath).size < 1000) {

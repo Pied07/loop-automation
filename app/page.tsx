@@ -31,6 +31,7 @@ import {
   Share2,
   Sparkles,
   TrendingUp,
+  Upload,
   Users,
   WandSparkles,
   X,
@@ -154,6 +155,10 @@ export default function Home() {
   const [platformTab, setPlatformTab] = useState("Self");
   const [videoToDelete, setVideoToDelete] = useState<VideoRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [processMode, setProcessMode] = useState<"cloud" | "queue">("cloud");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -321,9 +326,59 @@ export default function Home() {
     }
   }
 
-  async function handleSplitVideo() {
-    if (!videoUrl.trim()) {
-      notify("Paste a viral video URL first.");
+  async function handleFileUpload(file: File) {
+    if (!file) return;
+    if (file.size > 100 * 1024 * 1024) {
+      notify("Video file must be under 100MB for free cloud processing.");
+      return;
+    }
+    setIsUploading(true);
+    setUploadProgress(15);
+    try {
+      notify("Requesting direct upload slot...");
+      const sigRes = await fetch("/api/viral-clips/upload-sign", { method: "POST" });
+      const sigData = await sigRes.json();
+      if (!sigRes.ok || !sigData.success) {
+        throw new Error(sigData.error || "Failed to initiate video upload");
+      }
+
+      setUploadProgress(40);
+      notify("Uploading video to cloud storage (bypasses all YouTube bot checks)...");
+      const form = new FormData();
+      form.append("file", file);
+      form.append("api_key", sigData.apiKey);
+      form.append("timestamp", sigData.timestamp);
+      form.append("public_id", sigData.publicId);
+      form.append("signature", sigData.signature);
+
+      const upRes = await fetch(sigData.uploadUrl, {
+        method: "POST",
+        body: form,
+      });
+      const upData = await upRes.json();
+      if (!upRes.ok || !upData.secure_url) {
+        throw new Error(upData.error?.message || "Video upload failed");
+      }
+
+      setUploadProgress(100);
+      setVideoUrl(upData.secure_url);
+      notify("Video uploaded! Splitting into clips now...");
+      setTimeout(() => {
+        handleSplitVideo(upData.secure_url);
+      }, 400);
+    } catch (err: any) {
+      notify("Upload error: " + err.message);
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleSplitVideo(overrideUrl?: string) {
+    const targetUrl = typeof overrideUrl === "string" ? overrideUrl.trim() : videoUrl.trim();
+    if (!targetUrl) {
+      notify("Paste a video URL or upload an MP4 file first.");
       return;
     }
     setIsSplitting(true);
@@ -357,7 +412,7 @@ export default function Home() {
       const res = await fetch("/api/viral-clips", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ videoUrl: videoUrl.trim(), contentCategory: selectedCategory }),
+        body: JSON.stringify({ videoUrl: targetUrl, contentCategory: selectedCategory, mode: processMode }),
       });
       clearInterval(progressInterval);
       const responseText = await res.text();
@@ -370,12 +425,12 @@ export default function Home() {
       if (!res.ok || !data.success) throw new Error(data.error || "Failed to process video.");
 
       if (data.jobId) {
-        setSplitStep("Processing started (queued for worker)...");
+        setSplitStep(processMode === "queue" ? "Job queued for desktop worker..." : "Processing started in cloud runner...");
         setSplitProgress(18);
 
         let finished = false;
 
-        // 1. HTTP polling to /api/viral-clips/status (always works regardless of Firestore rules)
+        // 1. HTTP polling to /api/viral-clips/status
         const pollInterval = setInterval(async () => {
           if (finished) return;
           try {
@@ -390,50 +445,51 @@ export default function Home() {
                 finished = true;
                 clearInterval(pollInterval);
                 setSplitProgress(100);
-                setSplitStep(`✅ ${job.clips.length} clips ready from cloud!`);
+                setSplitStep(`✅ ${job.clips.length} clips ready!`);
                 setClips(job.clips);
                 if (job.sourceTitle) setSourceTitle(job.sourceTitle);
                 setIsSplitting(false);
-                notify(`Cloud split complete: ${job.clips.length} clips ready! Review and publish below.`);
+                notify(`Split complete: ${job.clips.length} clips ready! Review and publish below.`);
               } else if (job.status === "failed" && !finished) {
                 finished = true;
                 clearInterval(pollInterval);
                 setIsSplitting(false);
                 setSplitProgress(0);
                 setSplitStep("");
-                notify(job.error || "GitHub cloud runner failed.");
+                notify(job.error || "Video processing failed.");
               }
             }
           } catch {}
         }, 2500);
 
-        // Firestore job updates are opt-in; HTTP polling is the default status source.
-        if (database && process.env.NEXT_PUBLIC_ENABLE_FIRESTORE_JOB_LISTENER === "true") {
+        // 2. Real-time Firestore job updates
+        if (database) {
           try {
             const unsub = onSnapshot(doc(database, "jobs", data.jobId), (snap) => {
               if (!snap.exists() || finished) return;
               const job = snap.data();
-              if (job.progress) setSplitProgress(job.progress);
-              if (job.step) setSplitStep(job.step);
-              if (job.sourceTitle) setSourceTitle(job.sourceTitle);
+              if (job.progress && !finished) setSplitProgress(job.progress);
+              if (job.step && !finished) setSplitStep(job.step);
+              if (job.sourceTitle && !finished) setSourceTitle(job.sourceTitle);
 
-              if (job.status === "done" && Array.isArray(job.clips)) {
+              if (job.status === "done" && Array.isArray(job.clips) && !finished) {
                 finished = true;
                 clearInterval(pollInterval);
                 unsub();
                 setSplitProgress(100);
-                setSplitStep(`✅ ${job.clips.length} clips ready from cloud!`);
+                setSplitStep(`✅ ${job.clips.length} clips ready!`);
                 setClips(job.clips);
+                if (job.sourceTitle) setSourceTitle(job.sourceTitle);
                 setIsSplitting(false);
-                notify(`Cloud split complete: ${job.clips.length} clips ready! Review and publish below.`);
-              } else if (job.status === "failed") {
+                notify(`Split complete: ${job.clips.length} clips ready! Review and publish below.`);
+              } else if (job.status === "failed" && !finished) {
                 finished = true;
                 clearInterval(pollInterval);
                 unsub();
                 setIsSplitting(false);
                 setSplitProgress(0);
                 setSplitStep("");
-                notify(job.error || "GitHub cloud runner failed.");
+                notify(job.error || "Video processing failed.");
               }
             });
           } catch {}
@@ -684,27 +740,104 @@ export default function Home() {
               <div className="format-grid">{formats.map(({ name, icon: Icon, tone, detail }) => <button key={name} onClick={() => setSelectedCategory(name)} className={`format-option ${selectedCategory === name ? "selected" : ""}`}><span className={`format-icon ${tone}`}><Icon size={18} /></span><span className="format-copy"><strong>{name}</strong><small>{detail}</small></span>{selectedCategory === name && <Check className="format-check" size={16} />}</button>)}
               </div>
             </div>
-            <div className="form-section brief-section"><div className="section-title"><span className="step-number">02</span><div><h2>Paste a viral video URL</h2><p>YouTube, Twitter/X, TikTok, Instagram, or any direct .mp4 link.</p></div></div>
+            <div className="form-section brief-section"><div className="section-title"><span className="step-number">02</span><div><h2>Select video source</h2><p>Paste a YouTube link, or upload an MP4 file directly (zero bot blocks).</p></div></div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="video/mp4,video/quicktime,video/webm"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  if (e.target.files?.[0]) handleFileUpload(e.target.files[0]);
+                }}
+              />
               <div style={{ position: 'relative', marginTop: '8px' }}>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <div style={{ flex: 1, position: 'relative' }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 320px', position: 'relative' }}>
                     <Link size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }} />
                     <input
                       value={videoUrl}
                       onChange={(e) => setVideoUrl(e.target.value)}
-                      placeholder="https://www.youtube.com/watch?v=..."
+                      placeholder="https://www.youtube.com/watch?v=... or direct MP4 link"
                       style={{ width: '100%', padding: '12px 14px 12px 40px', borderRadius: '10px', border: '1.5px solid #272a38', fontSize: '13px', background: '#0c0d12', color: '#ffffff', outline: 'none', boxSizing: 'border-box' }}
                     />
                   </div>
-                  <button className="secondary-button" onClick={handleAutoFind} disabled={isFinding || isSplitting} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  <button className="secondary-button" onClick={handleAutoFind} disabled={isFinding || isSplitting || isUploading} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
                     {isFinding ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />}
                     {isFinding ? 'Finding...' : 'Auto-Find'}
                   </button>
-                  <button className="primary-button" onClick={handleSplitVideo} disabled={isSplitting} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isFinding || isSplitting || isUploading}
+                    style={{ whiteSpace: 'nowrap', flexShrink: 0, borderColor: 'rgba(56,189,248,0.4)', color: '#38bdf8' }}
+                  >
+                    {isUploading ? <LoaderCircle className="spin" size={16} /> : <Upload size={16} />}
+                    {isUploading ? 'Uploading...' : 'Upload MP4'}
+                  </button>
+                  <button className="primary-button" onClick={() => handleSplitVideo()} disabled={isSplitting || isUploading} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
                     {isSplitting ? <LoaderCircle className="spin" size={16} /> : <Scissors size={16} />}
                     {isSplitting ? 'Splitting...' : 'Split into Clips'}
                   </button>
                 </div>
+
+                {/* Processing Mode and Online Tools Tip */}
+                <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', fontSize: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: '#9ca3af' }}>Runner:</span>
+                    <button
+                      type="button"
+                      onClick={() => setProcessMode("cloud")}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        border: processMode === "cloud" ? '1px solid #e50914' : '1px solid #272a38',
+                        background: processMode === "cloud" ? 'rgba(229,9,20,0.18)' : '#111218',
+                        color: processMode === "cloud" ? '#ff4d56' : '#9ca3af',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ☁️ Cloud Runner (GitHub Actions)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setProcessMode("queue")}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        border: processMode === "queue" ? '1px solid #38bdf8' : '1px solid #272a38',
+                        background: processMode === "queue" ? 'rgba(56,189,248,0.18)' : '#111218',
+                        color: processMode === "queue" ? '#38bdf8' : '#9ca3af',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🖥️ Desktop Worker (`npm run worker`)
+                    </button>
+                  </div>
+                  <span style={{ color: '#6b7280', fontSize: '11px' }}>
+                    💡 YouTube block? Download free with Cobalt or SnapSave, then click <strong>Upload MP4</strong>!
+                  </span>
+                </div>
+
+                {isUploading && (
+                  <div style={{ marginTop: '14px', padding: '14px 16px', background: '#111218', borderRadius: '12px', border: '1px solid rgba(56,189,248,0.3)', boxShadow: '0 4px 20px rgba(0,0,0,0.35)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: '#38bdf8' }}>
+                        <LoaderCircle className="spin" size={15} />
+                        <span>Uploading video file directly...</span>
+                      </div>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#38bdf8' }}>{uploadProgress}%</span>
+                    </div>
+                    <div style={{ height: '6px', background: '#1e2230', borderRadius: '999px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${uploadProgress}%`, background: 'linear-gradient(90deg, #0284c7 0%, #38bdf8 100%)', borderRadius: '999px', transition: 'width 0.3s ease' }} />
+                    </div>
+                  </div>
+                )}
+
                 {isSplitting && (
                   <div style={{ marginTop: '16px', padding: '16px 18px', background: '#111218', borderRadius: '12px', border: '1px solid #272a38', boxShadow: '0 4px 20px rgba(0,0,0,0.35)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>

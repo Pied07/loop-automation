@@ -43,3 +43,19 @@ next-env.d.ts
 
 # OAuth tokens (never commit these!)
 tokens.json
+
+# Heavy binaries (Never deploy to Vercel - saves gigabytes of Function Storage)
+*.exe
+ffmpeg.exe
+yt-dlp.exe
+cookies.txt
+
+# Generated clips & media
+public/clips/*
+!public/clips/.gitkeep
+temp_worker/
+huggingface-worker/
+
+# Local media files
+*.mp4
+!public/assets/video-outro.mp4

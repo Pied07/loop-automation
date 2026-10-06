@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { database } from "@/app/firebase";
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, setDoc, updateDoc, where } from "firebase/firestore";
 
 export const dynamic = "force-dynamic";
 
-// In-memory queue for video jobs
 interface QueueJob {
   jobId: string;
   videoUrl: string;
@@ -17,29 +18,55 @@ declare global {
   var __viralJobQueue: Map<string, QueueJob> | undefined;
 }
 
-const queue = globalThis.__viralJobQueue || new Map<string, QueueJob>();
-globalThis.__viralJobQueue = queue;
+const memQueue = globalThis.__viralJobQueue || new Map<string, QueueJob>();
+globalThis.__viralJobQueue = memQueue;
 
 // GET: Worker polls this endpoint for pending jobs
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const claimJobId = searchParams.get("claim");
 
-  // If worker wants to claim a specific job
+  // Claim a specific job
   if (claimJobId) {
-    const job = queue.get(claimJobId);
-    if (job) {
-      job.status = "processing";
-      job.worker = "desktop-worker";
-      queue.set(claimJobId, job);
-      return NextResponse.json({ success: true, job });
+    if (database) {
+      try {
+        const jobRef = doc(database, "jobs", claimJobId);
+        const snap = await getDoc(jobRef);
+        if (snap.exists()) {
+          await updateDoc(jobRef, { status: "processing", worker: "desktop-worker", claimedAt: Date.now() });
+          return NextResponse.json({ success: true, job: { jobId: claimJobId, ...snap.data(), status: "processing" } });
+        }
+      } catch (err: any) {
+        console.warn("Firestore claim job notice:", err.message);
+      }
+    }
+
+    const memJob = memQueue.get(claimJobId);
+    if (memJob) {
+      memJob.status = "processing";
+      memJob.worker = "desktop-worker";
+      memQueue.set(claimJobId, memJob);
+      return NextResponse.json({ success: true, job: memJob });
     }
     return NextResponse.json({ error: "Job not found" }, { status: 404 });
   }
 
-  // Find oldest pending job
-  for (const [id, job] of queue.entries()) {
-    // If pending and less than 15 minutes old
+  // Find oldest pending job in Firestore
+  if (database) {
+    try {
+      const q = query(collection(database, "jobs"), where("status", "==", "pending"), orderBy("createdAt", "asc"), limit(1));
+      const snaps = await getDocs(q);
+      if (!snaps.empty) {
+        const docSnap = snaps.docs[0];
+        return NextResponse.json({ job: { jobId: docSnap.id, ...docSnap.data() } });
+      }
+    } catch (err: any) {
+      console.warn("Firestore queue query notice:", err.message);
+    }
+  }
+
+  // Fallback to in-memory queue
+  for (const [id, job] of memQueue.entries()) {
     if (job.status === "pending" && Date.now() - job.createdAt < 15 * 60 * 1000) {
       return NextResponse.json({ job });
     }
@@ -59,17 +86,32 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "claim") {
-      const job = queue.get(jobId);
-      if (job) {
-        job.status = "processing";
-        queue.set(jobId, job);
-        return NextResponse.json({ success: true, job });
+      if (database) {
+        try {
+          const jobRef = doc(database, "jobs", jobId);
+          await updateDoc(jobRef, { status: "processing", worker: "desktop-worker", claimedAt: Date.now() });
+          const snap = await getDoc(jobRef);
+          return NextResponse.json({ success: true, job: { jobId, ...snap.data() } });
+        } catch {}
+      }
+
+      const memJob = memQueue.get(jobId);
+      if (memJob) {
+        memJob.status = "processing";
+        memQueue.set(jobId, memJob);
+        return NextResponse.json({ success: true, job: memJob });
       }
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 
     if (action === "complete" || action === "remove") {
-      queue.delete(jobId);
+      if (database) {
+        try {
+          const jobRef = doc(database, "jobs", jobId);
+          await updateDoc(jobRef, { status: "done", completedAt: Date.now() });
+        } catch {}
+      }
+      memQueue.delete(jobId);
       return NextResponse.json({ success: true });
     }
 
@@ -82,13 +124,21 @@ export async function POST(req: NextRequest) {
       createdAt: Date.now(),
     };
 
-    queue.set(jobId, job);
+    if (database) {
+      try {
+        await setDoc(doc(database, "jobs", jobId), job, { merge: true });
+      } catch (err: any) {
+        console.warn("Failed to write queue job to Firestore:", err.message);
+      }
+    }
 
-    // Auto-cleanup jobs older than 1 hour
+    memQueue.set(jobId, job);
+
+    // Auto-cleanup jobs older than 1 hour in memory
     const now = Date.now();
-    for (const [id, j] of queue.entries()) {
+    for (const [id, j] of memQueue.entries()) {
       if (now - j.createdAt > 3600000) {
-        queue.delete(id);
+        memQueue.delete(id);
       }
     }
 

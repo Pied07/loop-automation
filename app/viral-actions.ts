@@ -141,6 +141,25 @@ async function downloadWithYtDlp(
     } catch {}
   };
 
+  const isDirectMedia = videoUrl.includes("cloudinary.com") || [".mp4", ".mov", ".webm", ".m4v"].some((ext) => videoUrl.toLowerCase().split("?")[0].endsWith(ext));
+  if (isDirectMedia) {
+    try {
+      const resp = await fetch(videoUrl);
+      if (resp.ok) {
+        const arrayBuf = await resp.arrayBuffer();
+        fs.writeFileSync(outputPath, Buffer.from(arrayBuf));
+        const urlObj = new URL(videoUrl);
+        const baseName = path.basename(urlObj.pathname, path.extname(urlObj.pathname));
+        return {
+          title: baseName.replace(/[_\-]+/g, " ").trim() || "Uploaded Video",
+          duration: 0,
+        };
+      }
+    } catch (e: any) {
+      console.warn("Direct HTTP fetch failed, trying yt-dlp:", e.message);
+    }
+  }
+
   const attempts: { name: string; format: string; extraArgs: string[] }[] = isYouTubeUrl
     ? [
         {
@@ -566,7 +585,7 @@ export async function publishClipAndCleanup(params: {
       ? path.join(process.cwd(), "public", clipPath)
       : clipPath;
 
-    if (!fs.existsSync(absolutePath)) {
+    if (!fs.existsSync(/*turbopackIgnore: true*/ absolutePath)) {
       return { success: false, error: "Clip file not found on disk.", logs };
     }
   }
@@ -609,7 +628,7 @@ export async function publishClipAndCleanup(params: {
           },
           status: { privacyStatus: "public", selfDeclaredMadeForKids: false },
         },
-        media: { body: require("fs").createReadStream(absolutePath) },
+        media: { body: fs.createReadStream(/*turbopackIgnore: true*/ absolutePath) },
       });
 
       youtubeVideoId = res.data.id;
@@ -628,7 +647,7 @@ export async function publishClipAndCleanup(params: {
       if (!pageId || !pageToken) throw new Error("Facebook not connected.");
 
       // Upload as file stream via multipart
-      const fileBuffer = fs.readFileSync(absolutePath);
+      const fileBuffer = fs.readFileSync(/*turbopackIgnore: true*/ absolutePath);
       const formData = new FormData();
       formData.append("access_token", pageToken);
       formData.append("title", fullTitle.slice(0, 100));
@@ -779,7 +798,7 @@ export async function publishClipAndCleanup(params: {
     // ─ GUARANTEED VIDEO DELETION: Runs NO MATTER WHAT (success or failure) ─
     // 1. Delete local or downloaded tmp clip file
     try {
-      if (absolutePath && fs.existsSync(absolutePath)) {
+      if (absolutePath && fs.existsSync(/*turbopackIgnore: true*/ absolutePath)) {
         fs.unlinkSync(absolutePath);
         logs.push("🗑️ Video clip file deleted from storage.");
       }
