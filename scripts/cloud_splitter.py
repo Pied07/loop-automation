@@ -320,43 +320,57 @@ def run():
         },
     ]
 
-    for attempt in download_attempts:
-        strat_name = attempt["name"]
-        print(f"Attempting download with: {strat_name}...")
-        cmd = [
-            YTDLP_BIN,
-            VIDEO_URL,
-            "--output", str(source_file),
-            "--js-runtimes", "node",
-        ] + attempt["flags"] + common_download_flags + cookies_flag
+    # Run download attempts with cookies (if available), then fallback to clean unauthenticated if rejected
+    pass_rounds = [("with cookies", cookies_flag)] if cookies_flag else []
+    pass_rounds.append(("unauthenticated (clean)", []))
 
-        try:
-            if source_file.exists():
-                source_file.unlink()
-            for part in CLIPS_DIR.glob(f"{source_file.stem}*"):
-                try: part.unlink()
+    for round_name, current_cookies_flag in pass_rounds:
+        if download_success:
+            break
+        print(f"--- Download round: {round_name} ---")
+        for attempt in download_attempts:
+            strat_name = attempt["name"]
+            print(f"Attempting download with: {strat_name} ({round_name})...")
+            cmd = [
+                YTDLP_BIN,
+                VIDEO_URL,
+                "--output", str(source_file),
+                "--js-runtimes", "node",
+            ] + attempt["flags"] + common_download_flags + current_cookies_flag
+
+            try:
+                if source_file.exists():
+                    source_file.unlink()
+                for part in CLIPS_DIR.glob(f"{source_file.stem}*"):
+                    try: part.unlink()
+                    except: pass
+
+                proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                if proc.returncode == 0 and source_file.exists() and source_file.stat().st_size > 1000:
+                    for line in reversed(proc.stdout.strip().split("\n")):
+                        if line.strip().startswith("{") and line.strip().endswith("}"):
+                            try:
+                                info = json.loads(line.strip())
+                                title = info.get("title") or info.get("fulltitle") or title
+                                total_duration = float(info.get("duration") or 0)
+                                break
+                            except (ValueError, TypeError):
+                                continue
+                    download_success = True
+                    print(f"Download succeeded with {strat_name} ({title})")
+                    break
+                else:
+                    last_error = proc.stderr.strip() if proc.stderr else f"yt-dlp exited with code {proc.returncode}"
+                    print(f"{strat_name} failed: {last_error[:200]}")
+            except Exception as e:
+                last_error = str(e)
+                print(f"{strat_name} error: {e}")
+
+        if not download_success and current_cookies_flag:
+            print("Notice: Cookies appear expired or rejected by YouTube. Falling back to unauthenticated mobile/VisionOS clients...")
+            if cookies_path.exists():
+                try: cookies_path.unlink()
                 except: pass
-
-            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            if proc.returncode == 0 and source_file.exists() and source_file.stat().st_size > 1000:
-                for line in reversed(proc.stdout.strip().split("\n")):
-                    if line.strip().startswith("{") and line.strip().endswith("}"):
-                        try:
-                            info = json.loads(line.strip())
-                            title = info.get("title") or info.get("fulltitle") or title
-                            total_duration = float(info.get("duration") or 0)
-                            break
-                        except (ValueError, TypeError):
-                            continue
-                download_success = True
-                print(f"Download succeeded with {strat_name} ({title})")
-                break
-            else:
-                last_error = proc.stderr.strip() if proc.stderr else f"yt-dlp exited with code {proc.returncode}"
-                print(f"{strat_name} failed: {last_error[:200]}")
-        except Exception as e:
-            last_error = str(e)
-            print(f"{strat_name} error: {e}")
 
     if not download_success:
         print(f"All download strategies failed: {last_error}")
