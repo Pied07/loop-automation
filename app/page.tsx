@@ -41,7 +41,6 @@ import { useEffect, useState, useRef, type FormEvent } from "react";
 import { auth, firebaseConfigured, database, type VideoRecord } from "./firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 import { deleteFromYouTube, deleteFromFacebook, getPublishedAutomationVideos } from "./actions";
-import { autoFindViralVideo } from "./viral-actions";
 import { FaYoutube, FaInstagram, FaFacebookF } from "react-icons/fa6";
 import { SiGmail } from "react-icons/si";
 
@@ -300,20 +299,26 @@ export default function Home() {
     setVideos([]);
   }
 
-    async function handleAutoFind() {
+  async function handleAutoFind() {
     setIsFinding(true);
     try {
-      const res = await autoFindViralVideo(selectedCategory);
-      if (res.error) {
-        notify(res.error);
-      } else if (res.url) {
-        setVideoUrl(res.url);
-        notify("Found viral video: " + (res.title || "Ready to split"));
+      const response = await fetch("/api/viral-clips/auto-find", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: selectedCategory }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.error) {
+        notify(data.error || "Failed to find video.");
+      } else if (data.url) {
+        setVideoUrl(data.url);
+        notify("Found viral video: " + (data.title || "Ready to split"));
       }
     } catch (err: any) {
       notify("Failed to find video: " + err.message);
+    } finally {
+      setIsFinding(false);
     }
-    setIsFinding(false);
   }
 
   async function handleSplitVideo() {
