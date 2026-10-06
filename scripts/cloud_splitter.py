@@ -275,47 +275,99 @@ def run():
         "--extractor-retries", "5",
         "--postprocessor-args", "ffmpeg:-strict -2",
     ]
-    if ffmpeg_location:
-        common_download_flags.extend(["--ffmpeg-location", ffmpeg_location])
-    download_cmd = [
-        YTDLP_BIN,
-        VIDEO_URL,
-        "--output", str(source_file),
-        "-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b",
-        "--merge-output-format", "mp4",
-        "--js-runtimes", "node",
-    ] + common_download_flags
+    # Check if cookies are available
+    cookies_path = ROOT_DIR / "cookies.txt"
+    youtube_cookies_env = os.environ.get("YOUTUBE_COOKIES", "").strip()
+    if youtube_cookies_env and not cookies_path.exists():
+        try:
+            cookies_path.write_text(youtube_cookies_env, encoding="utf-8")
+            print("Loaded YouTube cookies from YOUTUBE_COOKIES secret.")
+        except Exception as e:
+            print(f"Notice: Failed to write cookies from env: {e}")
 
-    print("Downloading with yt-dlp's default client (no cookies)...")
-    try:
-        proc = subprocess.run(download_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        if proc.returncode == 0 and source_file.exists() and source_file.stat().st_size > 1000:
-            for line in reversed(proc.stdout.strip().split("\n")):
-                if line.strip().startswith("{") and line.strip().endswith("}"):
-                    try:
-                        info = json.loads(line.strip())
-                        title = info.get("title") or info.get("fulltitle") or title
-                        total_duration = float(info.get("duration") or 0)
-                        break
-                    except (ValueError, TypeError):
-                        continue
-            download_success = True
-            print(f"Download succeeded ({title})")
-        else:
-            last_error = proc.stderr.strip() if proc.stderr else f"yt-dlp exited with code {proc.returncode}"
-    except Exception as e:
-        last_error = str(e)
+    cookies_flag = ["--cookies", str(cookies_path)] if cookies_path.exists() else []
+
+    download_attempts = [
+        {
+            "name": "VisionOS + Android Client (Datacenter-safe)",
+            "flags": [
+                "-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b/best",
+                "--merge-output-format", "mp4",
+                "--extractor-args", "youtube:player-client=visionos,android",
+            ],
+        },
+        {
+            "name": "iOS + Android Client",
+            "flags": [
+                "-f", "bv*+ba/b/best",
+                "--merge-output-format", "mp4",
+                "--extractor-args", "youtube:player-client=ios,android",
+            ],
+        },
+        {
+            "name": "Android Client (single format)",
+            "flags": [
+                "-f", "b/18/best",
+                "--extractor-args", "youtube:player-client=android",
+            ],
+        },
+        {
+            "name": "Default Client fallback",
+            "flags": [
+                "-f", "bv*+ba/b/best",
+                "--merge-output-format", "mp4",
+            ],
+        },
+    ]
+
+    for attempt in download_attempts:
+        strat_name = attempt["name"]
+        print(f"Attempting download with: {strat_name}...")
+        cmd = [
+            YTDLP_BIN,
+            VIDEO_URL,
+            "--output", str(source_file),
+            "--js-runtimes", "node",
+        ] + attempt["flags"] + common_download_flags + cookies_flag
+
+        try:
+            if source_file.exists():
+                source_file.unlink()
+            for part in CLIPS_DIR.glob(f"{source_file.stem}*"):
+                try: part.unlink()
+                except: pass
+
+            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if proc.returncode == 0 and source_file.exists() and source_file.stat().st_size > 1000:
+                for line in reversed(proc.stdout.strip().split("\n")):
+                    if line.strip().startswith("{") and line.strip().endswith("}"):
+                        try:
+                            info = json.loads(line.strip())
+                            title = info.get("title") or info.get("fulltitle") or title
+                            total_duration = float(info.get("duration") or 0)
+                            break
+                        except (ValueError, TypeError):
+                            continue
+                download_success = True
+                print(f"Download succeeded with {strat_name} ({title})")
+                break
+            else:
+                last_error = proc.stderr.strip() if proc.stderr else f"yt-dlp exited with code {proc.returncode}"
+                print(f"{strat_name} failed: {last_error[:200]}")
+        except Exception as e:
+            last_error = str(e)
+            print(f"{strat_name} error: {e}")
 
     if not download_success:
-        print(f"Download failed: {last_error}")
+        print(f"All download strategies failed: {last_error}")
         friendly_error = last_error
         if "bot" in last_error.lower() or "sign in to confirm" in last_error.lower():
             friendly_error = (
-                "YouTube refused this unauthenticated request from the current network. This job does not use cookies; "
-                "yt-dlp cannot override that restriction. Use a source video file you own or a direct media URL that "
-                "allows downloading, then process and store the clips in Cloudinary."
+                "YouTube refused unauthenticated requests from the cloud runner IP. "
+                "Add your YouTube cookies as a YOUTUBE_COOKIES secret in GitHub, "
+                "or run the desktop worker (`npm run worker`) for zero-block residential downloads."
             )
-        update_job_status(status="failed", error=f"Download failed: {friendly_error[:200]}")
+        update_job_status(status="failed", error=f"Download failed: {friendly_error[:250]}")
         sys.exit(1)
 
     update_job_status(status="processing", progress=50, step="Cutting 9:16 vertical clips with FFmpeg...", source_title=title, total_duration=total_duration)
