@@ -231,7 +231,6 @@ def run():
             "yt-dlp",
             VIDEO_URL,
             "--output", str(source_file),
-            "-f", "bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b/best",
             "--merge-output-format", "mp4",
             "--no-playlist",
             "--no-warnings",
@@ -268,14 +267,14 @@ def run():
             print(f"Client {client} exception: {e}")
 
     if not download_success:
-        # Final fallback: simplest download with visionos,android
-        print("Attempting fallback download with visionos,android...")
+        # Final fallback: simplest download with -f b
+        print("Attempting fallback download with -f b...")
         try:
             fallback_cmd = [
                 "yt-dlp",
                 VIDEO_URL,
                 "--output", str(source_file),
-                "-f", "bv*+ba/b/best",
+                "-f", "b",
                 "--extractor-args", "youtube:player-client=visionos,android",
                 "--no-playlist",
             ]
