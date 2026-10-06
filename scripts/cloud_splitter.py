@@ -222,21 +222,37 @@ def run():
     if has_cookies:
         print("Using authenticated session with cookies.txt")
 
-    # When cookies are present, use web client (matches browser session). Otherwise use visionos,android
-    clients_to_try = ["web", "mweb"] if has_cookies else ["visionos,android", "android"]
+    # Try download strategies in order of reliability
+    download_attempts = [
+        {
+            "name": "Auto-select client (VisionOS default)",
+            "flags": ["-f", "bv*+ba/b", "--merge-output-format", "mp4", "--js-runtimes", "node"],
+        },
+        {
+            "name": "Explicit VisionOS Client",
+            "flags": ["-f", "bv*+ba/b", "--merge-output-format", "mp4", "--js-runtimes", "node", "--extractor-args", "youtube:player-client=visionos"],
+        },
+        {
+            "name": "Android Client (single format)",
+            "flags": ["-f", "b/18/best", "--js-runtimes", "node", "--extractor-args", "youtube:player-client=android"],
+        },
+        {
+            "name": "Web Client",
+            "flags": ["-f", "bv*+ba/b", "--merge-output-format", "mp4", "--js-runtimes", "node", "--extractor-args", "youtube:player-client=web"],
+        },
+    ]
 
-    for client in clients_to_try:
-        print(f"Attempting download with player_client={client}...")
+    for attempt in download_attempts:
+        strat_name = attempt["name"]
+        print(f"Attempting download with strategy: {strat_name}...")
         download_cmd = [
             "yt-dlp",
             VIDEO_URL,
             "--output", str(source_file),
-            "--merge-output-format", "mp4",
             "--no-playlist",
             "--no-warnings",
             "--print-json",
-            "--extractor-args", f"youtube:player-client={client}",
-        ]
+        ] + attempt["flags"]
 
         if not has_cookies:
             download_cmd.extend(["--extractor-args", "youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416"])
@@ -257,26 +273,25 @@ def run():
                 except Exception:
                     pass
                 download_success = True
-                print(f"Download succeeded with client={client}: {title}")
+                print(f"Download succeeded with strategy: {strat_name} ({title})")
                 break
             else:
                 last_error = proc.stderr.strip() if proc.stderr else f"Exit code {proc.returncode}"
-                print(f"Client {client} failed: {last_error[:200]}")
+                print(f"Strategy {strat_name} failed: {last_error[:200]}")
         except Exception as e:
             last_error = str(e)
-            print(f"Client {client} exception: {e}")
+            print(f"Strategy {strat_name} exception: {e}")
 
     if not download_success:
         # Final fallback: simplest download
         print("Attempting simplest fallback download...")
         try:
-            fallback_client = "web" if has_cookies else "visionos,android"
             fallback_cmd = [
                 "yt-dlp",
                 VIDEO_URL,
                 "--output", str(source_file),
-                "-f", "b/best",
-                "--extractor-args", f"youtube:player-client={fallback_client}",
+                "-f", "bv*+ba/b/best",
+                "--js-runtimes", "node",
                 "--no-playlist",
             ]
             if has_cookies:
