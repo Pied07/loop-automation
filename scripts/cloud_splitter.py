@@ -273,10 +273,8 @@ def run():
         "--retries", "5",
         "--fragment-retries", "10",
         "--extractor-retries", "5",
-        "--wait-for-video", os.environ.get("YTDLP_WAIT_FOR_VIDEO", "10-30"),
+        "--postprocessor-args", "ffmpeg:-strict -2",
     ]
-    if os.environ.get("YTDLP_LIVE_FROM_START", "1").strip().lower() not in ("0", "false", "no", "off"):
-        common_download_flags.append("--live-from-start")
     if ffmpeg_location:
         common_download_flags.extend(["--ffmpeg-location", ffmpeg_location])
     download_cmd = [
@@ -337,12 +335,14 @@ def run():
 
     # 2. Split with FFmpeg
     clip_length = SHORT_CLIP_LENGTH_SECONDS
+    max_clips = int(os.environ.get("MAX_CLIPS", "5"))
+    total_parts = min(max_clips, max(1, int(total_duration // clip_length) + (1 if total_duration % clip_length >= 3.0 else 0)))
     clips_meta = []
     created_clip_files = []
     start_time = 0.0
     part_num = 1
 
-    while start_time < total_duration:
+    while start_time < total_duration and part_num <= max_clips:
         remaining = total_duration - start_time
         duration = min(clip_length, remaining)
         if duration < 3.0: break
@@ -350,14 +350,24 @@ def run():
         clip_filename = f"clip_{timestamp}_part{part_num}.mp4"
         clip_path = CLIPS_DIR / clip_filename
 
+        current_progress = 50 + int(((part_num - 1) / max(1, total_parts)) * 30)
+        update_job_status(
+            status="processing",
+            progress=current_progress,
+            step=f"Cutting clip {part_num} of {total_parts}...",
+            source_title=title,
+            total_duration=total_duration,
+        )
+
         split_cmd = [
             FFMPEG_BIN, "-y",
+            "-threads", "0",
             "-ss", str(start_time),
             "-i", str(source_file),
             "-t", str(duration),
             "-vf", "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30",
             "-c:v", "libx264",
-            "-preset", "veryfast",
+            "-preset", "ultrafast",
             "-crf", "28",
             "-c:a", "aac",
             "-b:a", "96k",
