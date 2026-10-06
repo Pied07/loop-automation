@@ -222,8 +222,8 @@ def run():
     if has_cookies:
         print("Using authenticated session with cookies.txt")
 
-    # If cookies are present, try standard client first
-    clients_to_try = ["default", "web", "mweb", "android"] if has_cookies else ["web", "mweb", "android", "tv", "ios"]
+    # VisionOS and Android clients reliably return video and audio streams
+    clients_to_try = ["visionos,android", "android", "mweb", "web"]
 
     for client in clients_to_try:
         print(f"Attempting download with player_client={client}...")
@@ -231,18 +231,16 @@ def run():
             "yt-dlp",
             VIDEO_URL,
             "--output", str(source_file),
-            "-f", "bestvideo[height<=1080]+bestaudio/bestvideo+bestaudio/best",
+            "-f", "bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b/best",
             "--merge-output-format", "mp4",
             "--no-playlist",
             "--no-warnings",
             "--print-json",
+            "--extractor-args", f"youtube:player-client={client}",
         ]
 
         if not has_cookies:
             download_cmd.extend(["--extractor-args", "youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416"])
-
-        if client != "default":
-            download_cmd.extend(["--extractor-args", f"youtube:player-client={client}"])
 
         if has_cookies:
             download_cmd.extend(["--cookies", str(cookie_file)])
@@ -270,14 +268,15 @@ def run():
             print(f"Client {client} exception: {e}")
 
     if not download_success:
-        # Final fallback: simplest download with any format
-        print("Attempting simplest fallback download...")
+        # Final fallback: simplest download with visionos,android
+        print("Attempting fallback download with visionos,android...")
         try:
             fallback_cmd = [
                 "yt-dlp",
                 VIDEO_URL,
                 "--output", str(source_file),
-                "-f", "b/best",
+                "-f", "bv*+ba/b/best",
+                "--extractor-args", "youtube:player-client=visionos,android",
                 "--no-playlist",
             ]
             if has_cookies:
