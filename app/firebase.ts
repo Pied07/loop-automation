@@ -18,6 +18,7 @@ export type VideoRecord = {
   youtube?: 0 | 1;
   facebook?: 0 | 1;
   instagram?: 0 | 1;
+  thumbnailUrl?: string;
   format: string;
   createdAt: string;
   status?: "completed" | "failed";

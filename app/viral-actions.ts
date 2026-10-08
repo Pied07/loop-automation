@@ -645,6 +645,7 @@ export async function publishClipAndCleanup(params: {
   youtubeVideoId?: string;
   facebookVideoId?: string;
   instagramVideoId?: string;
+  thumbnailUrl?: string;
   gmailSent?: boolean;
   error?: string;
   logs: string[];
@@ -754,7 +755,10 @@ export async function publishClipAndCleanup(params: {
             },
             status: { privacyStatus: "public", selfDeclaredMadeForKids: false },
           },
-          media: { body: fs.createReadStream(/*turbopackIgnore: true*/ absolutePath) },
+          media: {
+            mimeType: "video/mp4",
+            body: fs.createReadStream(/*turbopackIgnore: true*/ absolutePath),
+          },
         });
 
         youtubeVideoId = res.data.id;
@@ -763,10 +767,16 @@ export async function publishClipAndCleanup(params: {
           : `https://www.youtube.com/watch?v=${youtubeVideoId}`;
         logs.push(`✅ YouTube: ${youtubeUrl}`);
       } catch (e: any) {
-        if (e?.message?.includes("invalid_grant") || e?.message?.includes("revoked")) {
+        const errMsg = e?.response?.data?.error?.message || e?.message || "";
+        const errReason = e?.response?.data?.error?.errors?.[0]?.reason || "";
+        if (errMsg.includes("invalid_grant") || errMsg.includes("revoked")) {
           logs.push("❌ YouTube: Google access expired. Please click 'Connect' on YouTube in Settings to re-authenticate.");
+        } else if (errReason === "uploadLimitExceeded" || errMsg.includes("exceeded the number of videos")) {
+          logs.push("⚠️ YouTube Daily Upload Limit Reached: YouTube allows ~5-10 uploads per day for standard channels. Enable Advanced Features in YouTube Studio -> Channel -> Feature Eligibility to unlock 100/day, or wait for the 24-hr reset.");
+        } else if (errReason === "quotaExceeded" || errMsg.includes("quota")) {
+          logs.push("⚠️ YouTube Daily API Quota Reached: YouTube Data API free limit (10,000 units/day) reached. Quota resets daily at midnight PST.");
         } else {
-          logs.push(`❌ YouTube: ${e.message}`);
+          logs.push(`❌ YouTube: ${errMsg || e.message}`);
         }
       }
     }
@@ -1136,16 +1146,11 @@ export async function publishClipAndCleanup(params: {
       }
     }
 
-    // 4. Delete story card image from Cloudinary if uploaded
-    if (uploadedStoryCardId && cloudName && apiKey && apiSecret && process.env.CLOUDINARY_DELETE_AFTER_PUBLISH === "true") {
-      try {
-        const { deleteCloudinaryImage } = await import("@/app/cloudinary-upload");
-        await deleteCloudinaryImage(uploadedStoryCardId);
-      } catch (scErr: any) {
-        console.warn("Could not delete story card from Cloudinary:", scErr.message);
-      }
-    }
+    // 4. Retain lightweight story card thumbnail image (~30 KB) in Cloudinary
+    // so library cards always display an aesthetic, high-res thumbnail preview!
   }
+
+  const resolvedThumb = storyCardUrl || (facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${facebookVideoId}` : undefined);
 
   return {
     success: true,
@@ -1155,6 +1160,7 @@ export async function publishClipAndCleanup(params: {
     youtubeVideoId,
     facebookVideoId,
     instagramVideoId,
+    thumbnailUrl: resolvedThumb,
     gmailSent,
     logs,
   };

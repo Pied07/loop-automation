@@ -600,6 +600,7 @@ export default function Home() {
         youtube: youtubeVal,
         facebook: facebookVal,
         instagram: instagramVal,
+        thumbnailUrl: data.thumbnailUrl || (data.facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${data.facebookVideoId}` : undefined),
         format: selectedCategory,
         createdAt: new Date().toISOString().slice(0, 10),
         status: "completed",
@@ -1035,11 +1036,12 @@ export default function Home() {
       return m && m[1]?.length === 11 ? m[1] : "";
     })();
 
-    const thumbUrl = ytId
-      ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`
-      : video.videoUrl && video.videoUrl.includes("res.cloudinary.com")
-      ? video.videoUrl.replace(/\.[^.]+$/, ".jpg")
-      : "";
+    const thumbUrl =
+      video.thumbnailUrl ||
+      (ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : "") ||
+      (video.facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${video.facebookVideoId}` : "") ||
+      (video.videoUrl && video.videoUrl.includes("res.cloudinary.com") ? video.videoUrl.replace(/\.[^.]+$/, ".jpg") : "") ||
+      `/api/viral-clips/thumbnail?format=${encodeURIComponent(video.format || "Trending")}`;
 
     const targetLink = ytId
       ? `https://www.youtube.com/shorts/${ytId}`
