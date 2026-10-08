@@ -1099,14 +1099,63 @@ export default function Home() {
       <p style={{ color: video.status === 'failed' ? '#d32f2f' : 'inherit' }}>{video.description}</p>
       {video.status !== 'failed' && <div className="hashtag-row">{Array.from(new Set(video.hashtags || [])).map((tag, idx) => <span key={`${tag}-${idx}`}>#{tag.replace(/^#/, '')}</span>)}</div>}
       <div className="video-card-actions">
-        <span>{video.createdAt}</span>
-        <div style={{display:'flex', gap:'8px', marginLeft:'auto', flexWrap:'wrap', alignItems:'center'}}>
-        {video.youtube === 1 && <a href={video.youtubeVideoId ? `https://www.youtube.com/shorts/${video.youtubeVideoId}` : (video.videoUrl || "#")} target="_blank" rel="noreferrer" className="secondary-button" style={{display: 'inline-flex', alignItems: 'center', gap: '5px', padding:'4px 10px', fontSize:'11px', color: '#ff4d56', borderColor: 'rgba(229,9,20,0.3)', backgroundColor: 'rgba(229,9,20,0.1)'}} title="Watch on YouTube Shorts"><FaYoutube size={13} /> Shorts</a>}
-        {video.facebook === 1 && <a href={video.facebookVideoId ? `https://www.facebook.com/reel/${video.facebookVideoId}` : "https://www.facebook.com"} target="_blank" rel="noreferrer" className="secondary-button" style={{display: 'inline-flex', alignItems: 'center', gap: '5px', padding:'4px 10px', fontSize:'11px', color: '#38bdf8', borderColor: 'rgba(56,189,248,0.3)', backgroundColor: 'rgba(56,189,248,0.1)'}} title="Watch Facebook Reel"><FaFacebookF size={12} /> Facebook Reel</a>}
-        {video.instagram === 1 && <a href={video.instagramVideoId ? `https://www.instagram.com/reel/${video.instagramVideoId}` : "https://www.instagram.com"} target="_blank" rel="noreferrer" className="secondary-button" style={{display: 'inline-flex', alignItems: 'center', gap: '5px', padding:'4px 10px', fontSize:'11px', color: '#f472b6', borderColor: 'rgba(244,114,182,0.3)', backgroundColor: 'rgba(244,114,182,0.1)'}} title="Watch Instagram Reel"><FaInstagram size={13} /> Instagram Reel</a>}
-        {video.youtube !== 1 && video.facebook !== 1 && video.instagram !== 1 && video.videoUrl && !video.videoUrl.includes("youtube.com/") && <a href={video.videoUrl} download className="icon-button" title="Download video"><Download size={16} /></a>}
-        <button className="icon-button" style={{ color: '#ea4335' }} onClick={() => setVideoToDelete(video)} title="Delete video"><Trash2 size={16} /></button>
-        </div></div></div></article>
+        <div className="card-platform-links">
+          {video.youtube === 1 && (
+            <a
+              href={video.youtubeVideoId ? `https://www.youtube.com/shorts/${video.youtubeVideoId}` : (video.videoUrl || "#")}
+              target="_blank"
+              rel="noreferrer"
+              className="platform-btn yt-btn"
+              title="Watch on YouTube Shorts"
+            >
+              <FaYoutube size={12} />
+              <span>Shorts</span>
+            </a>
+          )}
+          {video.facebook === 1 && (
+            <a
+              href={video.facebookVideoId ? `https://www.facebook.com/reel/${video.facebookVideoId}` : "https://www.facebook.com"}
+              target="_blank"
+              rel="noreferrer"
+              className="platform-btn fb-btn"
+              title="Watch Facebook Reel"
+            >
+              <FaFacebookF size={11} />
+              <span>FB Reel</span>
+            </a>
+          )}
+          {video.instagram === 1 && (
+            <a
+              href={video.instagramVideoId ? `https://www.instagram.com/reel/${video.instagramVideoId}` : "https://www.instagram.com"}
+              target="_blank"
+              rel="noreferrer"
+              className="platform-btn ig-btn"
+              title="Watch Instagram Reel"
+            >
+              <FaInstagram size={12} />
+              <span>IG Reel</span>
+            </a>
+          )}
+        </div>
+        <div className="card-footer-meta">
+          <span className="card-date">{video.createdAt}</span>
+          <div className="card-footer-tools">
+            {video.youtube !== 1 && video.facebook !== 1 && video.instagram !== 1 && video.videoUrl && !video.videoUrl.includes("youtube.com/") && (
+              <a href={video.videoUrl} download className="footer-tool-btn" title="Download video">
+                <Download size={13} />
+              </a>
+            )}
+            <button
+              className="footer-tool-btn delete-tool"
+              onClick={() => setVideoToDelete(video)}
+              title="Delete video"
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div></article>
     );
   })}</div> : <div className="empty-library"><div className="empty-art"><span /><span /><span /><Clapperboard size={27} /></div><h2>{query || filter !== "All videos" ? "No matching clips" : "No clips published yet."}</h2><p>{query || filter !== "All videos" ? "Try another search or category." : "Published viral clips will appear here with YouTube, Facebook, and Instagram links."}</p>{!query && filter === "All videos" && <button className="primary-button" onClick={() => setScreen("studio")}><TrendingUp size={16} /> Create your first viral clip</button>}</div>}</section>}
       {screen === "settings" && <section className="settings-content"><div className="eyebrow"><span className="eyebrow-dot" /> WORKSPACE SETTINGS</div><h1>Your studio, <em>your way.</em></h1><p className="settings-intro">Manage automated workflows and connected social networks.</p>
