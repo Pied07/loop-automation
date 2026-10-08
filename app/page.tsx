@@ -230,7 +230,7 @@ export default function Home() {
           oauth_rejected: "Access was declined. Reconnect and approve the requested permissions.",
           missing_credentials: "Facebook App ID or Meta App Secret is missing from the server environment.",
           meta_permissions_missing: "Meta did not grant Page access. Reconnect and approve pages_show_list and pages_manage_posts.",
-          meta_no_pages: "No Facebook Pages were available to this login. Create or get Page task access, then reconnect.",
+          meta_no_pages: "No Facebook Page found. Automated Reels require a Facebook Page. Create a free Page at facebook.com/pages/create, link Instagram to it, and reconnect.",
           meta_page_access_missing: "Meta listed a Page but did not grant its access token. Reconnect and approve Page permissions.",
           meta_no_instagram: "No linked Instagram Professional account was found. Convert Instagram to Business/Creator and link it to the Facebook Page, then reconnect.",
           token_exchange_failed: "Meta could not complete the connection. Check the app redirect URI and try reconnecting.",
@@ -246,6 +246,7 @@ export default function Home() {
         setConnections(newConns);
         notify(errorMessages[connectionError] || `Meta connection failed (${connectionError}).`);
         window.history.replaceState({}, document.title, window.location.pathname);
+        setTimeout(() => setScreen("settings"), 0);
       } else if (existingConns.length > 0) {
         setConnections(existingConns);
       }
