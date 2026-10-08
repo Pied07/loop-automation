@@ -284,23 +284,32 @@ def run():
     timestamp = int(time.time())
     source_file = CLIPS_DIR / f"source_{timestamp}.mp4"
 
-    # 0. Check if direct media URL (e.g. Cloudinary uploaded video or direct MP4)
-    is_direct = "cloudinary.com" in VIDEO_URL or any(VIDEO_URL.lower().split("?")[0].endswith(ext) for ext in [".mp4", ".mov", ".m4v", ".webm"])
+    # 0. Check if direct media URL (e.g. Cloudinary, Mixkit, Archive.org, Wikimedia, or direct MP4/video link)
+    is_direct = (
+        "cloudinary.com" in VIDEO_URL
+        or "mixkit.co" in VIDEO_URL
+        or "archive.org" in VIDEO_URL
+        or "wikimedia.org" in VIDEO_URL
+        or any(VIDEO_URL.lower().split("?")[0].endswith(ext) for ext in [".mp4", ".mov", ".m4v", ".webm"])
+    )
     if is_direct:
         print(f"Direct media link detected: {VIDEO_URL}")
         try:
-            req = urllib.request.Request(VIDEO_URL, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+            req = urllib.request.Request(
+                VIDEO_URL,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"}
+            )
             with urllib.request.urlopen(req, timeout=120) as resp, open(source_file, "wb") as out_f:
                 shutil.copyfileobj(resp, out_f)
             if source_file.exists() and source_file.stat().st_size > 1000:
                 download_success = True
                 parsed_name = Path(urllib.parse.urlparse(VIDEO_URL).path).stem
-                title = re.sub(r"[_\-]+", " ", parsed_name).strip() or "Uploaded Viral Video"
+                title = re.sub(r"[_\-]+", " ", parsed_name).strip() or "Viral Video"
                 print(f"Direct media download succeeded: {source_file} ({source_file.stat().st_size} bytes)")
         except Exception as direct_err:
             print(f"Direct download notice: {direct_err}")
 
-    # 1. Download with yt-dlp's default unauthenticated YouTube client.
+    # 1. Download with yt-dlp (YouTube, TikTok, Reddit, Instagram, Twitter, etc.)
     title = title if download_success else "Viral Video"
     total_duration = 0.0
     last_error = ""
@@ -323,11 +332,16 @@ def run():
     ]
     # Check if cookies are available
     cookies_path = ROOT_DIR / "cookies.txt"
-    youtube_cookies_env = os.environ.get("YOUTUBE_COOKIES", "").strip()
+    youtube_cookies_env = os.environ.get("YOUTUBE_COOKIES", "").strip() or os.environ.get("YOUTUBE_COOKIES_B64", "").strip()
     if youtube_cookies_env and not cookies_path.exists():
         try:
-            cookies_path.write_text(youtube_cookies_env, encoding="utf-8")
-            print("Loaded YouTube cookies from YOUTUBE_COOKIES secret.")
+            if youtube_cookies_env.startswith("#") or "\t" in youtube_cookies_env:
+                cookies_path.write_text(youtube_cookies_env, encoding="utf-8")
+            else:
+                import base64
+                decoded = base64.b64decode(youtube_cookies_env).decode("utf-8")
+                cookies_path.write_text(decoded, encoding="utf-8")
+            print("Loaded YouTube cookies from env secret.")
         except Exception as e:
             print(f"Notice: Failed to write cookies from env: {e}")
 
@@ -335,19 +349,19 @@ def run():
 
     download_attempts = [
         {
+            "name": "iOS + mweb + web_embedded Client (High Success Rate)",
+            "flags": [
+                "-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b/best",
+                "--merge-output-format", "mp4",
+                "--extractor-args", "youtube:player-client=ios,mweb,web_embedded,android",
+            ],
+        },
+        {
             "name": "VisionOS + Android Client (Datacenter-safe)",
             "flags": [
                 "-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b/best",
                 "--merge-output-format", "mp4",
                 "--extractor-args", "youtube:player-client=visionos,android",
-            ],
-        },
-        {
-            "name": "iOS + Android Client",
-            "flags": [
-                "-f", "bv*+ba/b/best",
-                "--merge-output-format", "mp4",
-                "--extractor-args", "youtube:player-client=ios,android",
             ],
         },
         {

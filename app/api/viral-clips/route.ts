@@ -56,54 +56,17 @@ async function registerQueuedJob(req: NextRequest, params: { jobId: string; vide
   }
 }
 
-async function initializeJobStatus(req: NextRequest, jobId: string) {
+async function updateJobStatus(req: NextRequest, data: Record<string, unknown>) {
   try {
     const statusUrl = new URL("/api/viral-clips/status", req.url).toString();
     await fetch(statusUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jobId,
-        status: "processing",
-        progress: 12,
-        step: "Queued for video processing...",
-      }),
+      body: JSON.stringify(data),
     });
   } catch (error) {
-    console.warn("Initial status update failed:", error);
+    console.warn("Status update notice:", error);
   }
-}
-
-async function dispatchGitHubWorkflow(params: {
-  videoUrl: string;
-  contentCategory: string;
-  jobId: string;
-  userId: string;
-}) {
-  const githubPat = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
-  if (!githubPat) return false;
-
-  const githubRepo = process.env.GITHUB_REPO || "Pied07/loop-automation";
-  const response = await fetch(`https://api.github.com/repos/${githubRepo}/actions/workflows/split-video.yml/dispatches`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${githubPat}`,
-      Accept: "application/vnd.github.v3+json",
-      "Content-Type": "application/json",
-      "User-Agent": "The-Viral-Desk-App",
-    },
-    body: JSON.stringify({
-      ref: "main",
-      inputs: params,
-    }),
-  });
-
-  if (!response.ok) {
-    console.warn("GitHub workflow dispatch failed:", response.status, await response.text());
-    return false;
-  }
-
-  return true;
 }
 
 export async function POST(req: NextRequest) {
@@ -129,7 +92,6 @@ export async function POST(req: NextRequest) {
     }
 
     const normalizedCategory = typeof contentCategory === "string" && contentCategory.trim() ? contentCategory.trim() : "Trending";
-    const userId = typeof body.userId === "string" && body.userId.trim() ? body.userId.trim() : "creator";
     const processingMode = getProcessingMode(req, body.mode);
 
     if (processingMode === "queue") {
@@ -138,7 +100,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Could not queue the job for the desktop worker." }, { status: 500 });
       }
 
-      await initializeJobStatus(req, jobId);
+      await updateJobStatus(req, {
+        jobId,
+        status: "processing",
+        progress: 12,
+        step: "Queued for residential desktop worker...",
+      });
       return NextResponse.json({
         success: true,
         cloudMode: "desktop-worker",
@@ -147,30 +114,34 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (processingMode === "cloud") {
-      await initializeJobStatus(req, jobId);
-      const githubDispatched = await dispatchGitHubWorkflow({ videoUrl, contentCategory: normalizedCategory, jobId, userId });
-      if (!githubDispatched) {
-        return NextResponse.json({ error: "Could not start the GitHub cloud runner. Set VIRAL_CLIPS_PROCESSOR=local to process on this machine." }, { status: 502 });
-      }
-
-      return NextResponse.json({
-        success: true,
-        cloudMode: "github",
-        jobId,
-        message: "Video splitting job started in GitHub Actions.",
-      });
-    }
+    // Direct Cloud Processing (No GitHub Actions, zero datacenter bot-block hurdles)
+    await updateJobStatus(req, {
+      jobId,
+      status: "processing",
+      progress: 25,
+      step: "Downloading video stream in cloud...",
+    });
 
     assertCloudinaryConfigured();
     await mkdir(clipsDir, { recursive: true, mode: 0o700 });
 
     const splitResult = await downloadAndSplitVideo(videoUrl, clipsDir);
     if ("error" in splitResult) {
+      await updateJobStatus(req, { jobId, status: "failed", error: splitResult.error });
       return NextResponse.json({ error: splitResult.error }, { status: 400 });
     }
 
     const { clips, sourceTitle, totalDuration } = splitResult;
+
+    await updateJobStatus(req, {
+      jobId,
+      status: "processing",
+      progress: 60,
+      step: "Cropping 9:16 vertical clips with FFmpeg & generating viral hooks...",
+      sourceTitle,
+      totalDuration,
+    });
+
     const clipsWithMetadata = await Promise.all(
       clips.map(async (clip, index) => {
         const meta = await generateClipMetadata({
@@ -193,6 +164,15 @@ export async function POST(req: NextRequest) {
         };
       })
     );
+
+    await updateJobStatus(req, {
+      jobId,
+      status: "processing",
+      progress: 85,
+      step: "Uploading clips to Cloudinary cloud storage...",
+      sourceTitle,
+      totalDuration,
+    });
 
     const clipsWithMeta: Array<{
       clipPath: string;
@@ -225,8 +205,19 @@ export async function POST(req: NextRequest) {
       throw uploadError;
     }
 
+    await updateJobStatus(req, {
+      jobId,
+      status: "done",
+      progress: 100,
+      step: `✅ All ${clipsWithMeta.length} clips ready in cloud storage!`,
+      sourceTitle,
+      totalDuration,
+      clips: clipsWithMeta,
+    });
+
     return NextResponse.json({
       success: true,
+      jobId,
       sourceTitle,
       totalDuration,
       clips: clipsWithMeta,
@@ -234,6 +225,7 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to process video.";
     console.error("Viral clips error:", err);
+    await updateJobStatus(req, { jobId, status: "failed", error: message });
     return NextResponse.json({ error: message }, { status: 500 });
   } finally {
     await rm(clipsDir, { recursive: true, force: true }).catch((cleanupError) => {

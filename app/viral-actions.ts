@@ -141,17 +141,29 @@ async function downloadWithYtDlp(
     } catch {}
   };
 
-  const isDirectMedia = videoUrl.includes("cloudinary.com") || [".mp4", ".mov", ".webm", ".m4v"].some((ext) => videoUrl.toLowerCase().split("?")[0].endsWith(ext));
+  const isDirectMedia =
+    videoUrl.includes("cloudinary.com") ||
+    videoUrl.includes("tiktokcdn") ||
+    videoUrl.includes("tikwm.com") ||
+    videoUrl.includes("akamaized.net") ||
+    videoUrl.includes("mixkit.co") ||
+    videoUrl.includes("archive.org") ||
+    videoUrl.includes("wikimedia.org") ||
+    [".mp4", ".mov", ".webm", ".m4v"].some((ext) => videoUrl.toLowerCase().split("?")[0].endsWith(ext));
   if (isDirectMedia) {
     try {
-      const resp = await fetch(videoUrl);
+      const resp = await fetch(videoUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        },
+      });
       if (resp.ok) {
         const arrayBuf = await resp.arrayBuffer();
         fs.writeFileSync(outputPath, Buffer.from(arrayBuf));
         const urlObj = new URL(videoUrl);
         const baseName = path.basename(urlObj.pathname, path.extname(urlObj.pathname));
         return {
-          title: baseName.replace(/[_\-]+/g, " ").trim() || "Uploaded Video",
+          title: baseName.replace(/[_\-]+/g, " ").trim() || "Viral Video",
           duration: 0,
         };
       }
@@ -878,8 +890,8 @@ export async function publishClipAndCleanup(params: {
   };
 }
 
-// ─── Native YouTube Search (zero dependency, no browseId crashes) ─────────────
-async function searchYouTubeVideos(query: string): Promise<{ url: string; title: string; views: number }[]> {
+// ─── Native YouTube Search (supports modern Shorts shelf & video lockups) ────
+async function searchYouTubeVideos(query: string): Promise<{ url: string; title: string; views: number; source: string }[]> {
   try {
     const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
     const res = await fetch(url, {
@@ -896,34 +908,62 @@ async function searchYouTubeVideos(query: string): Promise<{ url: string; title:
 
     const data = JSON.parse(jsonMatch[1]);
     const sections = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
-    const results: { url: string; title: string; views: number }[] = [];
+    const results: { url: string; title: string; views: number; source: string }[] = [];
+    const seenIds = new Set<string>();
 
     for (const section of sections) {
       const items = section?.itemSectionRenderer?.contents || [];
       for (const item of items) {
-        // Standard video renderers
+        // 1. Standard videoRenderer
         const vr = item?.videoRenderer;
-        if (vr?.videoId && vr.title?.runs?.[0]?.text) {
+        if (vr?.videoId && !seenIds.has(vr.videoId)) {
+          seenIds.add(vr.videoId);
+          const title = vr.title?.runs?.[0]?.text || vr.title?.accessibility?.accessibilityData?.label || "Viral Video";
           const viewsText = vr.viewCountText?.simpleText || vr.viewCountText?.runs?.[0]?.text || "0";
           const views = parseInt(viewsText.replace(/[^0-9]/g, "")) || 0;
           results.push({
             url: `https://www.youtube.com/watch?v=${vr.videoId}`,
-            title: vr.title.runs[0].text,
+            title,
             views,
+            source: "YouTube Trending (Fair Use)",
           });
         }
-        // Shorts shelf items
+
+        // 2. Modern gridShelfViewModel (Shorts shelf in modern YouTube UI)
+        if (item?.gridShelfViewModel?.contents && Array.isArray(item.gridShelfViewModel.contents)) {
+          for (const entry of item.gridShelfViewModel.contents) {
+            const slvm = entry?.shortsLockupViewModel;
+            const videoId =
+              slvm?.onTap?.innertubeCommand?.reelWatchEndpoint?.videoId ||
+              (slvm?.entityId && typeof slvm.entityId === "string" ? slvm.entityId.replace(/^shorts-shelf-item-/, "") : null);
+            if (videoId && !seenIds.has(videoId)) {
+              seenIds.add(videoId);
+              const rawTitle = slvm?.accessibilityText || "Viral Short";
+              const title = rawTitle.replace(/,\s*\d+[\d,.]*\s*(?:million|billion|thousand|views|\w+ views)?.*$/i, "").trim() || rawTitle;
+              results.push({
+                url: `https://www.youtube.com/watch?v=${videoId}`,
+                title,
+                views: 500000,
+                source: "YouTube Shorts (Viral)",
+              });
+            }
+          }
+        }
+
+        // 3. Legacy reelShelfRenderer (Shorts shelf in classic YouTube UI)
         const reelShelf = item?.reelShelfRenderer;
         if (reelShelf && Array.isArray(reelShelf.items)) {
           for (const reel of reelShelf.items) {
             const rvr = reel?.reelItemRenderer;
-            if (rvr?.videoId) {
+            if (rvr?.videoId && !seenIds.has(rvr.videoId)) {
+              seenIds.add(rvr.videoId);
               const viewsText = rvr.viewCountText?.simpleText || "0";
               const views = parseInt(viewsText.replace(/[^0-9]/g, "")) || 0;
               results.push({
                 url: `https://www.youtube.com/watch?v=${rvr.videoId}`,
                 title: rvr.headline?.simpleText || "Viral Short",
                 views,
+                source: "YouTube Shorts (Viral)",
               });
             }
           }
@@ -933,115 +973,253 @@ async function searchYouTubeVideos(query: string): Promise<{ url: string; title:
 
     return results;
   } catch (e) {
-    console.warn("Direct YouTube search fallback:", e);
+    console.warn("Direct YouTube search fallback error:", e);
     return [];
   }
 }
 
-// ─── Auto-Find Viral Video (100% YouTube, copyright-safe, high-reach) ─────────
+// ─── Auto-Find Viral Video Queries (Multi-Platform Viral Discovery) ───────────
 const SAFE_CATEGORY_QUERIES: Record<string, string[]> = {
-  "Motivational": ["best motivational speech shorts", "podcast life advice wisdom shorts", "discipline mindset powerful speech shorts"],
-  "Educational":   ["interesting facts educational shorts", "science facts did you know shorts", "eye opening history lesson shorts"],
-  "Funny":         ["funny podcast moments shorts", "stand up comedy hilarious clean shorts", "epic funny moment shorts"],
-  "Comedy":        ["stand up comedy hilarious clean shorts", "funny comedy moments shorts", "epic funny clips shorts"],
-  "Horror":        ["scary urban legends stories shorts", "spooky horror mystery narration shorts", "creepy paranormal true stories shorts"],
-  "Romance":       ["touching romantic story shorts", "wholesome love relationship advice shorts", "sweet emotional love stories shorts"],
-  "Adventure":     ["extreme sports outdoor adventure shorts", "hiking wilderness exploration shorts", "action travel adventure shorts"],
-  "Music":         ["amazing street musician performance shorts", "talented instrumental piano guitar solo shorts", "impressive vocal performance shorts"],
-  "Nature":        ["breathtaking nature wildlife shorts", "amazing earth planet discovery shorts", "peaceful nature landscape shorts"],
-  "Sports":        ["athlete discipline motivation speech shorts", "legendary sports moment highlights shorts", "unstoppable athlete mindset shorts"],
-  "Gaming":        ["epic gaming moment clutch shorts", "funny gaming moments clips shorts"],
-  "Travel":        ["beautiful places to visit before you die shorts", "world travel hidden gems shorts"],
-  "Food":          ["satisfying cooking recipe street food shorts", "delicious food compilation shorts"],
-  "Fashion":       ["street style transformation aesthetic fashion shorts", "classic stylish outfit ideas shorts"],
+  "Trending": [
+    "viral shorts trending",
+    "popular viral video shorts",
+    "trending shorts reels",
+    "most viral video moments",
+  ],
+  "Motivational": [
+    "best motivational speech shorts",
+    "podcast life advice wisdom shorts",
+    "discipline mindset powerful speech shorts",
+    "success motivation powerful quotes shorts",
+  ],
+  "Educational": [
+    "interesting facts educational shorts",
+    "science facts did you know shorts",
+    "eye opening history lesson shorts",
+    "mind blowing facts trivia shorts",
+  ],
+  "Funny": [
+    "funny podcast moments shorts",
+    "stand up comedy hilarious clean shorts",
+    "epic funny moment shorts",
+    "try not to laugh funny shorts",
+  ],
+  "Comedy": [
+    "stand up comedy hilarious clean shorts",
+    "funny comedy moments shorts",
+    "epic funny clips shorts",
+    "hilarious clean comedy shorts",
+  ],
+  "Horror": [
+    "scary urban legends stories shorts",
+    "spooky horror mystery narration shorts",
+    "creepy paranormal true stories shorts",
+  ],
+  "Romance": [
+    "touching romantic story shorts",
+    "wholesome love relationship advice shorts",
+    "sweet emotional love stories shorts",
+  ],
+  "Adventure": [
+    "extreme sports outdoor adventure shorts",
+    "hiking wilderness exploration shorts",
+    "action travel adventure shorts",
+  ],
+  "Music": [
+    "amazing street musician performance shorts",
+    "talented instrumental piano guitar solo shorts",
+    "impressive vocal live performance shorts",
+  ],
+  "Nature": [
+    "breathtaking nature wildlife shorts",
+    "amazing earth planet discovery shorts",
+    "peaceful nature landscape shorts",
+    "animals amazing moments wildlife shorts",
+  ],
+  "Sports": [
+    "athlete discipline motivation speech shorts",
+    "legendary sports moment highlights shorts",
+    "unstoppable athlete mindset shorts",
+    "gym workout fitness motivation shorts",
+  ],
+  "Gaming": [
+    "epic gaming moment clutch shorts",
+    "funny gaming moments clips shorts",
+    "satisfying gaming moments shorts",
+  ],
+  "Travel": [
+    "beautiful places to visit before you die shorts",
+    "world travel hidden gems shorts",
+    "stunning travel destinations wanderlust shorts",
+  ],
+  "Food": [
+    "satisfying cooking recipe street food shorts",
+    "delicious food compilation shorts",
+    "viral food recipes street food shorts",
+  ],
+  "Fashion": [
+    "street style transformation aesthetic fashion shorts",
+    "classic stylish outfit ideas shorts",
+    "outfit inspiration aesthetic trend shorts",
+  ],
 };
 
-// ─── 100% Dynamic Copyright-Free & Public Domain Video Search Engine ───────────
-// Live dynamic scraping & API search on every button click: ZERO hardcoded URLs.
-// Guarantees 100% public domain / CC0 media to eliminate copyright strikes & profile bans.
+// ─── Real Dynamic Viral Scrapers (Live Online Only — Zero Hardcoding & Zero AI) ─
 
-async function searchNASA(category: string): Promise<{ title: string; url: string; source: string } | null> {
-  const queryMap: Record<string, string> = {
-    "Trending": "rocket launch spaceflight",
-    "Motivational": "aurora spacewalk earth",
-    "Educational": "solar flare eclipse planet",
-    "Comedy": "testing robot space",
-    "Horror": "black hole dark nebula",
-    "Romance": "earth sunset ocean",
-    "Adventure": "mars rover expedition",
-    "Nature": "earth atmosphere storm clouds",
-    "Music": "cosmic vibrations space waves",
-    "Food": "space agriculture harvest"
-  };
-  const q = queryMap[category] || category;
+const TIKTOK_CATEGORY_KEYWORDS: Record<string, string[]> = {
+  "Motivational": ["motivation", "mindset", "success", "grind", "nevergiveup", "focus", "discipline", "life", "quote", "inspire", "hardwork", "hustle", "gymmotivation"],
+  "Funny": ["funny", "laugh", "humor", "comedy", "lol", "prank", "joke", "meme", "fails", "trynottolaugh", "hilarious", "relatable"],
+  "Comedy": ["funny", "laugh", "humor", "comedy", "lol", "prank", "joke", "meme", "fails", "standup", "sketch"],
+  "Educational": ["facts", "didyouknow", "science", "learn", "history", "educational", "interesting", "knowledge", "discovery", "school"],
+  "Nature": ["nature", "wildlife", "animal", "earth", "ocean", "forest", "dog", "cat", "puppy", "pet", "birds", "landscape"],
+  "Sports": ["sports", "football", "soccer", "gym", "workout", "athlete", "goals", "basketball", "training", "fitness", "run", "champion", "tennis", "fight", "ufc", "boxing"],
+  "Gaming": ["gaming", "game", "gamer", "play", "gta", "fortnite", "roblox", "minecraft", "streamer", "twitch", "gameplay", "clip"],
+  "Travel": ["travel", "explore", "vacation", "trip", "place", "city", "beautiful", "hotel", "flight", "beach", "view", "wanderlust", "destination"],
+  "Food": ["food", "recipe", "cooking", "chef", "tasty", "delicious", "eat", "dinner", "cake", "kitchen", "bake", "lunch", "streetfood", "snack"],
+  "Fashion": ["fashion", "style", "ootd", "outfit", "clothes", "dress", "model", "drip", "fit", "beauty", "makeup", "look"],
+  "Music": ["music", "song", "sing", "dance", "lyrics", "sound", "rap", "cover", "beat", "banger"],
+};
+
+// 1. Live Trending TikTok Video Scraper (Real creators, millions of views, direct MP4 CDN stream)
+async function scrapeTikTokTrendingVideos(category: string): Promise<{ title: string; url: string; source: string } | null> {
+  const regions = ["GB", "US", "CA", "AU"];
+  // Randomly rotate region so every call gets fresh, varied live content
+  const region = regions[Math.floor(Math.random() * regions.length)];
   try {
-    const res = await fetch(`https://images-api.nasa.gov/search?media_type=video&q=${encodeURIComponent(q)}`, {
-      signal: AbortSignal.timeout(4500)
+    const res = await fetch(`https://www.tikwm.com/api/feed/list?region=${region}&count=35`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+      },
+      signal: AbortSignal.timeout(7500),
     });
     if (!res.ok) return null;
     const data = await res.json();
-    const items = data.collection?.items || [];
-    if (!items.length) return null;
+    const rawVideos: any[] = data.data || [];
+    if (!Array.isArray(rawVideos) || rawVideos.length === 0) return null;
 
-    // Pick randomly among top 12 results for fresh variety on every click
-    const sample = items.slice(0, 12);
-    const item = sample[Math.floor(Math.random() * sample.length)];
-    const title = item.data?.[0]?.title || "NASA Open Archive Video";
+    // Filter valid videos: direct MP4, real title, exclude synthetic AI generations
+    const valid = rawVideos.filter((v) => {
+      if (!v.play || !v.title) return false;
+      const t = String(v.title).toLowerCase();
+      const u = String(v.play).toLowerCase();
+      if (t.includes("ai generated") || t.includes("ai-generation") || u.includes("user-ai-generation")) return false;
+      return true;
+    });
 
-    if (item.href) {
-      const collRes = await fetch(item.href, { signal: AbortSignal.timeout(3500) });
-      if (collRes.ok) {
-        const files: string[] = await collRes.json();
-        const mp4 = files.find(f => f.endsWith("~medium.mp4") || f.endsWith("~orig.mp4") || (f.endsWith(".mp4") && !f.endsWith("~preview.mp4")));
-        if (mp4) {
-          return {
-            title,
-            url: mp4.replace(/^http:\/\//i, "https://"),
-            source: "NASA Public Domain (100% Ban-Safe)"
-          };
-        }
-      }
-    }
-  } catch {}
+    if (valid.length === 0) return null;
+
+    const catKws = TIKTOK_CATEGORY_KEYWORDS[category] || [];
+    let matched = valid.filter((v) => {
+      const text = `${v.title} ${v.author?.nickname || ""} ${v.author?.unique_id || ""}`.toLowerCase();
+      return catKws.some((k) => text.includes(k));
+    });
+
+    // If no keyword match found in this batch or category is Trending, pool high-engagement videos
+    const pool = matched.length > 0 ? matched : valid.filter((v) => (v.play_count || 0) > 100000);
+    const candidateList = pool.length > 0 ? pool : valid;
+
+    // Sort by highest view count so the most viral videos appear first
+    candidateList.sort((a, b) => (b.play_count || 0) - (a.play_count || 0));
+
+    // Pick from top 6 engaging videos
+    const picked = candidateList[Math.floor(Math.random() * Math.min(candidateList.length, 6))];
+    if (!picked) return null;
+
+    const author = picked.author?.nickname || picked.author?.unique_id || "Creator";
+    const views = picked.play_count ? Number(picked.play_count).toLocaleString() : "";
+    const cleanTitle = picked.title.replace(/#[a-zA-Z0-9_]+/g, "").replace(/\s+/g, " ").trim();
+    const displayTitle = cleanTitle.length > 5 ? cleanTitle : picked.title.trim();
+
+    return {
+      title: displayTitle.slice(0, 80),
+      url: picked.play,
+      source: `Live Trending TikTok (${views ? `${views} views • ` : ""}@${author})`,
+    };
+  } catch (err: any) {
+    console.warn("TikTok live trending feed notice:", err.message);
+  }
   return null;
 }
 
+// 2. Mixkit Live HD Video Scraper (Real human-filmed action, food, sports, nature footage)
+async function searchMixkit(category: string): Promise<{ title: string; url: string; source: string } | null> {
+  const catMap: Record<string, string> = {
+    "Trending": "lifestyle",
+    "Motivational": "lifestyle",
+    "Funny": "lifestyle",
+    "Comedy": "lifestyle",
+    "Educational": "technology",
+    "Nature": "nature",
+    "Sports": "sports",
+    "Gaming": "technology",
+    "Travel": "travel",
+    "Food": "food",
+    "Fashion": "lifestyle",
+  };
+  const targetCategory = catMap[category] || "nature";
+  try {
+    const res = await fetch(`https://mixkit.co/free-stock-video/${targetCategory}/`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const mp4Matches = [...new Set([...html.matchAll(/https:\/\/assets\.mixkit\.co\/videos\/(\d+)\/\1\-(?:720|1080)\.mp4/g)].map((m) => m[0]))];
+    if (mp4Matches.length > 0) {
+      const picked = mp4Matches[Math.floor(Math.random() * mp4Matches.length)];
+      return {
+        title: `Viral ${category} Moment`,
+        url: picked,
+        source: "Mixkit HD Video (Direct Cloud MP4, Zero Bot Checks)",
+      };
+    }
+  } catch (e) {
+    console.warn("Mixkit direct search fallback notice:", e);
+  }
+  return null;
+}
+
+// 3. Internet Archive Live API (Classic comedy, vintage cartoons, iconic public moments)
 async function searchArchiveOrg(category: string): Promise<{ title: string; url: string; source: string } | null> {
   const queryMap: Record<string, string> = {
-    "Trending": "automobile future innovation",
-    "Motivational": "achievement success sport",
-    "Educational": "science education history",
-    "Comedy": "comedy cartoon slapstick",
-    "Horror": "ghost horror mystery",
-    "Romance": "love romance story",
-    "Adventure": "expedition adventure wildlife",
-    "Nature": "wildlife nature animals",
-    "Music": "swing jazz orchestra dance",
-    "Food": "cooking harvest food preparation"
+    "Trending": "innovation discovery future viral",
+    "Motivational": "achievement success athlete inspiration",
+    "Educational": "science education history discovery",
+    "Comedy": "comedy cartoon slapstick funny",
+    "Funny": "comedy cartoon slapstick humor",
+    "Horror": "ghost horror mystery gothic",
+    "Romance": "love romance classic vintage",
+    "Adventure": "expedition adventure wildlife nature",
+    "Nature": "wildlife nature animals wilderness",
+    "Music": "swing jazz orchestra dance concert",
+    "Food": "cooking harvest food preparation festival",
   };
   const q = queryMap[category] || category;
   try {
-    const searchUrl = `https://archive.org/advancedsearch.php?q=mediatype:movies+AND+collection:(prelinger+OR+animationandcartoons+OR+classic_tv+OR+feature_films+OR+stock_footage)+AND+${encodeURIComponent(q)}&fl[]=identifier,title,description&sort[]=downloads+desc&rows=25&output=json`;
-    const res = await fetch(searchUrl, { signal: AbortSignal.timeout(4500) });
+    const searchUrl = `https://archive.org/advancedsearch.php?q=mediatype:movies+AND+collection:(prelinger+OR+animationandcartoons+OR+classic_tv)+AND+${encodeURIComponent(q)}&fl[]=identifier,title,description&sort[]=downloads+desc&rows=25&output=json`;
+    const res = await fetch(searchUrl, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) return null;
     const data = await res.json();
     const docs = data.response?.docs || [];
     if (!docs.length) return null;
 
-    // Pick randomly among top 15 results for fresh variety
     const sample = docs.slice(0, 15);
     const doc = sample[Math.floor(Math.random() * sample.length)];
 
-    const metaRes = await fetch(`https://archive.org/metadata/${doc.identifier}/files`, { signal: AbortSignal.timeout(3500) });
+    const metaRes = await fetch(`https://archive.org/metadata/${doc.identifier}/files`, { signal: AbortSignal.timeout(4000) });
     if (metaRes.ok) {
       const meta = await metaRes.json();
       const files: any[] = meta.result || [];
-      const mp4 = files.find(f => f.name?.endsWith("_512kb.mp4")) || files.find(f => f.name?.endsWith(".mp4") && !f.name?.includes("_thumb"));
+      const mp4 =
+        files.find((f) => f.name?.endsWith("_512kb.mp4")) ||
+        files.find((f) => f.name?.endsWith(".mp4") && !f.name?.includes("_thumb"));
       if (mp4) {
         return {
-          title: doc.title,
+          title: doc.title || `Classic ${category} Clip`,
           url: `https://archive.org/download/${doc.identifier}/${encodeURIComponent(mp4.name)}`,
-          source: "Archive.org Public Domain (100% Ban-Safe)"
+          source: "Internet Archive (Direct Cloud MP4, Zero Bot Checks)",
         };
       }
     }
@@ -1049,12 +1227,13 @@ async function searchArchiveOrg(category: string): Promise<{ title: string; url:
   return null;
 }
 
+// 4. Wikimedia Commons Live API (High quality community-filmed videos)
 async function searchWikimedia(category: string): Promise<{ title: string; url: string; source: string } | null> {
   try {
     const url = `https://commons.wikimedia.org/w/api.php?action=query&list=search&srnamespace=6&srsearch=filetype:video+${encodeURIComponent(category)}&srlimit=15&format=json`;
     const res = await fetch(url, {
       headers: { "User-Agent": "TheViralDesk/1.0 (contact@viraldesk.app)" },
-      signal: AbortSignal.timeout(4500)
+      signal: AbortSignal.timeout(4500),
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -1067,7 +1246,7 @@ async function searchWikimedia(category: string): Promise<{ title: string; url: 
     const infoUrl = `https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=imageinfo&iiprop=url|mime&format=json`;
     const infoRes = await fetch(infoUrl, {
       headers: { "User-Agent": "TheViralDesk/1.0 (contact@viraldesk.app)" },
-      signal: AbortSignal.timeout(3500)
+      signal: AbortSignal.timeout(3500),
     });
     if (infoRes.ok) {
       const infoData = await infoRes.json();
@@ -1077,7 +1256,7 @@ async function searchWikimedia(category: string): Promise<{ title: string; url: 
         return {
           title: title.replace(/^File:/, "").replace(/\.[^.]+$/, ""),
           url: videoUrl,
-          source: "Wikimedia Commons (Creative Commons / Public Domain)"
+          source: "Wikimedia Commons (Creative Commons / Public Domain)",
         };
       }
     }
@@ -1085,87 +1264,97 @@ async function searchWikimedia(category: string): Promise<{ title: string; url: 
   return null;
 }
 
-export async function findSafeRoyaltyFreeVideo(category: string): Promise<{ url: string; title: string; source: string }> {
+// ─── Scrape Live Online Viral Videos (100% Dynamic, Zero Hardcoding, Zero AI) ─
+export async function scrapeOnlineViralVideo(category: string): Promise<{ url: string; title: string; source: string }> {
   const cleanCat = category?.trim() || "Trending";
 
-  // Dynamic search routing based on category specialty:
-  if (["Comedy", "Horror", "Music", "Food"].includes(cleanCat)) {
-    const fromArchive = await searchArchiveOrg(cleanCat);
-    if (fromArchive) return fromArchive;
-    const fromWiki = await searchWikimedia(cleanCat);
-    if (fromWiki) return fromWiki;
-    const fromNasa = await searchNASA(cleanCat);
-    if (fromNasa) return fromNasa;
-  } else {
-    const fromNasa = await searchNASA(cleanCat);
-    if (fromNasa) return fromNasa;
-    const fromArchive = await searchArchiveOrg(cleanCat);
-    if (fromArchive) return fromArchive;
-    const fromWiki = await searchWikimedia(cleanCat);
-    if (fromWiki) return fromWiki;
-  }
+  // 1. Live Trending TikTok Videos (Real creators, millions of views, direct unwatermarked CDN stream)
+  const fromTikTok = await scrapeTikTokTrendingVideos(cleanCat);
+  if (fromTikTok) return fromTikTok;
 
-  // Final fallback dynamic query
-  const fallback = await searchArchiveOrg("animation cartoon") || await searchNASA("earth orbit");
-  if (fallback) return fallback;
+  // 2. Mixkit HD real human-filmed video scraper (action/sports/food/nature)
+  const fromMixkit = await searchMixkit(cleanCat);
+  if (fromMixkit) return fromMixkit;
 
-  throw new Error(`Could not dynamically scrape a copyright-safe video for "${cleanCat}". Please paste a URL directly.`);
+  // 3. Internet Archive live search (classic comedy, slapstick, vintage cartoons)
+  const fromArchive = await searchArchiveOrg(cleanCat);
+  if (fromArchive) return fromArchive;
+
+  // 4. Wikimedia Commons live search
+  const fromWiki = await searchWikimedia(cleanCat);
+  if (fromWiki) return fromWiki;
+
+  // 5. Fallback retry with general Trending on TikTok live feed
+  const fallbackTikTok = await scrapeTikTokTrendingVideos("Trending");
+  if (fallbackTikTok) return fallbackTikTok;
+
+  // 6. Fallback retry with Mixkit real footage
+  const fallbackMixkit = (await searchMixkit("nature")) || (await searchMixkit("lifestyle"));
+  if (fallbackMixkit) return fallbackMixkit;
+
+  throw new Error(`Could not find a live viral video stream for "${cleanCat}". Please paste a video URL directly.`);
 }
 
+export async function findSafeRoyaltyFreeVideo(category: string): Promise<{ url: string; title: string; source: string }> {
+  return scrapeOnlineViralVideo(category);
+}
+
+// ─── Multi-Platform Viral Video Finder (Online Scraper, Zero Bot Checks) ──────
 export async function autoFindViralVideo(
   category: string,
-  mode: "safe" | "youtube" = "safe"
+  mode: "scrape" | "viral" | "direct" | "youtube" = "scrape"
 ): Promise<{ url?: string; title?: string; source?: string; error?: string }> {
   try {
     const cleanCat = category?.trim() || "Trending";
 
-    // 1. By default, prefer 100% copyright-free & public domain sources to prevent profile bans
-    if (mode === "safe") {
+    // 1. By default ("scrape" or "direct" or "viral"): Scrape viral contents online
+    // This returns DIRECT MP4 URLs with ZERO YouTube bot checks, 100% cloud-downloadable!
+    if (mode === "scrape" || mode === "direct" || mode === "viral") {
       try {
-        const safeVideo = await findSafeRoyaltyFreeVideo(cleanCat);
-        if (safeVideo?.url) {
-          return safeVideo;
+        const scrapedVideo = await scrapeOnlineViralVideo(cleanCat);
+        if (scrapedVideo?.url) {
+          return scrapedVideo;
         }
-      } catch (safeErr: any) {
-        console.warn("Safe video resolver encountered error, falling back to YouTube:", safeErr.message);
+      } catch (scrapeErr: any) {
+        console.warn("Online viral scraper notice, trying YouTube fallback:", scrapeErr.message);
       }
     }
 
-    // 2. Fallback or explicit YouTube search
+    // 2. Only if explicit YouTube requested or scraper failed:
     const queries = SAFE_CATEGORY_QUERIES[cleanCat] || [
-      `${cleanCat} podcast advice shorts`,
-      `${cleanCat} speech shorts`,
+      `${cleanCat} viral shorts`,
+      `${cleanCat} podcast shorts`,
       `${cleanCat} shorts`,
     ];
 
-    let videos: { url: string; title: string; views: number }[] = [];
+    let videos: { url: string; title: string; views: number; source: string }[] = [];
     for (const q of queries) {
       videos = await searchYouTubeVideos(q);
-      if (videos.length >= 2) break;
-    }
-
-    if (!videos.length) {
-      videos = await searchYouTubeVideos(`${cleanCat} shorts`);
+      if (videos.length >= 3) break;
     }
 
     if (videos.length > 0) {
       videos.sort((a, b) => b.views - a.views);
       const safeVideos = videos.filter(
-        (v) => !v.title.toLowerCase().includes("official music video") && !v.title.toLowerCase().includes("feat.")
+        (v) =>
+          !v.title.toLowerCase().includes("official music video") &&
+          !v.title.toLowerCase().includes("feat.") &&
+          !v.title.toLowerCase().includes("nasa")
       );
       const candidates = safeVideos.length ? safeVideos : videos;
-      const topVideo = candidates[Math.floor(Math.random() * Math.min(candidates.length, 5))];
+      const topVideo = candidates[Math.floor(Math.random() * Math.min(candidates.length, 6))];
       return {
         url: topVideo.url,
         title: topVideo.title,
-        source: "YouTube Trending (Fair Use)",
+        source: topVideo.source || "YouTube Shorts (Viral)",
       };
     }
 
-    // If YouTube had no results, always guarantee a safe public domain video
-    const fallbackSafe = await findSafeRoyaltyFreeVideo(cleanCat);
-    return fallbackSafe;
+    // Ultimate fallback: Scrape online direct MP4
+    const fallbackVideo = await scrapeOnlineViralVideo(cleanCat);
+    return fallbackVideo;
   } catch (error: any) {
     return { error: error.message || "Failed to search for viral video." };
   }
 }
+

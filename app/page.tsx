@@ -159,7 +159,7 @@ export default function Home() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processMode, setProcessMode] = useState<"cloud" | "queue">("cloud");
-  const [autoFindSource, setAutoFindSource] = useState<"safe" | "youtube">("safe");
+  const [autoFindSource, setAutoFindSource] = useState<"scrape" | "direct" | "youtube">("scrape");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -319,11 +319,7 @@ export default function Home() {
         notify(data.error || "Failed to find video.");
       } else if (data.url) {
         setVideoUrl(data.url);
-        notify(
-          autoFindSource === "safe"
-            ? `🛡️ Scraped Copyright-Free MP4: "${data.title || 'Ready to split'}" (100% Ban-Safe!)`
-            : `Found YouTube video: "${data.title || 'Ready to split'}"`
-        );
+        notify(`🔥 Scraped viral video online: "${data.title || 'Ready to split'}" (${data.source || 'Direct Cloud MP4'})`);
       }
     } catch (err: any) {
       notify("Failed to find video: " + err.message);
@@ -787,27 +783,46 @@ export default function Home() {
                   </button>
                 </div>
 
-                {/* Auto-Find Source Selector (Safe Non-YouTube vs YouTube) */}
+                {/* Auto-Find Source Selector (Scrape Online Viral Videos vs Direct HD vs YouTube) */}
                 <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '12px', color: '#9ca3af' }}>Auto-Find source:</span>
                   <button
                     type="button"
-                    onClick={() => setAutoFindSource("safe")}
+                    onClick={() => setAutoFindSource("scrape")}
                     style={{
                       padding: '4px 10px',
                       borderRadius: '6px',
                       fontSize: '11px',
                       fontWeight: 600,
-                      border: autoFindSource === "safe" ? '1px solid #10b981' : '1px solid #272a38',
-                      background: autoFindSource === "safe" ? 'rgba(16,185,129,0.18)' : '#111218',
-                      color: autoFindSource === "safe" ? '#34d399' : '#9ca3af',
+                      border: autoFindSource === "scrape" ? '1px solid #e50914' : '1px solid #272a38',
+                      background: autoFindSource === "scrape" ? 'rgba(229,9,20,0.22)' : '#111218',
+                      color: autoFindSource === "scrape" ? '#ff4d56' : '#9ca3af',
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '4px'
                     }}
                   >
-                    <ShieldCheck size={13} /> 🛡️ Copyright-Free Scraper (Zero Ban Risk, Direct MP4)
+                    <Sparkles size={13} /> 🔥 Scrape Viral Content Online (Direct Cloud MP4, Zero Bot Checks)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAutoFindSource("direct")}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      border: autoFindSource === "direct" ? '1px solid #10b981' : '1px solid #272a38',
+                      background: autoFindSource === "direct" ? 'rgba(16,185,129,0.18)' : '#111218',
+                      color: autoFindSource === "direct" ? '#34d399' : '#9ca3af',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <ShieldCheck size={13} /> ⚡ Mixkit & Coverr HD
                   </button>
                   <button
                     type="button"
@@ -817,13 +832,16 @@ export default function Home() {
                       borderRadius: '6px',
                       fontSize: '11px',
                       fontWeight: 600,
-                      border: autoFindSource === "youtube" ? '1px solid #e50914' : '1px solid #272a38',
-                      background: autoFindSource === "youtube" ? 'rgba(229,9,20,0.18)' : '#111218',
-                      color: autoFindSource === "youtube" ? '#ff4d56' : '#9ca3af',
-                      cursor: 'pointer'
+                      border: autoFindSource === "youtube" ? '1px solid #f59e0b' : '1px solid #272a38',
+                      background: autoFindSource === "youtube" ? 'rgba(245,158,11,0.18)' : '#111218',
+                      color: autoFindSource === "youtube" ? '#fbbf24' : '#9ca3af',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
                     }}
                   >
-                    📺 YouTube Trending (Fair Use)
+                    🎬 YouTube Shorts
                   </button>
                 </div>
 
@@ -845,7 +863,7 @@ export default function Home() {
                         cursor: 'pointer'
                       }}
                     >
-                      ☁️ Cloud Runner (GitHub Actions)
+                      ☁️ Direct Cloud Processing (Fast Cloudinary Storage)
                     </button>
                     <button
                       type="button"

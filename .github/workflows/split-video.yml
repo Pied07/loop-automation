@@ -21,6 +21,23 @@ on:
         required: false
         default: 'creator'
         type: string
+      appUrl:
+        description: 'App URL for status updates'
+        required: false
+        default: 'https://the-viral-desk.vercel.app'
+        type: string
+      cloudinaryCloudName:
+        description: 'Cloudinary Cloud Name'
+        required: false
+        type: string
+      cloudinaryApiKey:
+        description: 'Cloudinary API Key'
+        required: false
+        type: string
+      cloudinaryApiSecret:
+        description: 'Cloudinary API Secret'
+        required: false
+        type: string
 jobs:
   split-and-upload:
     runs-on: ubuntu-latest
@@ -40,7 +57,7 @@ jobs:
       - name: Install yt-dlp & FFmpeg
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
-          pip install --upgrade "yt-dlp[default,curl-cffi]"
+          pip install --upgrade "yt-dlp[default,curl-cffi]" requests
 
       - name: Run Cloud Video Processing
         env:
@@ -48,11 +65,11 @@ jobs:
           CONTENT_CATEGORY: ${{ inputs.contentCategory }}
           JOB_ID: ${{ inputs.jobId }}
           USER_ID: ${{ inputs.userId }}
-          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
-          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
-          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+          CLOUDINARY_CLOUD_NAME: ${{ inputs.cloudinaryCloudName != '' && inputs.cloudinaryCloudName || secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ inputs.cloudinaryApiKey != '' && inputs.cloudinaryApiKey || secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ inputs.cloudinaryApiSecret != '' && inputs.cloudinaryApiSecret || secrets.CLOUDINARY_API_SECRET }}
           YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
-          APP_URL: "https://the-viral-desk.vercel.app"
+          APP_URL: ${{ inputs.appUrl != '' && inputs.appUrl || 'https://the-viral-desk.vercel.app' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
