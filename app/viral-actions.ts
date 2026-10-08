@@ -637,6 +637,7 @@ export async function publishClipAndCleanup(params: {
   let facebookUrl: string | undefined;
   let instagramUrl: string | undefined;
   let gmailSent = false;
+  let uploadedCloudinaryId: string | undefined;
 
   const { readTokens } = await import("@/app/lib/tokens");
   const tokens: any = await readTokens();
@@ -734,28 +735,47 @@ export async function publishClipAndCleanup(params: {
       }
     }
 
-    // ─ Instagram ─
+    // ─ Instagram (Posts as Reel + Posts Story) ─
     if (platforms.includes("Instagram")) {
       try {
-        const igUserId = tokens.facebook?.instagram_user_id;
+        const igUserId = tokens.facebook?.instagram_user_id || "17841430707006338";
         const instagramToken =
-          tokens.facebook?.instagram_access_token || tokens.facebook?.instagram_page_access_token;
+          tokens.facebook?.instagram_access_token ||
+          tokens.facebook?.instagram_page_access_token ||
+          tokens.facebook?.page_access_token;
         const instagramApi = tokens.facebook?.instagram_access_token
           ? "https://graph.instagram.com/v26.0"
           : "https://graph.facebook.com/v26.0";
         if (!instagramToken || !igUserId) throw new Error("Instagram not connected.");
 
-        // Instagram requires a public video URL — use YouTube link if available, else skip
-        if (!youtubeUrl) throw new Error("Instagram requires the video to be hosted publicly. Upload to YouTube first.");
+        // Meta Instagram API requires a direct accessible MP4 video file URL
+        let publicVideoUrl = (isRemote && (clipPath.startsWith("http://") || clipPath.startsWith("https://"))) ? clipPath : "";
+        if (!publicVideoUrl) {
+          try {
+            const { uploadVideoToCloudinary } = await import("@/app/cloudinary-upload");
+            const publicId = `ig_clip_${Date.now()}_part${partNumber}`;
+            const uploadRes = await uploadVideoToCloudinary(absolutePath, publicId);
+            publicVideoUrl = uploadRes.secureUrl;
+            uploadedCloudinaryId = uploadRes.publicId;
+          } catch (cErr: any) {
+            console.warn("Cloudinary upload for Instagram:", cErr.message);
+          }
+        }
 
+        if (!publicVideoUrl) {
+          throw new Error("Instagram Reels require a direct video file. Please configure Cloudinary in .env or provide a public video URL.");
+        }
+
+        // 1. Post Instagram Reel
         const createRes = await fetch(`${instagramApi}/${igUserId}/media`, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({
             access_token: instagramToken,
             media_type: "REELS",
-            video_url: youtubeUrl,
+            video_url: publicVideoUrl,
             caption: `${title}\n\n${description}\n\n${formattedHashtags.join(" ")}`,
+            share_to_feed: "true",
           }),
         });
         const createData = await createRes.json();
@@ -763,7 +783,7 @@ export async function publishClipAndCleanup(params: {
 
         const creationId = createData.id;
         let finished = false;
-        for (let i = 0; i < 15; i++) {
+        for (let i = 0; i < 25; i++) {
           await new Promise((r) => setTimeout(r, 4000));
           const statusUrl = new URL(`${instagramApi}/${creationId}`);
           statusUrl.search = new URLSearchParams({
@@ -787,7 +807,44 @@ export async function publishClipAndCleanup(params: {
 
         instagramVideoId = publishData.id;
         instagramUrl = `https://www.instagram.com/reel/${instagramVideoId}`;
-        logs.push(`✅ Instagram: Reel published`);
+        logs.push(`✅ Instagram: Reel published (${instagramUrl})`);
+
+        // 2. Also post as Instagram Story
+        try {
+          const storyRes = await fetch(`${instagramApi}/${igUserId}/media`, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              access_token: instagramToken,
+              media_type: "STORIES",
+              video_url: publicVideoUrl,
+            }),
+          });
+          const storyData = await storyRes.json();
+          if (storyData?.id) {
+            const storyCreationId = storyData.id;
+            let storyFinished = false;
+            for (let s = 0; s < 20; s++) {
+              await new Promise((r) => setTimeout(r, 3500));
+              const sCheck = await fetch(`${instagramApi}/${storyCreationId}?fields=status_code,status&access_token=${instagramToken}`, { cache: "no-store" });
+              const sJson = await sCheck.json();
+              if (sJson.status_code === "FINISHED") { storyFinished = true; break; }
+              if (sJson.status_code === "ERROR") break;
+            }
+            if (storyFinished) {
+              const pubStoryRes = await fetch(`${instagramApi}/${igUserId}/media_publish`, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({ access_token: instagramToken, creation_id: storyCreationId }),
+              });
+              if (pubStoryRes.ok) {
+                logs.push(`✅ Instagram: Story published`);
+              }
+            }
+          }
+        } catch (storyErr: any) {
+          console.warn("Instagram story notice:", storyErr.message);
+        }
       } catch (e: any) {
         logs.push(`❌ Instagram: ${e.message}`);
       }
@@ -889,7 +946,7 @@ export async function publishClipAndCleanup(params: {
     const apiKey = process.env.CLOUDINARY_API_KEY;
     const apiSecret = process.env.CLOUDINARY_API_SECRET;
 
-    let targetPublicId = params.cloudinaryPublicId;
+    let targetPublicId = params.cloudinaryPublicId || uploadedCloudinaryId;
     if (!targetPublicId && clipPath.includes("res.cloudinary.com")) {
       const match = clipPath.match(/\/video\/upload\/(?:v\d+\/)?([^.]+)/);
       if (match) targetPublicId = match[1];

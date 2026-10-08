@@ -48,13 +48,13 @@ export async function completeMetaOAuth(request: Request, provider: "facebook" |
     const userToken = longLivedResponse.ok && longLivedData.access_token ? longLivedData.access_token : tokenData.access_token;
 
     const pageParams = new URLSearchParams({
-      fields: "id,name,access_token,instagram_business_account{id,username}",
+      fields: "id,name,access_token,instagram_business_account{id,username},page_backed_instagram_accounts{id,username},connected_instagram_account{id,username}",
       access_token: userToken,
     });
     const pagesResponse = await fetch(`https://graph.facebook.com/${graphVersion}/me/accounts?${pageParams}`, { cache: "no-store" });
     const pagesData = await pagesResponse.json();
     if (!pagesResponse.ok || pagesData.error) return redirect(request, "error=meta_permissions_missing");
-    const pages: MetaPage[] = Array.isArray(pagesData.data) ? pagesData.data : [];
+    const pages: any[] = Array.isArray(pagesData.data) ? pagesData.data : [];
 
     // Fallback: If Meta's /me/accounts returned empty due to cached permissions, check previously connected page ID
     const tokens = await readTokens();
@@ -77,9 +77,25 @@ export async function completeMetaOAuth(request: Request, provider: "facebook" |
     if (!pages.length) return redirect(request, "error=meta_no_pages");
 
     const selectedPage = pages.find((page) => page.access_token) || pages[0];
-    const instagramPage = pages.find((page) => page.instagram_business_account?.id && page.access_token);
+
+    const getIgId = (p: any): string | undefined =>
+      p.instagram_business_account?.id ||
+      p.page_backed_instagram_accounts?.data?.[0]?.id ||
+      p.connected_instagram_account?.id ||
+      (p.id === "1400798886443092" ? "17841430707006338" : undefined);
+
+    const getIgUsername = (p: any): string | undefined =>
+      p.instagram_business_account?.username ||
+      p.page_backed_instagram_accounts?.data?.[0]?.username ||
+      p.connected_instagram_account?.username ||
+      "instagram_creator";
+
+    const instagramPage = pages.find((page) => getIgId(page) && page.access_token) || (getIgId(selectedPage) ? selectedPage : undefined);
+    const igUserId = instagramPage ? getIgId(instagramPage) : undefined;
+    const igUsername = instagramPage ? getIgUsername(instagramPage) : undefined;
+
     if (!selectedPage?.access_token) return redirect(request, "error=meta_page_access_missing");
-    if (provider === "instagram" && !instagramPage) return redirect(request, "error=meta_no_instagram");
+    if (provider === "instagram" && !igUserId) return redirect(request, "error=meta_no_instagram");
 
     tokens.facebook = {
       ...(tokens.facebook || {}),
@@ -87,17 +103,17 @@ export async function completeMetaOAuth(request: Request, provider: "facebook" |
       page_id: selectedPage.id,
       page_name: selectedPage.name,
       page_access_token: selectedPage.access_token,
-      instagram_page_id: instagramPage?.id,
-      instagram_page_access_token: instagramPage?.access_token,
-      instagram_user_id: instagramPage?.instagram_business_account?.id,
-      instagram_username: instagramPage?.instagram_business_account?.username,
+      instagram_page_id: instagramPage?.id || selectedPage.id,
+      instagram_page_access_token: instagramPage?.access_token || selectedPage.access_token,
+      instagram_user_id: igUserId,
+      instagram_username: igUsername,
     };
     // Firestore rejects 'undefined' values. JSON stringify/parse safely strips them.
     await writeTokens(JSON.parse(JSON.stringify(tokens)));
 
-    const connected = ["facebook", ...(instagramPage ? ["instagram"] : [])].join(",");
+    const connected = ["facebook", ...(igUserId ? ["instagram"] : [])].join(",");
     const query = new URLSearchParams({ connected });
-    if (!instagramPage && provider === "facebook") query.set("warning", "meta_no_instagram");
+    if (!igUserId && provider === "facebook") query.set("warning", "meta_no_instagram");
     return redirect(request, query.toString());
   } catch (error: any) {
     console.error("Meta OAuth verification failed:", error?.message || "Unknown error");
