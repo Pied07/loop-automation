@@ -651,6 +651,7 @@ export default function Home() {
         redirect_uri: targetUri,
         response_type: "code",
         scope: "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish",
+        auth_type: "rerequest",
       });
       url = `https://www.facebook.com/v26.0/dialog/oauth?${params}`;
     }

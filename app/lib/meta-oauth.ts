@@ -55,6 +55,25 @@ export async function completeMetaOAuth(request: Request, provider: "facebook" |
     const pagesData = await pagesResponse.json();
     if (!pagesResponse.ok || pagesData.error) return redirect(request, "error=meta_permissions_missing");
     const pages: MetaPage[] = Array.isArray(pagesData.data) ? pagesData.data : [];
+
+    // Fallback: If Meta's /me/accounts returned empty due to cached permissions, check previously connected page ID
+    const tokens = await readTokens();
+    const fallbackPageId = tokens.facebook?.page_id || "1400798886443092";
+    if (!pages.length && fallbackPageId) {
+      try {
+        const directRes = await fetch(
+          `https://graph.facebook.com/${graphVersion}/${fallbackPageId}?${pageParams}`,
+          { cache: "no-store" }
+        );
+        const directData = await directRes.json();
+        if (directData?.id && directData?.access_token) {
+          pages.push(directData);
+        }
+      } catch (err) {
+        console.warn("Fallback direct page query failed:", err);
+      }
+    }
+
     if (!pages.length) return redirect(request, "error=meta_no_pages");
 
     const selectedPage = pages.find((page) => page.access_token) || pages[0];
@@ -62,7 +81,6 @@ export async function completeMetaOAuth(request: Request, provider: "facebook" |
     if (!selectedPage?.access_token) return redirect(request, "error=meta_page_access_missing");
     if (provider === "instagram" && !instagramPage) return redirect(request, "error=meta_no_instagram");
 
-    const tokens = await readTokens();
     tokens.facebook = {
       ...(tokens.facebook || {}),
       access_token: userToken,
