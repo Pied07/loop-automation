@@ -579,7 +579,7 @@ export default function Home() {
         description: clip.description,
         captions: "",
         hashtags: clip.hashtags.map((h) => `#${h}`),
-        videoUrl: clip.publicUrl || clip.clipPath || data.youtubeUrl || "",
+        videoUrl: (clip.publicUrl && clip.publicUrl.startsWith("http")) ? clip.publicUrl : (data.youtubeUrl || data.facebookUrl || data.instagramUrl || ""),
         youtubeVideoId: data.youtubeVideoId || "",
         facebookVideoId: data.facebookVideoId || "",
         instagramVideoId: data.instagramVideoId || "",
@@ -1015,18 +1015,84 @@ export default function Home() {
       </div>
       
       <div className="library-toolbar"><div className="search-field"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your clips" /></div><label className="filter-select"><span className="sr-only">Filter by category</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option>All videos</option>{formats.map((item) => <option key={item.name}>{item.name}</option>)}</select><ChevronDown size={15} /></label><span className="result-count">{filteredVideos.length} clips</span></div>{filteredVideos.length ? <div className="video-grid">
-  {filteredVideos.map((video) => <article className="video-card" key={video.id}>
-    {video.status === 'failed' ? (
-      <div className="video-thumb" style={{ background: '#ffebee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ color: '#d32f2f', fontWeight: 'bold' }}>FAILED</span></div>
-    ) : (
-      <div className="video-thumb video-thumb-preview">
-        {video.videoUrl && !video.videoUrl.includes("youtube.com/") ? <video src={video.videoUrl} controls playsInline preload="metadata" aria-label={`Play ${video.title}`} onLoadedData={(event) => {
-          const player = event.currentTarget;
-          if (player.currentTime === 0 && Number.isFinite(player.duration) && player.duration > 0) player.currentTime = Math.min(0.1, player.duration / 2);
-        }} /> : video.youtubeVideoId ? <a href={`https://youtube.com/watch?v=${video.youtubeVideoId}`} target="_blank" rel="noreferrer" aria-label={`Watch ${video.title} on YouTube`} style={{ backgroundImage: `url(https://i.ytimg.com/vi/${video.youtubeVideoId}/hqdefault.jpg)`, backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundSize: "contain" }} /> : <span className="thumb-unavailable">Preview unavailable</span>}
-        <span className="thumb-tag">{video.format}</span>
-      </div>
-    )}
+  {filteredVideos.map((video) => {
+    const ytId = video.youtubeVideoId || (() => {
+      const m = video.videoUrl?.match(/(?:youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|shorts\/|live\/)([^#&?]*)/);
+      return m && m[1]?.length === 11 ? m[1] : "";
+    })();
+
+    const thumbUrl = ytId
+      ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`
+      : video.videoUrl && video.videoUrl.includes("res.cloudinary.com")
+      ? video.videoUrl.replace(/\.[^.]+$/, ".jpg")
+      : "";
+
+    const targetLink = ytId
+      ? `https://www.youtube.com/shorts/${ytId}`
+      : video.facebookVideoId
+      ? `https://www.facebook.com/reel/${video.facebookVideoId}`
+      : video.instagramVideoId
+      ? `https://www.instagram.com/reel/${video.instagramVideoId}`
+      : (video.videoUrl && (video.videoUrl.startsWith("http://") || video.videoUrl.startsWith("https://")))
+      ? video.videoUrl
+      : "#";
+
+    const isPlayableRemote =
+      !thumbUrl &&
+      video.videoUrl &&
+      (video.videoUrl.startsWith("http://") || video.videoUrl.startsWith("https://")) &&
+      !video.videoUrl.includes("youtube.com") &&
+      !video.videoUrl.includes("youtu.be");
+
+    return (
+      <article className="video-card" key={video.id}>
+        {video.status === 'failed' ? (
+          <div className="video-thumb" style={{ background: '#ffebee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ color: '#d32f2f', fontWeight: 'bold' }}>FAILED</span></div>
+        ) : (
+          <div className="video-thumb video-thumb-preview">
+            {thumbUrl ? (
+              <a
+                href={targetLink}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Watch ${video.title}`}
+                style={{
+                  backgroundImage: `url(${thumbUrl})`,
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat",
+                  backgroundSize: "cover",
+                  width: "100%",
+                  height: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  position: "absolute",
+                  inset: 0,
+                  textDecoration: "none",
+                }}
+              >
+                <span className="thumb-play">
+                  <Play size={18} fill="white" />
+                </span>
+              </a>
+            ) : isPlayableRemote ? (
+              <video
+                src={video.videoUrl}
+                controls
+                playsInline
+                preload="metadata"
+                aria-label={`Play ${video.title}`}
+                onLoadedData={(event) => {
+                  const player = event.currentTarget;
+                  if (player.currentTime === 0 && Number.isFinite(player.duration) && player.duration > 0) player.currentTime = Math.min(0.1, player.duration / 2);
+                }}
+              />
+            ) : (
+              <span className="thumb-unavailable">Preview unavailable</span>
+            )}
+            <span className="thumb-tag">{video.format}</span>
+          </div>
+        )}
     <div className="video-details">
       <div className="video-type-label"><Film size={11} /> {video.format || "Viral Clip"}</div>
       <h3>{video.title}</h3>
@@ -1040,7 +1106,9 @@ export default function Home() {
         {video.instagram === 1 && <a href={video.instagramVideoId ? `https://www.instagram.com/reel/${video.instagramVideoId}` : "https://www.instagram.com"} target="_blank" rel="noreferrer" className="secondary-button" style={{display: 'inline-flex', alignItems: 'center', gap: '5px', padding:'4px 10px', fontSize:'11px', color: '#f472b6', borderColor: 'rgba(244,114,182,0.3)', backgroundColor: 'rgba(244,114,182,0.1)'}} title="Watch Instagram Reel"><FaInstagram size={13} /> Instagram Reel</a>}
         {video.youtube !== 1 && video.facebook !== 1 && video.instagram !== 1 && video.videoUrl && !video.videoUrl.includes("youtube.com/") && <a href={video.videoUrl} download className="icon-button" title="Download video"><Download size={16} /></a>}
         <button className="icon-button" style={{ color: '#ea4335' }} onClick={() => setVideoToDelete(video)} title="Delete video"><Trash2 size={16} /></button>
-        </div></div></div></article>)}</div> : <div className="empty-library"><div className="empty-art"><span /><span /><span /><Clapperboard size={27} /></div><h2>{query || filter !== "All videos" ? "No matching clips" : "No clips published yet."}</h2><p>{query || filter !== "All videos" ? "Try another search or category." : "Published viral clips will appear here with YouTube, Facebook, and Instagram links."}</p>{!query && filter === "All videos" && <button className="primary-button" onClick={() => setScreen("studio")}><TrendingUp size={16} /> Create your first viral clip</button>}</div>}</section>}
+        </div></div></div></article>
+    );
+  })}</div> : <div className="empty-library"><div className="empty-art"><span /><span /><span /><Clapperboard size={27} /></div><h2>{query || filter !== "All videos" ? "No matching clips" : "No clips published yet."}</h2><p>{query || filter !== "All videos" ? "Try another search or category." : "Published viral clips will appear here with YouTube, Facebook, and Instagram links."}</p>{!query && filter === "All videos" && <button className="primary-button" onClick={() => setScreen("studio")}><TrendingUp size={16} /> Create your first viral clip</button>}</div>}</section>}
       {screen === "settings" && <section className="settings-content"><div className="eyebrow"><span className="eyebrow-dot" /> WORKSPACE SETTINGS</div><h1>Your studio, <em>your way.</em></h1><p className="settings-intro">Manage automated workflows and connected social networks.</p>
       
       {/* Auto-Pilot Daily Automation Toggler (Requirement 8) */}

@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { open, stat } from "node:fs/promises";
+import { open, stat, readFile } from "node:fs/promises";
 import path from "node:path";
 
 const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
@@ -23,7 +23,7 @@ function signParams(params: Record<string, string>, apiSecret: string) {
   return createHash("sha1").update(`${signatureBase}${apiSecret}`).digest("hex");
 }
 
-async function signedRequest(endpoint: string, params: Record<string, string>) {
+async function signedRequest(endpoint: string, params: Record<string, string>, resourceType: "video" | "image" = "video") {
   const { cloudName, apiKey, apiSecret } = assertCloudinaryConfigured();
   const timestamp = String(Math.floor(Date.now() / 1000));
   const signedParams = { ...params, timestamp };
@@ -32,7 +32,7 @@ async function signedRequest(endpoint: string, params: Record<string, string>) {
   form.append("api_key", apiKey);
   form.append("signature", signParams(signedParams, apiSecret));
 
-  const response = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/video/${endpoint}`, {
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/${resourceType}/${endpoint}`, {
     method: "POST",
     body: form,
     signal: AbortSignal.timeout(60_000),
@@ -116,11 +116,46 @@ export async function uploadVideoToCloudinary(filePath: string, publicId: string
   throw new Error("Cloudinary upload ended without a completed response.");
 }
 
-export async function deleteCloudinaryVideo(publicId: string) {
+export async function deleteCloudinaryAsset(publicId: string, resourceType: "video" | "image" = "video") {
   try {
-    const result = await signedRequest("destroy", { public_id: publicId });
+    const result = await signedRequest("destroy", { public_id: publicId }, resourceType);
     return result.result === "ok";
   } catch {
     return false;
   }
 }
+
+export async function deleteCloudinaryVideo(publicId: string) {
+  return deleteCloudinaryAsset(publicId, "video");
+}
+
+export async function deleteCloudinaryImage(publicId: string) {
+  return deleteCloudinaryAsset(publicId, "image");
+}
+
+export async function uploadImageToCloudinary(filePath: string, publicId: string) {
+  const { cloudName, apiKey, apiSecret } = assertCloudinaryConfigured();
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signedParams = { public_id: publicId, timestamp };
+  const signature = signParams(signedParams, apiSecret);
+  const fileBuffer = await readFile(filePath);
+
+  const form = new FormData();
+  form.append("file", new Blob([fileBuffer], { type: "image/jpeg" }), path.basename(filePath));
+  form.append("api_key", apiKey);
+  form.append("timestamp", timestamp);
+  form.append("public_id", publicId);
+  form.append("signature", signature);
+
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/upload`, {
+    method: "POST",
+    body: form,
+    signal: AbortSignal.timeout(60_000),
+  });
+  const result = await readCloudinaryJson(response) as { secure_url?: string; public_id?: string; error?: { message?: string } };
+  if (!response.ok || !result.secure_url) {
+    throw new Error(result.error?.message || `Cloudinary image upload failed (HTTP ${response.status}).`);
+  }
+  return { secureUrl: result.secure_url, publicId: result.public_id || publicId };
+}
+

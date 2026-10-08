@@ -573,6 +573,40 @@ export async function generateClipMetadata(params: {
 
 // ─── Publish Clip + Cleanup ───────────────────────────────────────────────────
 
+// ─── Story Card Image Generator (9:16 vertical card with thumbnail & CTA) ─────
+async function generateStoryCardImage(videoPath: string, outputPath: string): Promise<boolean> {
+  let ffmpegBin = "ffmpeg";
+  try {
+    ffmpegBin = await checkFfmpeg();
+  } catch {
+    return false;
+  }
+
+  const filter = [
+    "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=25:15[bg]",
+    "[0:v]scale=920:1350:force_original_aspect_ratio=decrease[fg]",
+    "[bg][fg]overlay=(W-w)/2:(H-h)/2-80[v1]",
+    "[v1]drawbox=x=80:y=1560:w=920:h=160:color=red@0.95:t=fill[v2]",
+    "[v2]drawbox=x=80:y=160:w=920:h=100:color=black@0.8:t=fill[v3]",
+    "[v3]drawtext=text='TAP TO SEE THE REEL':fontcolor=white:fontsize=52:x=(w-text_w)/2:y=1615[v4]",
+    "[v4]drawtext=text='NEW VIRAL REEL':fontcolor=yellow:fontsize=42:x=(w-text_w)/2:y=190[out]",
+  ].join(";");
+
+  try {
+    await execAsync(`"${ffmpegBin}" -y -ss 1 -i "${videoPath}" -filter_complex "${filter}" -map "[out]" -vframes 1 "${outputPath}"`);
+    if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) return true;
+  } catch (err: any) {
+    console.warn("Styled story card filter failed, trying clean frame extraction:", err?.message);
+  }
+
+  try {
+    await execAsync(`"${ffmpegBin}" -y -ss 1 -i "${videoPath}" -vframes 1 -q:v 2 "${outputPath}"`);
+    return fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0;
+  } catch {
+    return false;
+  }
+}
+
 export async function publishClipAndCleanup(params: {
   clipPath: string;
   partNumber: number;
@@ -638,9 +672,26 @@ export async function publishClipAndCleanup(params: {
   let instagramUrl: string | undefined;
   let gmailSent = false;
   let uploadedCloudinaryId: string | undefined;
+  let storyCardUrl: string | undefined;
+  let uploadedStoryCardId: string | undefined;
+  const os = require("os");
+  const storyCardPath = path.join(os.tmpdir(), `story_card_${Date.now()}_part${partNumber}.jpg`);
 
   const { readTokens } = await import("@/app/lib/tokens");
   const tokens: any = await readTokens();
+
+  // Generate eye-catching 9:16 Story card thumbnail with "TAP TO SEE THE REEL"
+  try {
+    const cardOk = await generateStoryCardImage(absolutePath, storyCardPath);
+    if (cardOk && fs.existsSync(storyCardPath)) {
+      const { uploadImageToCloudinary } = await import("@/app/cloudinary-upload");
+      const cRes = await uploadImageToCloudinary(storyCardPath, `story_${Date.now()}_part${partNumber}`);
+      storyCardUrl = cRes.secureUrl;
+      uploadedStoryCardId = cRes.publicId;
+    }
+  } catch (cardErr: any) {
+    console.warn("Story card generation notice:", cardErr?.message);
+  }
 
   try {
     // ─ YouTube (Posts as YouTube Short if <= 180s) ─
@@ -683,7 +734,7 @@ export async function publishClipAndCleanup(params: {
       }
     }
 
-    // ─ Facebook (Posts as Reel + Creates Story/Feed update linking to Reel) ─
+    // ─ Facebook (Posts as Reel + Creates Story card linking to Reel) ─
     if (platforms.includes("Facebook")) {
       try {
         const pageId = tokens.facebook?.page_id;
@@ -715,18 +766,35 @@ export async function publishClipAndCleanup(params: {
         facebookUrl = `https://www.facebook.com/reel/${facebookVideoId}`;
         logs.push(`✅ Facebook: ${facebookUrl}`);
 
-        // Also post a Page Story / Feed update linking to the new reel
+        // Also post Facebook Page Story / Feed card with thumbnail & link
         try {
-          await fetch(`https://graph.facebook.com/v26.0/${pageId}/feed`, {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-              access_token: pageToken,
-              message: `✨ New Viral Reel: ${title}\n\n${description.slice(0, 150)}...\n\n👉 Watch full Reel: ${facebookUrl}`,
-              link: facebookUrl,
-            }),
-          });
-          logs.push(`✅ Facebook: Story/Feed link published`);
+          const caption = `✨ Tap to watch the full Reel 👆\n👉 Watch full Reel: ${facebookUrl}\n\n${title}`;
+          if (storyCardUrl) {
+            const photoRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/photos`, {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({
+                access_token: pageToken,
+                url: storyCardUrl,
+                caption,
+              }),
+            });
+            const photoData = await photoRes.json();
+            if (photoData?.id) {
+              logs.push(`✅ Facebook: Story/Feed card published with link`);
+            }
+          } else {
+            await fetch(`https://graph.facebook.com/v26.0/${pageId}/feed`, {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({
+                access_token: pageToken,
+                message: caption,
+                link: facebookUrl,
+              }),
+            });
+            logs.push(`✅ Facebook: Story/Feed link published`);
+          }
         } catch (storyErr: any) {
           console.warn("Facebook story notice:", storyErr.message);
         }
@@ -735,7 +803,7 @@ export async function publishClipAndCleanup(params: {
       }
     }
 
-    // ─ Instagram (Posts as Reel + Posts Story) ─
+    // ─ Instagram (Posts as Reel + Posts Story with Thumbnail Card) ─
     if (platforms.includes("Instagram")) {
       try {
         const igUserId = tokens.facebook?.instagram_user_id || "17841430707006338";
@@ -809,36 +877,39 @@ export async function publishClipAndCleanup(params: {
         instagramUrl = `https://www.instagram.com/reel/${instagramVideoId}`;
         logs.push(`✅ Instagram: Reel published (${instagramUrl})`);
 
-        // 2. Also post as Instagram Story
+        // 2. Post as Instagram Story (Designed Story card with "TAP TO SEE THE REEL")
         try {
-          const storyRes = await fetch(`${instagramApi}/${igUserId}/media`, {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-              access_token: instagramToken,
-              media_type: "STORIES",
-              video_url: publicVideoUrl,
-            }),
-          });
-          const storyData = await storyRes.json();
-          if (storyData?.id) {
-            const storyCreationId = storyData.id;
-            let storyFinished = false;
-            for (let s = 0; s < 20; s++) {
-              await new Promise((r) => setTimeout(r, 3500));
-              const sCheck = await fetch(`${instagramApi}/${storyCreationId}?fields=status_code,status&access_token=${instagramToken}`, { cache: "no-store" });
-              const sJson = await sCheck.json();
-              if (sJson.status_code === "FINISHED") { storyFinished = true; break; }
-              if (sJson.status_code === "ERROR") break;
-            }
-            if (storyFinished) {
-              const pubStoryRes = await fetch(`${instagramApi}/${igUserId}/media_publish`, {
-                method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: new URLSearchParams({ access_token: instagramToken, creation_id: storyCreationId }),
-              });
-              if (pubStoryRes.ok) {
-                logs.push(`✅ Instagram: Story published`);
+          const storyImageUrl = storyCardUrl || (publicVideoUrl.includes("cloudinary.com") ? publicVideoUrl.replace(/\.[^.]+$/, ".jpg") : "");
+          if (storyImageUrl) {
+            const storyRes = await fetch(`${instagramApi}/${igUserId}/media`, {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({
+                access_token: instagramToken,
+                media_type: "STORIES",
+                image_url: storyImageUrl,
+              }),
+            });
+            const storyData = await storyRes.json();
+            if (storyData?.id) {
+              const storyCreationId = storyData.id;
+              let storyFinished = false;
+              for (let s = 0; s < 15; s++) {
+                await new Promise((r) => setTimeout(r, 3000));
+                const sCheck = await fetch(`${instagramApi}/${storyCreationId}?fields=status_code,status&access_token=${instagramToken}`, { cache: "no-store" });
+                const sJson = await sCheck.json();
+                if (sJson.status_code === "FINISHED") { storyFinished = true; break; }
+                if (sJson.status_code === "ERROR") break;
+              }
+              if (storyFinished) {
+                const pubStoryRes = await fetch(`${instagramApi}/${igUserId}/media_publish`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                  body: new URLSearchParams({ access_token: instagramToken, creation_id: storyCreationId }),
+                });
+                if (pubStoryRes.ok) {
+                  logs.push(`✅ Instagram: Story published (Tap to see Reel card)`);
+                }
               }
             }
           }
@@ -925,6 +996,15 @@ export async function publishClipAndCleanup(params: {
       console.warn("Could not delete local/tmp clip file:", e.message);
     }
 
+    // Clean up temporary local story card image
+    try {
+      if (storyCardPath && fs.existsSync(storyCardPath)) {
+        fs.unlinkSync(storyCardPath);
+      }
+    } catch (e: any) {
+      console.warn("Could not delete local story card file:", e.message);
+    }
+
     // 2. Delete clip from Hugging Face Cloud Worker to keep disk at 0 MB forever
     const workerUrl = process.env.HUGGINGFACE_WORKER_URL;
     if (isRemote && workerUrl) {
@@ -979,6 +1059,16 @@ export async function publishClipAndCleanup(params: {
         }
       } catch (cErr: any) {
         console.warn("Could not delete clip from Cloudinary:", cErr.message);
+      }
+    }
+
+    // 4. Delete story card image from Cloudinary if uploaded
+    if (uploadedStoryCardId && cloudName && apiKey && apiSecret && process.env.CLOUDINARY_DELETE_AFTER_PUBLISH === "true") {
+      try {
+        const { deleteCloudinaryImage } = await import("@/app/cloudinary-upload");
+        await deleteCloudinaryImage(uploadedStoryCardId);
+      } catch (scErr: any) {
+        console.warn("Could not delete story card from Cloudinary:", scErr.message);
       }
     }
   }
