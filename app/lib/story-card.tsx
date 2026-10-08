@@ -6,7 +6,7 @@ export async function generatePolaroidStoryCard(params: {
   title: string;
 }): Promise<Buffer> {
   const { thumbnailUrl, title } = params;
-  const cleanTitle = (title || "VIRAL REEL").slice(0, 48);
+  const cleanTitle = (title || "VIRAL REEL").replace(/[^\x20-\x7E]/g, "").slice(0, 48);
 
   const element = (
     <div
@@ -40,7 +40,8 @@ export async function generatePolaroidStoryCard(params: {
           textTransform: "uppercase",
         }}
       >
-        ✨ NEW VIRAL REEL
+        <span style={{ color: "#ff3b45", marginRight: 10 }}>★</span>
+        NEW VIRAL REEL
       </div>
 
       {/* 2. Center Polaroid Photo Card (Casual Aesthetic Tilt) */}
@@ -132,7 +133,7 @@ export async function generatePolaroidStoryCard(params: {
               textTransform: "uppercase",
             }}
           >
-            🔥 NEW VIRAL REEL
+            NEW VIRAL REEL
           </div>
           <div
             style={{
@@ -175,7 +176,7 @@ export async function generatePolaroidStoryCard(params: {
             border: "2px solid rgba(255, 255, 255, 0.9)",
           }}
         >
-          🎬 WATCH REEL ON @the_viral_desk 👆
+          WATCH REEL ON @the_viral_desk
         </div>
         <div
           style={{
@@ -185,7 +186,7 @@ export async function generatePolaroidStoryCard(params: {
             letterSpacing: 1.5,
           }}
         >
-          TAP PROFILE ➔ WATCH FULL REEL
+          TAP PROFILE TO WATCH FULL REEL
         </div>
       </div>
     </div>

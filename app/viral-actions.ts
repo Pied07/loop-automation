@@ -759,7 +759,16 @@ export async function publishClipAndCleanup(params: {
           : `https://www.youtube.com/watch?v=${youtubeVideoId}`;
         logs.push(`✅ YouTube: ${youtubeUrl}`);
       } catch (e: any) {
-        logs.push(`❌ YouTube: ${e.message}`);
+        if (e?.message?.includes("invalid_grant") || e?.message?.includes("revoked")) {
+          try {
+            delete tokens.youtube;
+            const { writeTokens } = await import("@/app/lib/tokens");
+            await writeTokens(tokens);
+          } catch {}
+          logs.push("❌ YouTube: Google access expired. Please click 'Connect' on YouTube in Settings to re-authenticate.");
+        } else {
+          logs.push(`❌ YouTube: ${e.message}`);
+        }
       }
     }
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readTokens } from "@/app/lib/tokens";
+import { readTokens, writeTokens } from "@/app/lib/tokens";
 
 export const dynamic = "force-dynamic";
 
@@ -8,9 +8,33 @@ export async function GET() {
     const tokens: any = await readTokens();
     const connections: string[] = [];
 
-    if (tokens.youtube?.access_token || tokens.youtube?.refresh_token) {
-      connections.push("YouTube");
+    // Verify YouTube token validity
+    if (tokens.youtube?.refresh_token || tokens.youtube?.access_token) {
+      try {
+        const { google } = require("googleapis");
+        const client = new google.auth.OAuth2(
+          process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+          process.env.GOOGLE_CLIENT_SECRET
+        );
+        client.setCredentials(tokens.youtube);
+        const { token } = await client.getAccessToken();
+        if (token) {
+          connections.push("YouTube");
+        } else {
+          delete tokens.youtube;
+          await writeTokens(tokens);
+        }
+      } catch (ytErr: any) {
+        if (ytErr?.message?.includes("invalid_grant") || ytErr?.message?.includes("revoked")) {
+          delete tokens.youtube;
+          await writeTokens(tokens);
+        } else {
+          // Network hiccup: keep YouTube if credentials exist
+          connections.push("YouTube");
+        }
+      }
     }
+
     if (tokens.facebook?.page_id && tokens.facebook?.page_access_token) {
       connections.push("Facebook");
     }
