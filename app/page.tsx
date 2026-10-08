@@ -641,12 +641,16 @@ export default function Home() {
     } else if (platform === 'Gmail') {
       const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
       url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent('openid email https://www.googleapis.com/auth/gmail.send')}&access_type=offline&prompt=consent`;
-    } else if (platform === 'Instagram') {
-      window.location.href = "/api/auth/instagram/connect";
-      return;
-    } else if (platform === 'Facebook') {
+    } else if (platform === 'Instagram' || platform === 'Facebook') {
       const clientId = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID;
-      const params = new URLSearchParams({ client_id: clientId || "", redirect_uri: redirectUri, response_type: "code", scope: "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish" });
+      const callbackPath = platform.toLowerCase();
+      const targetUri = typeof window !== 'undefined' ? `${window.location.origin}/api/auth/callback/${callbackPath}` : redirectUri;
+      const params = new URLSearchParams({
+        client_id: clientId || "",
+        redirect_uri: targetUri,
+        response_type: "code",
+        scope: "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish",
+      });
       url = `https://www.facebook.com/v26.0/dialog/oauth?${params}`;
     }
     
