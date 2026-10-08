@@ -94,12 +94,10 @@ export async function POST(req: NextRequest) {
     const normalizedCategory = typeof contentCategory === "string" && contentCategory.trim() ? contentCategory.trim() : "Trending";
     const processingMode = getProcessingMode(req, body.mode);
 
-    if (processingMode === "queue") {
-      const queueRegistered = await registerQueuedJob(req, { jobId, videoUrl, contentCategory: normalizedCategory });
-      if (!queueRegistered) {
-        return NextResponse.json({ error: "Could not queue the job for the desktop worker." }, { status: 500 });
-      }
+    // Register job in worker queue so desktop worker or cloud runner can track it
+    await registerQueuedJob(req, { jobId, videoUrl, contentCategory: normalizedCategory });
 
+    if (processingMode === "queue") {
       await updateJobStatus(req, {
         jobId,
         status: "processing",
@@ -114,12 +112,63 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Direct Cloud Processing (No GitHub Actions, zero datacenter bot-block hurdles)
+    // 1. Check if GitHub Actions Cloud Runner is configured (Ubuntu VM, preinstalled FFmpeg, 100% free)
+    const githubPat = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
+    const githubRepo = process.env.GITHUB_REPO || "Pied07/loop-automation";
+
+    if (githubPat && processingMode !== "local") {
+      const dispatchUrl = `https://api.github.com/repos/${githubRepo}/actions/workflows/split-video.yml/dispatches`;
+      try {
+        const ghRes = await fetch(dispatchUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${githubPat}`,
+            Accept: "application/vnd.github.v3+json",
+            "Content-Type": "application/json",
+            "User-Agent": "The-Viral-Desk-App",
+          },
+          body: JSON.stringify({
+            ref: "main",
+            inputs: {
+              videoUrl,
+              contentCategory: normalizedCategory,
+              jobId,
+              userId: typeof body.userId === "string" ? body.userId : "creator",
+              cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
+              cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || "",
+              cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || "",
+              appUrl: process.env.APP_URL || "https://the-viral-desk.vercel.app",
+            },
+          }),
+        });
+
+        if (ghRes.ok) {
+          await updateJobStatus(req, {
+            jobId,
+            status: "processing",
+            progress: 15,
+            step: "Cloud video processor started on GitHub Actions...",
+          });
+          return NextResponse.json({
+            success: true,
+            cloudMode: "github",
+            jobId,
+            message: "Video splitting job queued for cloud processor!",
+          });
+        } else {
+          console.warn("GitHub Actions dispatch non-ok:", await ghRes.text());
+        }
+      } catch (ghErr) {
+        console.warn("GitHub dispatch notice:", ghErr);
+      }
+    }
+
+    // 2. Direct / Local Processing (when running on localhost with FFmpeg installed)
     await updateJobStatus(req, {
       jobId,
       status: "processing",
       progress: 25,
-      step: "Downloading video stream in cloud...",
+      step: "Downloading video stream...",
     });
 
     assertCloudinaryConfigured();

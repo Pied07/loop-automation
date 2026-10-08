@@ -283,10 +283,15 @@ def run():
 
     timestamp = int(time.time())
     source_file = CLIPS_DIR / f"source_{timestamp}.mp4"
+    download_success = False
+    title = "Viral Video"
 
-    # 0. Check if direct media URL (e.g. Cloudinary, Mixkit, Archive.org, Wikimedia, or direct MP4/video link)
+    # 0. Check if direct media URL (e.g. Cloudinary, TikTok CDN, TikWM, Akamai, Mixkit, Archive.org, Wikimedia, or direct MP4/video link)
     is_direct = (
         "cloudinary.com" in VIDEO_URL
+        or "tiktokcdn" in VIDEO_URL
+        or "tikwm.com" in VIDEO_URL
+        or "akamaized.net" in VIDEO_URL
         or "mixkit.co" in VIDEO_URL
         or "archive.org" in VIDEO_URL
         or "wikimedia.org" in VIDEO_URL
@@ -297,20 +302,23 @@ def run():
         try:
             req = urllib.request.Request(
                 VIDEO_URL,
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"}
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"}
             )
             with urllib.request.urlopen(req, timeout=120) as resp, open(source_file, "wb") as out_f:
                 shutil.copyfileobj(resp, out_f)
             if source_file.exists() and source_file.stat().st_size > 1000:
                 download_success = True
                 parsed_name = Path(urllib.parse.urlparse(VIDEO_URL).path).stem
-                title = re.sub(r"[_\-]+", " ", parsed_name).strip() or "Viral Video"
+                clean_name = re.sub(r"[_\-]+", " ", parsed_name).strip()
+                if clean_name and len(clean_name) > 3 and not clean_name.isdigit():
+                    title = clean_name.title()
+                else:
+                    title = f"Viral {CONTENT_CATEGORY} Short"
                 print(f"Direct media download succeeded: {source_file} ({source_file.stat().st_size} bytes)")
         except Exception as direct_err:
             print(f"Direct download notice: {direct_err}")
 
-    # 1. Download with yt-dlp (YouTube, TikTok, Reddit, Instagram, Twitter, etc.)
-    title = title if download_success else "Viral Video"
+    # 1. Download with yt-dlp (YouTube, TikTok, Reddit, Instagram, Twitter, etc.) if direct media wasn't downloaded
     total_duration = 0.0
     last_error = ""
 

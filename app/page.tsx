@@ -822,7 +822,7 @@ export default function Home() {
                       gap: '4px'
                     }}
                   >
-                    <ShieldCheck size={13} /> ⚡ Mixkit & Coverr HD
+                    <ShieldCheck size={13} /> ⚡ Mixkit HD
                   </button>
                   <button
                     type="button"
@@ -863,7 +863,7 @@ export default function Home() {
                         cursor: 'pointer'
                       }}
                     >
-                      ☁️ Direct Cloud Processing (Fast Cloudinary Storage)
+                      ☁️ Cloud Runner (GitHub Actions + Cloudinary)
                     </button>
                     <button
                       type="button"
