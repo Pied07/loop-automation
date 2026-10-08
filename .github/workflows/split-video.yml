@@ -12,6 +12,11 @@ on:
         required: false
         default: 'Trending'
         type: string
+      sourceTitle:
+        description: 'Clean Title of the video'
+        required: false
+        default: ''
+        type: string
       jobId:
         description: 'Job ID for progress tracking'
         required: true
@@ -38,6 +43,11 @@ on:
         description: 'Cloudinary API Secret'
         required: false
         type: string
+      autoPublish:
+        description: 'Auto-publish clips to connected platforms'
+        required: false
+        default: 'false'
+        type: string
 jobs:
   split-and-upload:
     runs-on: ubuntu-latest
@@ -63,6 +73,7 @@ jobs:
         env:
           VIDEO_URL: ${{ inputs.videoUrl }}
           CONTENT_CATEGORY: ${{ inputs.contentCategory }}
+          SOURCE_TITLE: ${{ inputs.sourceTitle }}
           JOB_ID: ${{ inputs.jobId }}
           USER_ID: ${{ inputs.userId }}
           CLOUDINARY_CLOUD_NAME: ${{ inputs.cloudinaryCloudName != '' && inputs.cloudinaryCloudName || secrets.CLOUDINARY_CLOUD_NAME }}
@@ -70,6 +81,7 @@ jobs:
           CLOUDINARY_API_SECRET: ${{ inputs.cloudinaryApiSecret != '' && inputs.cloudinaryApiSecret || secrets.CLOUDINARY_API_SECRET }}
           YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
           APP_URL: ${{ inputs.appUrl != '' && inputs.appUrl || 'https://the-viral-desk.vercel.app' }}
+          AUTO_PUBLISH: ${{ inputs.autoPublish }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |

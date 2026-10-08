@@ -3,7 +3,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "path";
 import { randomUUID } from "node:crypto";
-import { downloadAndSplitVideo, generateClipMetadata } from "@/app/viral-actions";
+import { downloadAndSplitVideo, generateClipMetadata, cleanViralTitle } from "@/app/viral-actions";
 import { assertCloudinaryConfigured, deleteCloudinaryVideo, uploadVideoToCloudinary } from "@/app/cloudinary-upload";
 
 export const maxDuration = 300;
@@ -13,7 +13,7 @@ type ProcessingMode = "local" | "cloud" | "queue";
 
 async function readJsonBody(req: NextRequest) {
   try {
-    return await req.json() as { videoUrl?: unknown; contentCategory?: unknown; userId?: unknown; mode?: unknown };
+    return await req.json() as { videoUrl?: unknown; contentCategory?: unknown; userId?: unknown; mode?: unknown; sourceTitle?: unknown };
   } catch {
     return null;
   }
@@ -132,6 +132,7 @@ export async function POST(req: NextRequest) {
             inputs: {
               videoUrl,
               contentCategory: normalizedCategory,
+              sourceTitle: typeof body.sourceTitle === "string" ? body.sourceTitle : "",
               jobId,
               userId: typeof body.userId === "string" ? body.userId : "creator",
               cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
@@ -181,13 +182,14 @@ export async function POST(req: NextRequest) {
     }
 
     const { clips, sourceTitle, totalDuration } = splitResult;
+    const cleanTitle = await cleanViralTitle(sourceTitle, normalizedCategory);
 
     await updateJobStatus(req, {
       jobId,
       status: "processing",
       progress: 60,
       step: "Cropping 9:16 vertical clips with FFmpeg & generating viral hooks...",
-      sourceTitle,
+      sourceTitle: cleanTitle,
       totalDuration,
     });
 
@@ -196,7 +198,7 @@ export async function POST(req: NextRequest) {
         const meta = await generateClipMetadata({
           partNumber: index + 1,
           totalParts: clips.length,
-          sourceTitle,
+          sourceTitle: cleanTitle,
           totalDuration,
           contentCategory: normalizedCategory,
           clipDuration: clip.duration,
@@ -205,7 +207,7 @@ export async function POST(req: NextRequest) {
         return {
           clipPath: clip.clipPath,
           partNumber: index + 1,
-          title: clips.length === 1 ? sourceTitle : `PART ${index + 1} | ${sourceTitle.slice(0, 45)}`,
+          title: clips.length === 1 ? cleanTitle : `PART ${index + 1} | ${cleanTitle.slice(0, 45)}`,
           description: meta.description,
           hashtags: meta.hashtags,
           duration: clip.duration,

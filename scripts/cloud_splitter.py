@@ -34,6 +34,7 @@ load_local_env()
 
 VIDEO_URL = os.environ.get("VIDEO_URL", "").strip()
 CONTENT_CATEGORY = os.environ.get("CONTENT_CATEGORY", "Trending").strip()
+SOURCE_TITLE = os.environ.get("SOURCE_TITLE", "").strip()
 JOB_ID = os.environ.get("JOB_ID", f"job_{int(time.time())}").strip()
 USER_ID = os.environ.get("USER_ID", "creator").strip()
 APP_URL = os.environ.get("APP_URL", "https://the-viral-desk.vercel.app").rstrip("/")
@@ -43,6 +44,7 @@ CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY", "").strip()
 CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET", "").strip()
 SHORT_CLIP_LENGTH_SECONDS = 90.0
 MAX_CLOUDINARY_UPLOAD_BYTES = int(os.environ.get("CLOUDINARY_MAX_UPLOAD_BYTES", str(100 * 1024 * 1024)))
+AUTO_PUBLISH = os.environ.get("AUTO_PUBLISH", "").strip().lower() in ("true", "1", "yes")
 
 CLIPS_DIR = Path("/tmp/clips")
 CLIPS_DIR.mkdir(parents=True, exist_ok=True)
@@ -79,13 +81,40 @@ HASHTAG_BANK = {
 UNIVERSAL_HASHTAGS = ["shorts", "viral", "trending", "foryou", "fyp", "explore", "mustwatch", "reels", "viralvideo", "watchthis"]
 
 
+def clean_human_title(raw_title: str, category: str = "Trending") -> str:
+    cleaned = re.sub(r"https?://\S+", "", raw_title or "")
+    cleaned = re.sub(r"#[a-zA-Z0-9_]+", "", cleaned).strip()
+    is_hash = bool(re.match(r"^[a-zA-Z0-9_-]{18,}$", cleaned)) or bool(re.match(r"^[0-9\s_-]+$", cleaned)) or not re.search(r"[a-zA-Z]", cleaned)
+    if not cleaned or is_hash or len(cleaned) < 4:
+        fallbacks = {
+            "Trending": ["Trending Viral Internet Moment", "Must Watch Viral Video", "This Clip Is Taking Over Social Media"],
+            "Motivational": ["The Mindset Shift That Changes Everything", "Powerful Motivation You Need Today", "Never Give Up On Your Dreams"],
+            "Funny": ["Try Not To Laugh Challenge", "Pure Comedy Gold Moment", "Funniest Video You Will See Today"],
+            "Comedy": ["Stand Up Comedy Masterpiece", "Funniest Clip You Will See Today", "Comedy Gold Moments"],
+            "Food": ["Incredible Street Food Chef Skills", "Delicious Cooking Recipe Master", "Mouth Watering Food Everyone Is Craving"],
+            "Sports": ["Legendary Athlete Moment Chills", "Incredible Sports Highlight", "Unstoppable Athletic Performance"],
+            "Travel": ["Breathtaking Place You Must Visit", "Hidden Paradise On Earth", "Stunning Travel View Before You Die"],
+            "Nature": ["Incredible Wildlife Encounter Caught On Camera", "Nature Never Ceases To Amaze", "Wild Animals Beautiful Moment"],
+            "Gaming": ["Insane Gaming Clutch Moment", "Epic Gameplay Highlight", "Unbelievable Gaming Reaction"],
+            "Music": ["Amazing Live Music Performance", "Incredible Rhythm And Melody", "Viral Sound That Hits Different"],
+        }
+        picks = fallbacks.get(category, fallbacks["Trending"])
+        cleaned = picks[int(time.time()) % len(picks)]
+    return re.sub(r"\s+", " ", cleaned).strip()[:80]
+
+
 def generate_clip_hashtags(title: str, category: str) -> list:
     cat_clean = (category or "Trending").strip().title()
     bank = HASHTAG_BANK.get(cat_clean) or HASHTAG_BANK.get("Trending", [])
-    words = re.findall(r"[a-zA-Z]{4,}", title.lower())
-    title_tags = [w for w in words if w not in bank and w not in UNIVERSAL_HASHTAGS][:3]
+    raw_words = re.findall(r"[a-zA-Z]{3,12}", title.lower())
+    clean_words = [
+        w for w in raw_words 
+        if not re.search(r"[bcdfghjklmnpqrstvwxyz]{5,}", w) 
+        and w not in bank 
+        and w not in UNIVERSAL_HASHTAGS
+    ][:4]
     combined = []
-    for tag in bank[:5] + title_tags + UNIVERSAL_HASHTAGS[:5] + bank[5:]:
+    for tag in clean_words + bank[:6] + ["shorts", "reels", "viral", "fyp"]:
         clean = tag.lower().replace("#", "").strip()
         if clean and clean not in combined:
             combined.append(clean)
@@ -568,12 +597,27 @@ def run():
 
         created_clip_files.append(clip_path)
 
-        hashtags = generate_clip_hashtags(title, CONTENT_CATEGORY)
+        clean_title = clean_human_title(title, CONTENT_CATEGORY)
+        hashtags = generate_clip_hashtags(clean_title, CONTENT_CATEGORY)
+
+        is_single = total_parts <= 1
+        clip_title = clean_title if is_single else f"PART {part_num} | {clean_title[:45]}"
+        part_badge = "" if is_single else f"📌 PART {part_num} of {total_parts}\n\n"
+
+        clip_desc = (
+            f"{part_badge}"
+            f"✨ {clean_title}\n\n"
+            f"💬 What are your thoughts on this? Drop a comment below!\n"
+            f"🔔 Follow & Subscribe for more daily viral clips!\n\n"
+            f"────────────────────────────\n"
+            f"Fair Use Disclaimer: This clip is curated and shared for educational, inspirational, and commentary purposes."
+        )
+
         clips_meta.append({
             "partNumber": part_num,
             "filename": clip_filename,
-            "title": f"PART {part_num} | {title[:45]}",
-            "description": f"📌 PART {part_num}\n{title}\n\nShared under Fair Use. Like & subscribe for more!",
+            "title": clip_title,
+            "description": clip_desc,
             "hashtags": hashtags,
             "duration": round(final_clip_duration, 2),
             "startTime": round(start_time, 2),
@@ -611,15 +655,35 @@ def run():
             **({"cloudinaryPublicId": cloudinary_public_id(JOB_ID, fname)} if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET else {}),
         })
 
-    # Clean up local disk
-    for cp in created_clip_files:
-        if cp.exists():
-            cp.unlink()
-    if source_file.exists():
-        source_file.unlink()
+    # 3.5 Auto-publish clips to connected platforms if requested
+    if AUTO_PUBLISH and APP_URL:
+        update_job_status(status="processing", progress=92, step=f"Auto-publishing {len(clips)} clips to connected socials...", source_title=title, total_duration=total_duration)
+        print(f"Auto-publishing {len(clips)} clips to {APP_URL}/api/viral-clips/publish...")
+        for clip_item in clips:
+            try:
+                pub_payload = {
+                    "clipPath": clip_item["publicUrl"] or clip_item["url"],
+                    "partNumber": clip_item["partNumber"],
+                    "totalParts": len(clips),
+                    "title": clip_item["title"],
+                    "description": clip_item["description"],
+                    "hashtags": clip_item["hashtags"],
+                    "cloudinaryPublicId": clip_item.get("cloudinaryPublicId"),
+                }
+                pub_req = urllib.request.Request(
+                    f"{APP_URL}/api/viral-clips/publish",
+                    data=json.dumps(pub_payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json", "User-Agent": "ViralDesk-AutoPublisher"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(pub_req, timeout=90) as presp:
+                    pdata = json.loads(presp.read().decode("utf-8"))
+                    print(f"Auto-published part {clip_item['partNumber']}: {pdata.get('logs', [])}")
+            except Exception as pe:
+                print(f"Notice: Auto-publish part {clip_item['partNumber']} notice: {pe}")
 
     # 4. Finish job
-    update_job_status(status="done", progress=100, step=f"✅ {len(clips)} clips ready!", clips=clips, source_title=title, total_duration=total_duration)
+    update_job_status(status="done", progress=100, step=f"✅ {len(clips)} clips ready and published!", clips=clips, source_title=title, total_duration=total_duration)
     print("SUCCESS: Pipeline complete.")
 
 

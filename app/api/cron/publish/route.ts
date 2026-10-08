@@ -1,107 +1,145 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
+import { database } from "@/app/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { scrapeOnlineViralVideo, cleanViralTitle } from "@/app/viral-actions";
 
-export async function GET(request: Request) {
+export const maxDuration = 300;
+export const dynamic = "force-dynamic";
+
+const CATEGORIES = [
+  "Trending",
+  "Comedy",
+  "Motivational",
+  "Horror",
+  "Educational",
+  "Romance",
+  "Adventure",
+  "Music",
+  "Food",
+];
+
+async function handleCronPublish(req: NextRequest) {
   try {
-    // 1. Generate Video Metadata and Prompts
-    const format = "ASMR"; 
-    
-    // Using 3 distinct visual scenes for the slideshow
-    const prompts = [
-      encodeURIComponent(`A hyper-realistic extreme macro shot of a crystalline sugar geode, ${format} style`),
-      encodeURIComponent(`A scalpel slicing into the sugar geode, shattering pieces, ${format} style`),
-      encodeURIComponent(`The geode breaking open revealing golden nectar inside, ${format} style`)
-    ];
-
-    // Using pollinations.ai for 100% free image generation
-    const imageUrls = prompts.map(p => `https://image.pollinations.ai/prompt/${p}?width=1080&height=1920&nologo=true`);
-
-    // 2. Send to Shotstack to stitch into a video
-    const shotstackKey = process.env.SHOTSTACK_API_KEY;
-    if (!shotstackKey) {
-      return NextResponse.json({ error: 'Missing Shotstack API Key' }, { status: 500 });
-    }
-
-    const shotstackPayload = {
-      timeline: {
-        background: "#000000",
-        tracks: [
-          {
-            clips: imageUrls.map((url, index) => ({
-              asset: {
-                type: "image",
-                src: url
-              },
-              start: index * 3,
-              length: 3,
-              effect: "zoomIn"
-            }))
+    // 1. Verify if auto-pilot is enabled in Firestore app settings
+    if (database) {
+      try {
+        const autoSnap = await getDoc(doc(database, "app_config", "auto_pilot"));
+        if (autoSnap.exists()) {
+          const autoData = autoSnap.data();
+          if (autoData.enabled === false) {
+            return NextResponse.json({
+              success: false,
+              message: "Auto-Pilot is currently toggled OFF in workspace settings.",
+            });
           }
-        ]
-      },
-      output: {
-        format: "mp4",
-        resolution: "1080",
-        aspectRatio: "9:16"
-      }
-    };
-
-    const renderResponse = await fetch('https://api.shotstack.io/edit/v1/render', {
-      method: 'POST',
-      headers: {
-        'x-api-key': shotstackKey,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(shotstackPayload)
-    });
-
-    const renderData = await renderResponse.json();
-    
-    if (!renderData.success) {
-      return NextResponse.json({ error: 'Shotstack rendering failed', details: renderData }, { status: 500 });
-    }
-
-    const renderId = renderData.response.id;
-
-    // 3. Poll Shotstack until the video is finished rendering (usually takes 10-15 seconds)
-    let status = "rendering";
-    let videoUrl = "";
-    
-    while (status !== "done" && status !== "failed") {
-      await new Promise(resolve => setTimeout(resolve, 3000)); // wait 3 seconds
-      
-      const statusResponse = await fetch(`https://api.shotstack.io/edit/v1/render/${renderId}`, {
-        headers: {
-          'x-api-key': shotstackKey
         }
-      });
-      const statusData = await statusResponse.json();
-      status = statusData.response.status;
-      
-      if (status === "done") {
-        videoUrl = statusData.response.url; // This is the final .mp4 link
+      } catch (err: any) {
+        console.warn("Notice: Firestore auto_pilot check fallback:", err.message);
       }
     }
 
-    if (status === "failed") {
-      return NextResponse.json({ error: 'Shotstack rendering failed during processing' }, { status: 500 });
+    // 2. Select a random viral category
+    const randomCategory = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
+
+    // 3. Scrape a viral video online (zero bot blocks, direct MP4)
+    let scraped = await scrapeOnlineViralVideo(randomCategory);
+    if (!scraped || !scraped.url) {
+      scraped = await scrapeOnlineViralVideo("Trending");
     }
 
-    // 4. Save ONLY the video URL to the database (Zero-Storage requirement)
-    // We do NOT download the file. We just save this URL string to Firebase Firestore.
-    // e.g. await addDoc(collection(db, "users", userId, "videos"), { url: videoUrl, title: "..." });
+    if (!scraped || !scraped.url) {
+      return NextResponse.json({
+        success: false,
+        error: "Could not find a viral video for auto-publishing today.",
+      }, { status: 500 });
+    }
 
-    // 5. Post to Social Media (YouTube) using Google Client Secret
-    // e.g. await uploadToYouTube(videoUrl, tokens.refresh_token);
+    const cleanTitle = await cleanViralTitle(scraped.title || "", randomCategory);
+    const jobId = `cron-${Date.now()}`;
 
-    return NextResponse.json({ 
-      success: true, 
-      message: "Video generated successfully! Link saved to database.",
-      videoUrl: videoUrl,
-      imageUrls 
+    // 4. Trigger cloud video runner with autoPublish=true
+    const githubPat = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
+    const githubRepo = process.env.GITHUB_REPO || "Pied07/loop-automation";
+    const appUrl = process.env.APP_URL || "https://the-viral-desk.vercel.app";
+
+    if (githubPat) {
+      const dispatchUrl = `https://api.github.com/repos/${githubRepo}/actions/workflows/split-video.yml/dispatches`;
+      const ghRes = await fetch(dispatchUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${githubPat}`,
+          Accept: "application/vnd.github.v3+json",
+          "Content-Type": "application/json",
+          "User-Agent": "The-Viral-Desk-App",
+        },
+        body: JSON.stringify({
+          ref: "main",
+          inputs: {
+            videoUrl: scraped.url,
+            contentCategory: randomCategory,
+            sourceTitle: cleanTitle,
+            jobId,
+            userId: "auto-pilot",
+            cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
+            cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || "",
+            cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || "",
+            appUrl,
+            autoPublish: "true",
+          },
+        }),
+      });
+
+      if (ghRes.ok) {
+        return NextResponse.json({
+          success: true,
+          mode: "cloud-github-actions",
+          category: randomCategory,
+          title: cleanTitle,
+          videoUrl: scraped.url,
+          jobId,
+          autoPublish: true,
+          message: `Auto-pilot started successfully for category "${randomCategory}". Video will be split and published to connected platforms automatically!`,
+        });
+      } else {
+        console.warn("GitHub Actions dispatch warning:", await ghRes.text());
+      }
+    }
+
+    // Fallback: Queue job for desktop worker if GitHub PAT is not set
+    const queueUrl = new URL("/api/viral-clips/queue", req.url).toString();
+    await fetch(queueUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jobId,
+        videoUrl: scraped.url,
+        contentCategory: randomCategory,
+        sourceTitle: cleanTitle,
+        autoPublish: true,
+        status: "pending",
+      }),
+    }).catch(() => {});
+
+    return NextResponse.json({
+      success: true,
+      mode: "queued-worker",
+      category: randomCategory,
+      title: cleanTitle,
+      videoUrl: scraped.url,
+      jobId,
+      autoPublish: true,
+      message: `Auto-pilot queued for category "${randomCategory}". Worker will split and publish all clips.`,
     });
-
-  } catch (error: any) {
-    console.error("Cron Job Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (err: any) {
+    console.error("Cron auto-pilot error:", err);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
+}
+
+export async function GET(req: NextRequest) {
+  return handleCronPublish(req);
+}
+
+export async function POST(req: NextRequest) {
+  return handleCronPublish(req);
 }

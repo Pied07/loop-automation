@@ -501,6 +501,28 @@ function pickRandom<T>(arr: T[], seed: number): T {
   return arr[seed % arr.length];
 }
 
+export async function cleanViralTitle(rawTitle: string, category = "Trending"): Promise<string> {
+  let title = (rawTitle || "").replace(/https?:\/\/\S+/gi, "").replace(/#[a-zA-Z0-9_]+/g, "").trim();
+  const isHash = /^[a-zA-Z0-9_-]{18,}$/.test(title) || /^[0-9\s_-]+$/.test(title) || !/[a-zA-Z]/.test(title);
+  if (!title || isHash || title.length < 4) {
+    const fallbacks: Record<string, string[]> = {
+      Trending: ["Trending Viral Internet Moment", "Must Watch Viral Video", "This Clip Is Taking Over Social Media"],
+      Motivational: ["The Mindset Shift That Changes Everything", "Powerful Motivation You Need Today", "Never Give Up On Your Dreams"],
+      Funny: ["Try Not To Laugh Challenge", "Pure Comedy Gold Moment", "Funniest Video You Will See Today"],
+      Comedy: ["Stand Up Comedy Masterpiece", "Funniest Clip You Will See Today", "Comedy Gold Moments"],
+      Food: ["Incredible Street Food Chef Skills", "Delicious Cooking Recipe Master", "Mouth Watering Food Everyone Is Craving"],
+      Sports: ["Legendary Athlete Moment Chills", "Incredible Sports Highlight", "Unstoppable Athletic Performance"],
+      Travel: ["Breathtaking Place You Must Visit", "Hidden Paradise On Earth", "Stunning Travel View Before You Die"],
+      Nature: ["Incredible Wildlife Encounter Caught On Camera", "Nature Never Ceases To Amaze", "Wild Animals Beautiful Moment"],
+      Gaming: ["Insane Gaming Clutch Moment", "Epic Gameplay Highlight", "Unbelievable Gaming Reaction"],
+      Music: ["Amazing Live Music Performance", "Incredible Rhythm And Melody", "Viral Sound That Hits Different"],
+    };
+    const list = fallbacks[category] || fallbacks.Trending;
+    return list[Math.floor(Math.random() * list.length)];
+  }
+  return title.slice(0, 80).replace(/\s+/g, " ").trim();
+}
+
 export async function generateClipMetadata(params: {
   partNumber: number;
   totalParts: number;
@@ -511,40 +533,40 @@ export async function generateClipMetadata(params: {
 }): Promise<{ description: string; hashtags: string[] }> {
   const { partNumber, totalParts, sourceTitle, contentCategory, clipDuration } = params;
 
-  // Pick hooks and CTA based on part number (deterministic rotation)
+  const cleanTitle = await cleanViralTitle(sourceTitle, contentCategory);
   const categoryHooks = HOOKS[contentCategory] || HOOKS["Motivational"];
   const hook = pickRandom(categoryHooks, partNumber - 1);
   const cta = pickRandom(CTAS, partNumber + 1);
 
-  // Build part label — strictly omit if video is covered in a single clip
+  // Strictly omit PART label if video is a single clip
   const isMultiPart = totalParts > 1;
   const partLabel = isMultiPart ? `📌 PART ${partNumber} of ${totalParts}` : "";
   const clipLen = clipDuration < 120 ? `${Math.round(clipDuration)}s` : `${Math.round(clipDuration / 60)}min`;
 
-  // Fair Use & Copyright Attribution (protects channel from strikes by directing claimants to contact first)
-  const creditBlock = `Credit / Source: "${sourceTitle}". This clip is shared under Fair Use for educational, inspirational, and commentary purposes. All rights belong to their respective owners. For credit or immediate removal, please reach out via DM/email.`;
-
-  // Build description
+  // Clean, structured description
   const description = [
-    ...(partLabel ? [partLabel] : []),
-    hook,
-    `⏱ ${clipLen} clip.`,
-    cta,
+    ...(partLabel ? [partLabel, ""] : []),
+    `✨ ${hook}`,
+    `🎬 ${cleanTitle}`,
+    `⏱ Duration: ${clipLen}`,
+    "",
+    `💬 ${cta}`,
+    "🔔 Like, comment & subscribe for daily viral moments!",
     "",
     "────────────────",
-    creditBlock,
+    `Fair Use Disclaimer: This clip from "${cleanTitle}" is curated under Fair Use for educational, inspirational, and commentary purposes. All rights belong to their respective owners.`,
   ].join("\n");
 
-  // Build hashtags: category-specific + universal + words from title (guaranteed 8 to 10)
+  // Post-respective hashtags: clean words from title + niche tags + platform tags
   const bankTags = (HASHTAG_BANK[contentCategory] || HASHTAG_BANK["Motivational"] || []).slice(0, 10);
-  const titleWords = sourceTitle.match(/[a-zA-Z]{4,}/g) || [];
-  const titleTags = titleWords
+  const rawWords = cleanTitle.match(/[a-zA-Z]{3,12}/g) || [];
+  const cleanTitleTags = rawWords
     .map((w) => w.toLowerCase())
-    .filter((w) => !bankTags.includes(w) && !UNIVERSAL_HASHTAGS.includes(w))
+    .filter((w) => !/[bcdfghjklmnpqrstvwxyz]{5,}/i.test(w) && !bankTags.includes(w) && !UNIVERSAL_HASHTAGS.includes(w))
     .slice(0, 4);
-  const universalPick = UNIVERSAL_HASHTAGS.slice(0, 6);
-  const combined = [...new Set([...bankTags.slice(0, 5), ...titleTags, ...universalPick, ...bankTags.slice(5)])];
-  const hashtags = combined.slice(0, Math.min(10, Math.max(8, combined.length)));
+
+  const combined = [...new Set([...cleanTitleTags, ...bankTags.slice(0, 6), "shorts", "reels", "viral", "fyp"])];
+  const hashtags = combined.slice(0, 10);
 
   return { description, hashtags };
 }
@@ -555,6 +577,7 @@ export async function publishClipAndCleanup(params: {
   clipPath: string;
   partNumber: number;
   totalParts: number;
+  totalDuration?: number;
   title: string;
   description: string;
   hashtags: string[];
@@ -619,194 +642,220 @@ export async function publishClipAndCleanup(params: {
   const tokens: any = await readTokens();
 
   try {
-    // ─ YouTube ─
-  if (platforms.includes("YouTube")) {
-    try {
-      const { google } = require("googleapis");
-      const oauth2Client = new google.auth.OAuth2(
-        process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET
-      );
-      oauth2Client.setCredentials(tokens.youtube);
-      const youtube = google.youtube({ version: "v3", auth: oauth2Client });
+    // ─ YouTube (Posts as YouTube Short if <= 180s) ─
+    if (platforms.includes("YouTube")) {
+      try {
+        const { google } = require("googleapis");
+        const oauth2Client = new google.auth.OAuth2(
+          process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+          process.env.GOOGLE_CLIENT_SECRET
+        );
+        oauth2Client.setCredentials(tokens.youtube);
+        const youtube = google.youtube({ version: "v3", auth: oauth2Client });
 
-      const res = await youtube.videos.insert({
-        part: ["snippet", "status"],
-        requestBody: {
-          snippet: {
-            title: fullTitle.slice(0, 100),
-            description: fullDescription,
-            tags: hashtags.slice(0, 15),
-            categoryId: "22",
+        const isShort = !params.totalDuration || params.totalDuration <= 180;
+        const cleanTitleWithShorts = isShort && !fullTitle.toLowerCase().includes("#shorts")
+          ? `${fullTitle.slice(0, 90)} #Shorts`
+          : fullTitle.slice(0, 100);
+
+        const res = await youtube.videos.insert({
+          part: ["snippet", "status"],
+          requestBody: {
+            snippet: {
+              title: cleanTitleWithShorts,
+              description: fullDescription,
+              tags: [...hashtags.slice(0, 12), "Shorts", "shorts", "viral"],
+              categoryId: "22",
+            },
+            status: { privacyStatus: "public", selfDeclaredMadeForKids: false },
           },
-          status: { privacyStatus: "public", selfDeclaredMadeForKids: false },
-        },
-        media: { body: fs.createReadStream(/*turbopackIgnore: true*/ absolutePath) },
-      });
+          media: { body: fs.createReadStream(/*turbopackIgnore: true*/ absolutePath) },
+        });
 
-      youtubeVideoId = res.data.id;
-      youtubeUrl = `https://www.youtube.com/watch?v=${youtubeVideoId}`;
-      logs.push(`✅ YouTube: ${youtubeUrl}`);
-    } catch (e: any) {
-      logs.push(`❌ YouTube: ${e.message}`);
-    }
-  }
-
-  // ─ Facebook ─
-  if (platforms.includes("Facebook")) {
-    try {
-      const pageId = tokens.facebook?.page_id;
-      const pageToken = tokens.facebook?.page_access_token;
-      if (!pageId || !pageToken) throw new Error("Facebook not connected.");
-
-      // Upload as file stream via multipart
-      const fileBuffer = fs.readFileSync(/*turbopackIgnore: true*/ absolutePath);
-      const formData = new FormData();
-      formData.append("access_token", pageToken);
-      formData.append("title", fullTitle.slice(0, 100));
-      formData.append("description", fullDescription);
-      formData.append("published", "true");
-      formData.append(
-        "source",
-        new Blob([fileBuffer], { type: "video/mp4" }),
-        `clip_part${partNumber}.mp4`
-      );
-
-      const postRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/videos`, {
-        method: "POST",
-        body: formData,
-        signal: AbortSignal.timeout(180000),
-      });
-      const postData = await postRes.json();
-      if (!postRes.ok || postData.error) throw new Error(postData.error?.message || `HTTP ${postRes.status}`);
-
-      facebookVideoId = postData.id;
-      facebookUrl = `https://www.facebook.com/video/${facebookVideoId}`;
-      logs.push(`✅ Facebook: ${facebookUrl}`);
-    } catch (e: any) {
-      logs.push(`❌ Facebook: ${e.message}`);
-    }
-  }
-
-  // ─ Instagram ─
-  if (platforms.includes("Instagram")) {
-    try {
-      const igUserId = tokens.facebook?.instagram_user_id;
-      const instagramToken =
-        tokens.facebook?.instagram_access_token || tokens.facebook?.instagram_page_access_token;
-      const instagramApi = tokens.facebook?.instagram_access_token
-        ? "https://graph.instagram.com/v26.0"
-        : "https://graph.facebook.com/v26.0";
-      if (!instagramToken || !igUserId) throw new Error("Instagram not connected.");
-
-      // Instagram requires a public video URL — use YouTube link if available, else skip
-      if (!youtubeUrl) throw new Error("Instagram requires the video to be hosted publicly. Upload to YouTube first.");
-
-      const createRes = await fetch(`${instagramApi}/${igUserId}/media`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          access_token: instagramToken,
-          media_type: "REELS",
-          video_url: youtubeUrl,
-          caption: `${title}\n\n${description}\n\n${formattedHashtags.join(" ")}`,
-        }),
-      });
-      const createData = await createRes.json();
-      if (!createRes.ok || createData.error) throw new Error(createData.error?.message || `HTTP ${createRes.status}`);
-
-      const creationId = createData.id;
-      let finished = false;
-      for (let i = 0; i < 15; i++) {
-        await new Promise((r) => setTimeout(r, 4000));
-        const statusUrl = new URL(`${instagramApi}/${creationId}`);
-        statusUrl.search = new URLSearchParams({
-          fields: "status_code,status",
-          access_token: instagramToken,
-        }).toString();
-        const statusRes = await fetch(statusUrl, { cache: "no-store" });
-        const statusData = await statusRes.json();
-        if (statusData.status_code === "FINISHED") { finished = true; break; }
-        if (statusData.status_code === "ERROR") throw new Error(statusData.status || "Instagram processing failed.");
+        youtubeVideoId = res.data.id;
+        youtubeUrl = isShort
+          ? `https://www.youtube.com/shorts/${youtubeVideoId}`
+          : `https://www.youtube.com/watch?v=${youtubeVideoId}`;
+        logs.push(`✅ YouTube: ${youtubeUrl}`);
+      } catch (e: any) {
+        logs.push(`❌ YouTube: ${e.message}`);
       }
-      if (!finished) throw new Error("Instagram processing timed out.");
-
-      const publishRes = await fetch(`${instagramApi}/${igUserId}/media_publish`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ access_token: instagramToken, creation_id: creationId }),
-      });
-      const publishData = await publishRes.json();
-      if (!publishRes.ok || publishData.error) throw new Error(publishData.error?.message || `HTTP ${publishRes.status}`);
-
-      instagramVideoId = publishData.id;
-      instagramUrl = `https://www.instagram.com/reel/${instagramVideoId}`;
-      logs.push(`✅ Instagram: Reel published`);
-    } catch (e: any) {
-      logs.push(`❌ Instagram: ${e.message}`);
     }
-  }
 
-  // ─ Gmail notification ─
-  if (platforms.includes("Gmail") || (tokens.gmail?.access_token && (youtubeUrl || facebookUrl || instagramUrl))) {
-    try {
-      const { google } = require("googleapis");
-      const oauth2Client = new google.auth.OAuth2(
-        process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET
-      );
-      oauth2Client.setCredentials(tokens.gmail);
-      const gmail = google.gmail({ version: "v1", auth: oauth2Client });
+    // ─ Facebook (Posts as Reel + Creates Story/Feed update linking to Reel) ─
+    if (platforms.includes("Facebook")) {
+      try {
+        const pageId = tokens.facebook?.page_id;
+        const pageToken = tokens.facebook?.page_access_token;
+        if (!pageId || !pageToken) throw new Error("Facebook not connected.");
 
-      let recipient = userEmail?.trim() || "";
-      if (!recipient && oauth2Client.credentials.id_token) {
+        // Upload as file stream via multipart
+        const fileBuffer = fs.readFileSync(/*turbopackIgnore: true*/ absolutePath);
+        const formData = new FormData();
+        formData.append("access_token", pageToken);
+        formData.append("title", fullTitle.slice(0, 100));
+        formData.append("description", fullDescription);
+        formData.append("published", "true");
+        formData.append(
+          "source",
+          new Blob([fileBuffer], { type: "video/mp4" }),
+          `clip_part${partNumber}.mp4`
+        );
+
+        const postRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/videos`, {
+          method: "POST",
+          body: formData,
+          signal: AbortSignal.timeout(180000),
+        });
+        const postData = await postRes.json();
+        if (!postRes.ok || postData.error) throw new Error(postData.error?.message || `HTTP ${postRes.status}`);
+
+        facebookVideoId = postData.id;
+        facebookUrl = `https://www.facebook.com/reel/${facebookVideoId}`;
+        logs.push(`✅ Facebook: ${facebookUrl}`);
+
+        // Also post a Page Story / Feed update linking to the new reel
         try {
-          const ticket = await oauth2Client.verifyIdToken({
-            idToken: oauth2Client.credentials.id_token,
-            audience: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+          await fetch(`https://graph.facebook.com/v26.0/${pageId}/feed`, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              access_token: pageToken,
+              message: `✨ New Viral Reel: ${title}\n\n${description.slice(0, 150)}...\n\n👉 Watch full Reel: ${facebookUrl}`,
+              link: facebookUrl,
+            }),
           });
-          recipient = ticket.getPayload()?.email || "";
-        } catch {}
+          logs.push(`✅ Facebook: Story/Feed link published`);
+        } catch (storyErr: any) {
+          console.warn("Facebook story notice:", storyErr.message);
+        }
+      } catch (e: any) {
+        logs.push(`❌ Facebook: ${e.message}`);
       }
-
-      if (recipient) {
-        const linksSection = [
-          youtubeUrl ? `📺 YouTube: ${youtubeUrl}` : null,
-          facebookUrl ? `📘 Facebook: ${facebookUrl}` : null,
-          instagramUrl ? `📸 Instagram: ${instagramUrl}` : null,
-        ]
-          .filter(Boolean)
-          .join("\n");
-
-        const emailBody =
-          `Your viral clip has been published!\n\n` +
-          `${title}\n${description}\n\n` +
-          `🔗 Published Links:\n${linksSection || "No links available."}\n\n` +
-          `Hashtags: ${formattedHashtags.join(" ")}`;
-
-        const message = [
-          `To: ${recipient}`,
-          "Content-Type: text/plain; charset=utf-8",
-          `Subject: ✅ Clip Published: ${title}`,
-          "",
-          emailBody,
-        ].join("\n");
-
-        const encodedMessage = Buffer.from(message)
-          .toString("base64")
-          .replace(/\+/g, "-")
-          .replace(/\//g, "_")
-          .replace(/=+$/, "");
-
-        await gmail.users.messages.send({ userId: "me", requestBody: { raw: encodedMessage } });
-        gmailSent = true;
-        logs.push(`✅ Gmail: Notification sent to ${recipient}`);
-      }
-    } catch (e: any) {
-      logs.push(`❌ Gmail: ${e.message}`);
     }
-  }
 
+    // ─ Instagram ─
+    if (platforms.includes("Instagram")) {
+      try {
+        const igUserId = tokens.facebook?.instagram_user_id;
+        const instagramToken =
+          tokens.facebook?.instagram_access_token || tokens.facebook?.instagram_page_access_token;
+        const instagramApi = tokens.facebook?.instagram_access_token
+          ? "https://graph.instagram.com/v26.0"
+          : "https://graph.facebook.com/v26.0";
+        if (!instagramToken || !igUserId) throw new Error("Instagram not connected.");
+
+        // Instagram requires a public video URL — use YouTube link if available, else skip
+        if (!youtubeUrl) throw new Error("Instagram requires the video to be hosted publicly. Upload to YouTube first.");
+
+        const createRes = await fetch(`${instagramApi}/${igUserId}/media`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            access_token: instagramToken,
+            media_type: "REELS",
+            video_url: youtubeUrl,
+            caption: `${title}\n\n${description}\n\n${formattedHashtags.join(" ")}`,
+          }),
+        });
+        const createData = await createRes.json();
+        if (!createRes.ok || createData.error) throw new Error(createData.error?.message || `HTTP ${createRes.status}`);
+
+        const creationId = createData.id;
+        let finished = false;
+        for (let i = 0; i < 15; i++) {
+          await new Promise((r) => setTimeout(r, 4000));
+          const statusUrl = new URL(`${instagramApi}/${creationId}`);
+          statusUrl.search = new URLSearchParams({
+            fields: "status_code,status",
+            access_token: instagramToken,
+          }).toString();
+          const statusRes = await fetch(statusUrl, { cache: "no-store" });
+          const statusData = await statusRes.json();
+          if (statusData.status_code === "FINISHED") { finished = true; break; }
+          if (statusData.status_code === "ERROR") throw new Error(statusData.status || "Instagram processing failed.");
+        }
+        if (!finished) throw new Error("Instagram processing timed out.");
+
+        const publishRes = await fetch(`${instagramApi}/${igUserId}/media_publish`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ access_token: instagramToken, creation_id: creationId }),
+        });
+        const publishData = await publishRes.json();
+        if (!publishRes.ok || publishData.error) throw new Error(publishData.error?.message || `HTTP ${publishRes.status}`);
+
+        instagramVideoId = publishData.id;
+        instagramUrl = `https://www.instagram.com/reel/${instagramVideoId}`;
+        logs.push(`✅ Instagram: Reel published`);
+      } catch (e: any) {
+        logs.push(`❌ Instagram: ${e.message}`);
+      }
+    }
+
+    // ─ Gmail notification (RFC 2047 MIME encoded subject to avoid garbled encoding) ─
+    if (platforms.includes("Gmail") || (tokens.gmail?.access_token && (youtubeUrl || facebookUrl || instagramUrl))) {
+      try {
+        const { google } = require("googleapis");
+        const oauth2Client = new google.auth.OAuth2(
+          process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+          process.env.GOOGLE_CLIENT_SECRET
+        );
+        oauth2Client.setCredentials(tokens.gmail);
+        const gmail = google.gmail({ version: "v1", auth: oauth2Client });
+
+        let recipient = userEmail?.trim() || "";
+        if (!recipient && oauth2Client.credentials.id_token) {
+          try {
+            const ticket = await oauth2Client.verifyIdToken({
+              idToken: oauth2Client.credentials.id_token,
+              audience: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+            });
+            recipient = ticket.getPayload()?.email || "";
+          } catch {}
+        }
+
+        if (recipient) {
+          const linksSection = [
+            youtubeUrl ? `📺 YouTube: ${youtubeUrl}` : null,
+            facebookUrl ? `📘 Facebook: ${facebookUrl}` : null,
+            instagramUrl ? `📸 Instagram: ${instagramUrl}` : null,
+          ]
+            .filter(Boolean)
+            .join("\n");
+
+          const emailBody =
+            `Your viral clip has been successfully published!\n\n` +
+            `Title: ${title}\n\n` +
+            `Description:\n${description}\n\n` +
+            `🔗 Published Links:\n${linksSection || "No links available."}\n\n` +
+            `Hashtags: ${formattedHashtags.join(" ")}`;
+
+          const cleanSubject = `[The Viral Desk] Clip Published: ${title.slice(0, 50)}`;
+          const encodedSubject = `=?UTF-8?B?${Buffer.from(cleanSubject).toString("base64")}?=`;
+
+          const message = [
+            `To: ${recipient}`,
+            "Content-Type: text/plain; charset=utf-8",
+            `Subject: ${encodedSubject}`,
+            "",
+            emailBody,
+          ].join("\n");
+
+          const encodedMessage = Buffer.from(message)
+            .toString("base64")
+            .replace(/\+/g, "-")
+            .replace(/\//g, "_")
+            .replace(/=+$/, "");
+
+          await gmail.users.messages.send({ userId: "me", requestBody: { raw: encodedMessage } });
+          gmailSent = true;
+          logs.push(`✅ Gmail: Notification sent to ${recipient}`);
+        }
+      } catch (e: any) {
+        logs.push(`❌ Gmail: ${e.message}`);
+      }
+    }
   } finally {
     // ─ GUARANTEED VIDEO DELETION: Runs NO MATTER WHAT (success or failure) ─
     // 1. Delete local or downloaded tmp clip file

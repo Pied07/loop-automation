@@ -41,8 +41,8 @@ import {
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { useEffect, useState, useRef, type FormEvent } from "react";
 import { auth, firebaseConfigured, database, type VideoRecord } from "./firebase";
-import { doc, onSnapshot } from "firebase/firestore";
-import { deleteFromYouTube, deleteFromFacebook, getPublishedAutomationVideos } from "./actions";
+import { doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
+import { deleteFromYouTube, deleteFromFacebook } from "./actions";
 import { FaYoutube, FaInstagram, FaFacebookF } from "react-icons/fa6";
 import { SiGmail } from "react-icons/si";
 
@@ -160,16 +160,44 @@ export default function Home() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processMode, setProcessMode] = useState<"cloud" | "queue">("cloud");
   const [autoFindSource, setAutoFindSource] = useState<"scrape" | "direct" | "youtube">("scrape");
+  const [autoPilotEnabled, setAutoPilotEnabled] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
+        const storedAuto = localStorage.getItem("tvd-auto-pilot") === "true";
+        setAutoPilotEnabled(storedAuto);
+        if (database) {
+          getDoc(doc(database, "app_config", "auto_pilot"))
+            .then((snap) => {
+              if (snap.exists() && typeof snap.data()?.enabled === "boolean") {
+                setAutoPilotEnabled(snap.data().enabled);
+                localStorage.setItem("tvd-auto-pilot", String(snap.data().enabled));
+              }
+            })
+            .catch(() => {});
+        }
+      } catch {}
+
+      try {
         const cachedVideos = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]");
         if (Array.isArray(cachedVideos)) {
           const sessionVideos = cachedVideos
-            .filter((video: VideoRecord) => video?.sessionOnly && (video.videoUrl || video.youtubeVideoId))
-            .map((video: VideoRecord) => video.id.startsWith("session-") ? { ...video, id: video.id.slice("session-".length) } : video);
+            .filter((video: VideoRecord) => video?.sessionOnly && (video.videoUrl || video.youtubeVideoId || video.facebookVideoId))
+            .map((video: VideoRecord) => {
+              const cleanId = video.id.startsWith("session-") ? video.id.slice("session-".length) : video.id;
+              const yt: 0 | 1 = (video.youtube !== undefined ? video.youtube : (video.youtubeVideoId ? 1 : 0)) as 0 | 1;
+              const fb: 0 | 1 = (video.facebook !== undefined ? video.facebook : (video.facebookVideoId ? 1 : 0)) as 0 | 1;
+              const ig: 0 | 1 = (video.instagram !== undefined ? video.instagram : (video.instagramVideoId ? 1 : 0)) as 0 | 1;
+              return {
+                ...video,
+                id: cleanId,
+                youtube: yt,
+                facebook: fb,
+                instagram: ig,
+              };
+            });
           window.setTimeout(() => setVideos(sessionVideos), 0);
         }
       } catch {
@@ -234,25 +262,6 @@ export default function Home() {
     });
     return () => unsubscribeAuth();
   }, []);
-
-  useEffect(() => {
-    if (!connections.includes("YouTube") || !signedIn || !auth?.currentUser) return;
-    let active = true;
-    void getPublishedAutomationVideos().then(async (recovered) => {
-      if (!active) return;
-      let hiddenVideoIds: string[] = [];
-      try { hiddenVideoIds = JSON.parse(localStorage.getItem("tvd-studio-hidden-youtube-videos") || "[]"); } catch { hiddenVideoIds = []; }
-      const records = (recovered as VideoRecord[])
-        .filter((video) => !hiddenVideoIds.includes(video.youtubeVideoId || ""))
-        .map((video) => ({ ...video, sessionOnly: true }));
-      if (active) {
-        setVideos((current) => mergeVideoRecords(current, records));
-        const cached = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]") as VideoRecord[];
-        localStorage.setItem("tvd-studio-session-videos", JSON.stringify(mergeVideoRecords(records, cached)));
-      }
-    }).catch((error) => console.warn("Could not recover videos from YouTube:", error));
-    return () => { active = false; };
-  }, [connections, signedIn]);
 
   
 
@@ -319,6 +328,7 @@ export default function Home() {
         notify(data.error || "Failed to find video.");
       } else if (data.url) {
         setVideoUrl(data.url);
+        if (data.title) setSourceTitle(data.title);
         notify(`🔥 Scraped viral video online: "${data.title || 'Ready to split'}" (${data.source || 'Direct Cloud MP4'})`);
       }
     } catch (err: any) {
@@ -388,7 +398,6 @@ export default function Home() {
     setSplitProgress(12);
     setClips([]);
     setClipResults({});
-    setSourceTitle("");
 
     // Advance smoothly across realistic processing stages
     const progressInterval = setInterval(() => {
@@ -414,7 +423,12 @@ export default function Home() {
       const res = await fetch("/api/viral-clips", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ videoUrl: targetUrl, contentCategory: selectedCategory, mode: processMode }),
+        body: JSON.stringify({
+          videoUrl: targetUrl,
+          contentCategory: selectedCategory,
+          mode: processMode,
+          sourceTitle: sourceTitle || undefined,
+        }),
       });
       clearInterval(progressInterval);
       const responseText = await res.text();
@@ -553,16 +567,24 @@ export default function Home() {
           logs: data.logs || [],
         },
       }));
+      const youtubeVal: 0 | 1 = (data.youtubeUrl || data.youtubeVideoId) ? 1 : 0;
+      const facebookVal: 0 | 1 = (data.facebookUrl || data.facebookVideoId) ? 1 : 0;
+      const instagramVal: 0 | 1 = (data.instagramUrl || data.instagramVideoId) ? 1 : 0;
+
       // Add to video library
       const newRecord: VideoRecord = {
         id: `clip-${clip.partNumber}-${Date.now()}`,
-        title: `${clip.title} — ${clip.description.slice(0, 50)}`,
+        title: clip.title,
         description: clip.description,
         captions: "",
         hashtags: clip.hashtags.map((h) => `#${h}`),
-        videoUrl: data.youtubeUrl || "",
+        videoUrl: clip.publicUrl || clip.clipPath || data.youtubeUrl || "",
         youtubeVideoId: data.youtubeVideoId || "",
         facebookVideoId: data.facebookVideoId || "",
+        instagramVideoId: data.instagramVideoId || "",
+        youtube: youtubeVal,
+        facebook: facebookVal,
+        instagram: instagramVal,
         format: selectedCategory,
         createdAt: new Date().toISOString().slice(0, 10),
         status: "completed",
@@ -682,11 +704,11 @@ export default function Home() {
 
     let matchesTab = true;
     if (platformTab === "YouTube") {
-      matchesTab = !!video.youtubeVideoId;
+      matchesTab = video.youtube === 1;
     } else if (platformTab === "Instagram") {
-      matchesTab = !!(video as any).instagramVideoId;
+      matchesTab = video.instagram === 1;
     } else if (platformTab === "Facebook") {
-      matchesTab = !!video.facebookVideoId;
+      matchesTab = video.facebook === 1;
     }
 
     return matchesFormat && matchesQuery && matchesTab;
@@ -1025,7 +1047,7 @@ export default function Home() {
       {screen === "library" && <section className="library-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR CLIPS LIBRARY</div><h1>Viral content, <em>in motion.</em></h1><p>Your published clips with links to YouTube, Facebook, and Instagram.</p></div><button className="secondary-button" onClick={exportCsv}><ArrowDownToLine size={16} /> Export spreadsheet</button></div>
       
       <div className="library-tabber">
-        {["All", ...(connections.includes("YouTube") ? ["YouTube"] : []), ...(connections.includes("Instagram") ? ["Instagram"] : []), ...(connections.includes("Facebook") ? ["Facebook"] : [])].map(tab => (
+        {["All", "YouTube", "Facebook", "Instagram"].map(tab => (
           <button 
             key={tab} 
             onClick={() => setPlatformTab(tab)}
@@ -1056,13 +1078,99 @@ export default function Home() {
       {video.status !== 'failed' && <div className="hashtag-row">{Array.from(new Set(video.hashtags || [])).map((tag, idx) => <span key={`${tag}-${idx}`}>#{tag.replace(/^#/, '')}</span>)}</div>}
       <div className="video-card-actions">
         <span>{video.createdAt}</span>
-        <div style={{display:'flex', gap:'8px', marginLeft:'auto'}}>
-        {video.youtubeVideoId && <a href={`https://youtube.com/watch?v=${video.youtubeVideoId}`} target="_blank" rel="noreferrer" className="secondary-button" style={{display: 'inline-flex', alignItems: 'center', gap: '5px', padding:'4px 10px', fontSize:'11px', color: '#ff4d56', borderColor: 'rgba(229,9,20,0.3)', backgroundColor: 'rgba(229,9,20,0.1)'}} title="Watch on YouTube"><FaYoutube size={13} /> YouTube</a>}
-        {video.facebookVideoId && <a href={`https://www.facebook.com/video/${video.facebookVideoId}`} target="_blank" rel="noreferrer" className="secondary-button" style={{display: 'inline-flex', alignItems: 'center', gap: '5px', padding:'4px 10px', fontSize:'11px', color: '#38bdf8', borderColor: 'rgba(56,189,248,0.3)', backgroundColor: 'rgba(56,189,248,0.1)'}} title="Watch on Facebook"><FaFacebookF size={12} /> Facebook</a>}
-        {!video.youtubeVideoId && !video.facebookVideoId && video.videoUrl && !video.videoUrl.includes("youtube.com/") && <a href={video.videoUrl} download className="icon-button" title="Download video"><Download size={16} /></a>}
+        <div style={{display:'flex', gap:'8px', marginLeft:'auto', flexWrap:'wrap', alignItems:'center'}}>
+        {video.youtube === 1 && <a href={video.youtubeVideoId ? `https://www.youtube.com/shorts/${video.youtubeVideoId}` : (video.videoUrl || "#")} target="_blank" rel="noreferrer" className="secondary-button" style={{display: 'inline-flex', alignItems: 'center', gap: '5px', padding:'4px 10px', fontSize:'11px', color: '#ff4d56', borderColor: 'rgba(229,9,20,0.3)', backgroundColor: 'rgba(229,9,20,0.1)'}} title="Watch on YouTube Shorts"><FaYoutube size={13} /> Shorts</a>}
+        {video.facebook === 1 && <a href={video.facebookVideoId ? `https://www.facebook.com/reel/${video.facebookVideoId}` : "https://www.facebook.com"} target="_blank" rel="noreferrer" className="secondary-button" style={{display: 'inline-flex', alignItems: 'center', gap: '5px', padding:'4px 10px', fontSize:'11px', color: '#38bdf8', borderColor: 'rgba(56,189,248,0.3)', backgroundColor: 'rgba(56,189,248,0.1)'}} title="Watch Facebook Reel"><FaFacebookF size={12} /> Facebook Reel</a>}
+        {video.instagram === 1 && <a href={video.instagramVideoId ? `https://www.instagram.com/reel/${video.instagramVideoId}` : "https://www.instagram.com"} target="_blank" rel="noreferrer" className="secondary-button" style={{display: 'inline-flex', alignItems: 'center', gap: '5px', padding:'4px 10px', fontSize:'11px', color: '#f472b6', borderColor: 'rgba(244,114,182,0.3)', backgroundColor: 'rgba(244,114,182,0.1)'}} title="Watch Instagram Reel"><FaInstagram size={13} /> Instagram Reel</a>}
+        {video.youtube !== 1 && video.facebook !== 1 && video.instagram !== 1 && video.videoUrl && !video.videoUrl.includes("youtube.com/") && <a href={video.videoUrl} download className="icon-button" title="Download video"><Download size={16} /></a>}
         <button className="icon-button" style={{ color: '#ea4335' }} onClick={() => setVideoToDelete(video)} title="Delete video"><Trash2 size={16} /></button>
         </div></div></div></article>)}</div> : <div className="empty-library"><div className="empty-art"><span /><span /><span /><Clapperboard size={27} /></div><h2>{query || filter !== "All videos" ? "No matching clips" : "No clips published yet."}</h2><p>{query || filter !== "All videos" ? "Try another search or category." : "Published viral clips will appear here with YouTube, Facebook, and Instagram links."}</p>{!query && filter === "All videos" && <button className="primary-button" onClick={() => setScreen("studio")}><TrendingUp size={16} /> Create your first viral clip</button>}</div>}</section>}
-      {screen === "settings" && <section className="settings-content"><div className="eyebrow"><span className="eyebrow-dot" /> WORKSPACE SETTINGS</div><h1>Your studio, <em>your way.</em></h1><p className="settings-intro">Manage the connections that power your viral clips workflow.</p><div className="settings-row"><div className="settings-icon youtube-icon"><FaYoutube size={22} /></div><div className="settings-copy"><h2>YouTube publishing</h2><p>Connect YouTube to publish viral clips directly to your channel.</p></div><button className={`secondary-button ${connections.includes("YouTube") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("YouTube")}>{connections.includes("YouTube") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon instagram-icon"><FaInstagram size={21} /></div><div className="settings-copy"><h2>Instagram publishing</h2><p>Connect Instagram to automatically post viral clips as Reels.</p></div><button className={`secondary-button ${connections.includes("Instagram") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Instagram")}>{connections.includes("Instagram") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon facebook-icon"><FaFacebookF size={19} /></div><div className="settings-copy"><h2>Facebook publishing</h2><p>Connect Facebook to cross-post your viral clips as Facebook Reels.</p></div><button className={`secondary-button ${connections.includes("Facebook") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Facebook")}>{connections.includes("Facebook") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon gmail-icon"><SiGmail size={19} /></div><div className="settings-copy"><h2>Gmail notifications</h2><p>Connect Gmail to receive post links (YouTube, Facebook, Instagram) after each clip is published.</p></div><button className={`secondary-button ${connections.includes("Gmail") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Gmail")}>{connections.includes("Gmail") ? "Disconnect" : "Connect"}</button></div><div className="settings-note"><CircleHelp size={17} /><p>100% free workflow: local yt-dlp + ffmpeg for splitting, smart rule-based descriptions &amp; hashtags, direct posting to your connected platforms. No paid services or API keys needed.</p></div></section>}
+      {screen === "settings" && <section className="settings-content"><div className="eyebrow"><span className="eyebrow-dot" /> WORKSPACE SETTINGS</div><h1>Your studio, <em>your way.</em></h1><p className="settings-intro">Manage automated workflows and connected social networks.</p>
+      
+      {/* Auto-Pilot Daily Automation Toggler (Requirement 8) */}
+      <div style={{ background: '#111218', border: '1.5px solid #232635', borderRadius: '12px', padding: '22px', marginBottom: '24px', boxShadow: '0 8px 30px rgba(0,0,0,0.45)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #e50914, #ff3b45)', display: 'grid', placeItems: 'center', color: '#fff', boxShadow: '0 0 16px rgba(229,9,20,0.5)', flexShrink: 0 }}>
+              <Sparkles size={22} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#ffffff' }}>Daily Auto-Pilot Automation</h2>
+                <span style={{ fontSize: '10px', fontWeight: 800, padding: '2px 8px', borderRadius: '12px', background: autoPilotEnabled ? 'rgba(34,197,94,0.18)' : 'rgba(148,163,184,0.15)', color: autoPilotEnabled ? '#4ade80' : '#94a3b8' }}>
+                  {autoPilotEnabled ? 'ACTIVE' : 'DISABLED'}
+                </span>
+              </div>
+              <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
+                Automatically find viral videos with random types every day and publish clips across all your connected socials.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              const nextState = !autoPilotEnabled;
+              setAutoPilotEnabled(nextState);
+              localStorage.setItem("tvd-auto-pilot", String(nextState));
+              if (database) {
+                try {
+                  await setDoc(doc(database, "app_config", "auto_pilot"), { enabled: nextState, updatedAt: new Date().toISOString() }, { merge: true });
+                } catch (e) {}
+              }
+              notify(nextState ? "🔥 Auto-Pilot enabled! Paste the webhook URL into your cron service." : "Auto-Pilot disabled.");
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 18px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              border: autoPilotEnabled ? '1px solid #22c55e' : '1px solid #33384a',
+              background: autoPilotEnabled ? 'rgba(34,197,94,0.15)' : '#181a24',
+              color: autoPilotEnabled ? '#4ade80' : '#cbd5e1',
+              transition: 'all 0.2s',
+            }}
+          >
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: autoPilotEnabled ? '#22c55e' : '#64748b' }} />
+            {autoPilotEnabled ? "Auto-Pilot ON" : "Auto-Pilot OFF"}
+          </button>
+        </div>
+
+        {autoPilotEnabled && (
+          <div style={{ marginTop: '18px', paddingTop: '16px', borderTop: '1px solid #1f2230' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#f8fafc', marginBottom: '8px' }}>
+              🔗 Free Cron Job Webhook URL:
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <input
+                readOnly
+                value={`${typeof window !== 'undefined' ? window.location.origin : 'https://the-viral-desk.vercel.app'}/api/cron/publish`}
+                style={{ flex: '1 1 280px', padding: '10px 14px', borderRadius: '8px', border: '1px solid #272a38', background: '#0a0b10', color: '#38bdf8', fontSize: '12px', outline: 'none' }}
+              />
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => {
+                  const link = `${window.location.origin}/api/cron/publish`;
+                  navigator.clipboard.writeText(link);
+                  notify("Webhook URL copied to clipboard! Paste it into cron-job.org.");
+                }}
+                style={{ whiteSpace: 'nowrap' }}
+              >
+                📋 Copy Link
+              </button>
+            </div>
+            <p style={{ margin: '10px 0 0', fontSize: '11px', color: '#94a3b8', lineHeight: 1.6 }}>
+              💡 <strong>How to schedule daily:</strong> Create a free account on <a href="https://cron-job.org" target="_blank" rel="noreferrer" style={{ color: '#ff3b45', textDecoration: 'underline' }}>cron-job.org</a>, create a new job, paste this URL, and set execution to once per day. It will automatically discover viral videos, cut vertical clips, and publish them to YouTube, Facebook, and Instagram with Gmail alerts.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="settings-row"><div className="settings-icon youtube-icon"><FaYoutube size={22} /></div><div className="settings-copy"><h2>YouTube publishing</h2><p>Connect YouTube to publish viral clips directly to your channel.</p></div><button className={`secondary-button ${connections.includes("YouTube") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("YouTube")}>{connections.includes("YouTube") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon instagram-icon"><FaInstagram size={21} /></div><div className="settings-copy"><h2>Instagram publishing</h2><p>Connect Instagram to automatically post viral clips as Reels.</p></div><button className={`secondary-button ${connections.includes("Instagram") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Instagram")}>{connections.includes("Instagram") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon facebook-icon"><FaFacebookF size={19} /></div><div className="settings-copy"><h2>Facebook publishing</h2><p>Connect Facebook to cross-post your viral clips as Facebook Reels.</p></div><button className={`secondary-button ${connections.includes("Facebook") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Facebook")}>{connections.includes("Facebook") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon gmail-icon"><SiGmail size={19} /></div><div className="settings-copy"><h2>Gmail notifications</h2><p>Connect Gmail to receive post links (YouTube, Facebook, Instagram) after each clip is published.</p></div><button className={`secondary-button ${connections.includes("Gmail") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Gmail")}>{connections.includes("Gmail") ? "Disconnect" : "Connect"}</button></div><div className="settings-note"><CircleHelp size={17} /><p>100% free workflow: local yt-dlp + ffmpeg for splitting, smart rule-based descriptions &amp; hashtags, direct posting to your connected platforms. No paid services or API keys needed.</p></div></section>}
       <footer className="workspace-footer">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img src="/assets/theme.png" alt="The Viral Desk" style={{ height: "30px", width: "30px", objectFit: "cover", borderRadius: "50%", boxShadow: "0 0 10px rgba(229,9,20,0.45)" }} />
