@@ -573,37 +573,53 @@ export async function generateClipMetadata(params: {
 
 // ─── Publish Clip + Cleanup ───────────────────────────────────────────────────
 
-// ─── Story Card Image Generator (9:16 vertical card with thumbnail & CTA) ─────
-async function generateStoryCardImage(videoPath: string, outputPath: string): Promise<boolean> {
-  let ffmpegBin = "ffmpeg";
+// ─── Story Card Image Generator (9:16 Polaroid card with thumbnail & CTA) ────
+async function getOrGenerateStoryCardUrl(params: {
+  videoPath?: string;
+  publicVideoUrl?: string;
+  title: string;
+  partNumber: number;
+}): Promise<{ secureUrl?: string; publicId?: string }> {
   try {
-    ffmpegBin = await checkFfmpeg();
-  } catch {
-    return false;
-  }
+    const { videoPath, publicVideoUrl, title, partNumber } = params;
+    let frameUrlOrData = "";
 
-  const filter = [
-    "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=25:15[bg]",
-    "[0:v]scale=920:1350:force_original_aspect_ratio=decrease[fg]",
-    "[bg][fg]overlay=(W-w)/2:(H-h)/2-80[v1]",
-    "[v1]drawbox=x=80:y=1560:w=920:h=160:color=red@0.95:t=fill[v2]",
-    "[v2]drawbox=x=80:y=160:w=920:h=100:color=black@0.8:t=fill[v3]",
-    "[v3]drawtext=text='TAP TO SEE THE REEL':fontcolor=white:fontsize=52:x=(w-text_w)/2:y=1615[v4]",
-    "[v4]drawtext=text='NEW VIRAL REEL':fontcolor=yellow:fontsize=42:x=(w-text_w)/2:y=190[out]",
-  ].join(";");
+    // 1. Try extracting 1s frame locally if videoPath exists
+    if (videoPath && fs.existsSync(/*turbopackIgnore: true*/ videoPath)) {
+      try {
+        const ffmpegBin = await checkFfmpeg();
+        const os = require("os");
+        const tmpFrame = path.join(os.tmpdir(), `frame_${Date.now()}_part${partNumber}.jpg`);
+        await execAsync(`"${ffmpegBin}" -y -ss 1 -i "${videoPath}" -vframes 1 -q:v 2 "${tmpFrame}"`);
+        if (fs.existsSync(tmpFrame) && fs.statSync(tmpFrame).size > 0) {
+          const buf = fs.readFileSync(tmpFrame);
+          frameUrlOrData = `data:image/jpeg;base64,${buf.toString("base64")}`;
+          try { fs.unlinkSync(tmpFrame); } catch {}
+        }
+      } catch (ffErr: any) {
+        console.warn("Local frame extract notice:", ffErr.message);
+      }
+    }
 
-  try {
-    await execAsync(`"${ffmpegBin}" -y -ss 1 -i "${videoPath}" -filter_complex "${filter}" -map "[out]" -vframes 1 "${outputPath}"`);
-    if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) return true;
+    // 2. Fallback to Cloudinary video poster frame URL if available
+    if (!frameUrlOrData && publicVideoUrl && publicVideoUrl.includes("cloudinary.com")) {
+      frameUrlOrData = publicVideoUrl.replace(/\.[^.]+$/, ".jpg");
+    }
+
+    // 3. Generate Polaroid Story Card with ImageResponse
+    const { generatePolaroidStoryCard } = await import("@/app/lib/story-card");
+    const cardBuffer = await generatePolaroidStoryCard({
+      thumbnailUrl: frameUrlOrData,
+      title,
+    });
+
+    // 4. Upload generated card buffer to Cloudinary
+    const { uploadImageToCloudinary } = await import("@/app/cloudinary-upload");
+    const cRes = await uploadImageToCloudinary(cardBuffer, `story_polaroid_${Date.now()}_part${partNumber}`);
+    return { secureUrl: cRes.secureUrl, publicId: cRes.publicId };
   } catch (err: any) {
-    console.warn("Styled story card filter failed, trying clean frame extraction:", err?.message);
-  }
-
-  try {
-    await execAsync(`"${ffmpegBin}" -y -ss 1 -i "${videoPath}" -vframes 1 -q:v 2 "${outputPath}"`);
-    return fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0;
-  } catch {
-    return false;
+    console.error("Story card generation error:", err.message);
+    return {};
   }
 }
 
@@ -674,23 +690,24 @@ export async function publishClipAndCleanup(params: {
   let uploadedCloudinaryId: string | undefined;
   let storyCardUrl: string | undefined;
   let uploadedStoryCardId: string | undefined;
-  const os = require("os");
-  const storyCardPath = path.join(os.tmpdir(), `story_card_${Date.now()}_part${partNumber}.jpg`);
 
   const { readTokens } = await import("@/app/lib/tokens");
   const tokens: any = await readTokens();
 
-  // Generate eye-catching 9:16 Story card thumbnail with "TAP TO SEE THE REEL"
+  // Pre-generate aesthetic Polaroid Story card thumbnail
   try {
-    const cardOk = await generateStoryCardImage(absolutePath, storyCardPath);
-    if (cardOk && fs.existsSync(storyCardPath)) {
-      const { uploadImageToCloudinary } = await import("@/app/cloudinary-upload");
-      const cRes = await uploadImageToCloudinary(storyCardPath, `story_${Date.now()}_part${partNumber}`);
-      storyCardUrl = cRes.secureUrl;
-      uploadedStoryCardId = cRes.publicId;
+    const cardData = await getOrGenerateStoryCardUrl({
+      videoPath: absolutePath,
+      publicVideoUrl: (isRemote && (clipPath.startsWith("http://") || clipPath.startsWith("https://"))) ? clipPath : undefined,
+      title,
+      partNumber,
+    });
+    if (cardData.secureUrl) {
+      storyCardUrl = cardData.secureUrl;
+      uploadedStoryCardId = cardData.publicId;
     }
   } catch (cardErr: any) {
-    console.warn("Story card generation notice:", cardErr?.message);
+    console.warn("Story card pre-generation notice:", cardErr?.message);
   }
 
   try {
@@ -766,34 +783,50 @@ export async function publishClipAndCleanup(params: {
         facebookUrl = `https://www.facebook.com/reel/${facebookVideoId}`;
         logs.push(`✅ Facebook: ${facebookUrl}`);
 
-        // Also post Facebook Page Story / Feed card with thumbnail & link
+        // Also post Facebook Page Story (using designed Polaroid Story card)
         try {
-          const caption = `✨ Tap to watch the full Reel 👆\n👉 Watch full Reel: ${facebookUrl}\n\n${title}`;
+          if (!storyCardUrl) {
+            const cardData = await getOrGenerateStoryCardUrl({
+              videoPath: absolutePath,
+              publicVideoUrl: (isRemote && (clipPath.startsWith("http://") || clipPath.startsWith("https://"))) ? clipPath : undefined,
+              title,
+              partNumber,
+            });
+            if (cardData.secureUrl) {
+              storyCardUrl = cardData.secureUrl;
+              uploadedStoryCardId = cardData.publicId;
+            }
+          }
+
           if (storyCardUrl) {
-            const photoRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/photos`, {
+            // Step 1: Upload photo as unpublished to prepare for Story
+            const upRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/photos`, {
               method: "POST",
               headers: { "Content-Type": "application/x-www-form-urlencoded" },
               body: new URLSearchParams({
                 access_token: pageToken,
                 url: storyCardUrl,
-                caption,
+                published: "false",
               }),
             });
-            const photoData = await photoRes.json();
-            if (photoData?.id) {
-              logs.push(`✅ Facebook: Story/Feed card published with link`);
+            const upData = await upRes.json();
+            if (upData?.id) {
+              // Step 2: Publish photo to Facebook Page Stories
+              const storyRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/photo_stories`, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({
+                  access_token: pageToken,
+                  photo_id: upData.id,
+                }),
+              });
+              const storyData = await storyRes.json();
+              if (storyData?.id || storyData?.success || storyData?.post_id) {
+                logs.push(`✅ Facebook: Story published (Polaroid Reel card)`);
+              } else {
+                console.warn("Facebook photo_stories error response:", storyData);
+              }
             }
-          } else {
-            await fetch(`https://graph.facebook.com/v26.0/${pageId}/feed`, {
-              method: "POST",
-              headers: { "Content-Type": "application/x-www-form-urlencoded" },
-              body: new URLSearchParams({
-                access_token: pageToken,
-                message: caption,
-                link: facebookUrl,
-              }),
-            });
-            logs.push(`✅ Facebook: Story/Feed link published`);
           }
         } catch (storyErr: any) {
           console.warn("Facebook story notice:", storyErr.message);
@@ -877,17 +910,29 @@ export async function publishClipAndCleanup(params: {
         instagramUrl = `https://www.instagram.com/reel/${instagramVideoId}`;
         logs.push(`✅ Instagram: Reel published (${instagramUrl})`);
 
-        // 2. Post as Instagram Story (Designed Story card with "TAP TO SEE THE REEL")
+        // 2. Post as Instagram Story (Designed Polaroid Story card)
         try {
-          const storyImageUrl = storyCardUrl || (publicVideoUrl.includes("cloudinary.com") ? publicVideoUrl.replace(/\.[^.]+$/, ".jpg") : "");
-          if (storyImageUrl) {
+          if (!storyCardUrl) {
+            const cardData = await getOrGenerateStoryCardUrl({
+              videoPath: absolutePath,
+              publicVideoUrl,
+              title,
+              partNumber,
+            });
+            if (cardData.secureUrl) {
+              storyCardUrl = cardData.secureUrl;
+              uploadedStoryCardId = cardData.publicId;
+            }
+          }
+
+          if (storyCardUrl) {
             const storyRes = await fetch(`${instagramApi}/${igUserId}/media`, {
               method: "POST",
               headers: { "Content-Type": "application/x-www-form-urlencoded" },
               body: new URLSearchParams({
                 access_token: instagramToken,
                 media_type: "STORIES",
-                image_url: storyImageUrl,
+                image_url: storyCardUrl,
               }),
             });
             const storyData = await storyRes.json();
@@ -908,7 +953,7 @@ export async function publishClipAndCleanup(params: {
                   body: new URLSearchParams({ access_token: instagramToken, creation_id: storyCreationId }),
                 });
                 if (pubStoryRes.ok) {
-                  logs.push(`✅ Instagram: Story published (Tap to see Reel card)`);
+                  logs.push(`✅ Instagram: Story published (Polaroid Reel card)`);
                 }
               }
             }
@@ -994,15 +1039,6 @@ export async function publishClipAndCleanup(params: {
       }
     } catch (e: any) {
       console.warn("Could not delete local/tmp clip file:", e.message);
-    }
-
-    // Clean up temporary local story card image
-    try {
-      if (storyCardPath && fs.existsSync(storyCardPath)) {
-        fs.unlinkSync(storyCardPath);
-      }
-    } catch (e: any) {
-      console.warn("Could not delete local story card file:", e.message);
     }
 
     // 2. Delete clip from Hugging Face Cloud Worker to keep disk at 0 MB forever

@@ -133,15 +133,18 @@ export async function deleteCloudinaryImage(publicId: string) {
   return deleteCloudinaryAsset(publicId, "image");
 }
 
-export async function uploadImageToCloudinary(filePath: string, publicId: string) {
+export async function uploadImageToCloudinary(filePathOrBuffer: string | Buffer, publicId: string) {
   const { cloudName, apiKey, apiSecret } = assertCloudinaryConfigured();
   const timestamp = String(Math.floor(Date.now() / 1000));
   const signedParams = { public_id: publicId, timestamp };
   const signature = signParams(signedParams, apiSecret);
-  const fileBuffer = await readFile(filePath);
+  const isBuf = Buffer.isBuffer(filePathOrBuffer);
+  const fileBuffer = isBuf ? filePathOrBuffer : await readFile(filePathOrBuffer);
+  const filename = isBuf ? "story_card.png" : path.basename(filePathOrBuffer);
+  const mimeType = filename.endsWith(".png") ? "image/png" : "image/jpeg";
 
   const form = new FormData();
-  form.append("file", new Blob([fileBuffer], { type: "image/jpeg" }), path.basename(filePath));
+  form.append("file", new Blob([new Uint8Array(fileBuffer)], { type: mimeType }), filename);
   form.append("api_key", apiKey);
   form.append("timestamp", timestamp);
   form.append("public_id", publicId);
