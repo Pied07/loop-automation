@@ -774,138 +774,88 @@ export default function Home() {
                   if (e.target.files?.[0]) handleFileUpload(e.target.files[0]);
                 }}
               />
-              <div style={{ position: 'relative', marginTop: '8px' }}>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div style={{ flex: '1 1 320px', position: 'relative' }}>
+              <div style={{ position: 'relative', marginTop: '8px', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+                <div className="video-source-action-bar">
+                  <div className="video-url-input-wrap">
                     <Link size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }} />
                     <input
                       value={videoUrl}
                       onChange={(e) => setVideoUrl(e.target.value)}
                       placeholder="https://www.youtube.com/watch?v=... or direct MP4 link"
-                      style={{ width: '100%', padding: '12px 14px 12px 40px', borderRadius: '10px', border: '1.5px solid #272a38', fontSize: '13px', background: '#0c0d12', color: '#ffffff', outline: 'none', boxSizing: 'border-box' }}
+                      className="video-url-input"
                     />
                   </div>
-                  <button className="secondary-button" onClick={handleAutoFind} disabled={isFinding || isSplitting || isUploading} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
-                    {isFinding ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />}
-                    {isFinding ? 'Finding...' : 'Auto-Find'}
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isFinding || isSplitting || isUploading}
-                    style={{ whiteSpace: 'nowrap', flexShrink: 0, borderColor: 'rgba(56,189,248,0.4)', color: '#38bdf8' }}
-                  >
-                    {isUploading ? <LoaderCircle className="spin" size={16} /> : <Upload size={16} />}
-                    {isUploading ? 'Uploading...' : 'Upload MP4'}
-                  </button>
-                  <button className="primary-button" onClick={() => handleSplitVideo()} disabled={isSplitting || isUploading} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
-                    {isSplitting ? <LoaderCircle className="spin" size={16} /> : <Scissors size={16} />}
-                    {isSplitting ? 'Splitting...' : 'Split into Clips'}
-                  </button>
+                  <div className="video-source-buttons">
+                    <button className="secondary-button" onClick={handleAutoFind} disabled={isFinding || isSplitting || isUploading}>
+                      {isFinding ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />}
+                      {isFinding ? 'Finding...' : 'Auto-Find'}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isFinding || isSplitting || isUploading}
+                      style={{ borderColor: 'rgba(56,189,248,0.4)', color: '#38bdf8' }}
+                    >
+                      {isUploading ? <LoaderCircle className="spin" size={16} /> : <Upload size={16} />}
+                      {isUploading ? 'Uploading...' : 'Upload MP4'}
+                    </button>
+                    <button className="primary-button" onClick={() => handleSplitVideo()} disabled={isSplitting || isUploading}>
+                      {isSplitting ? <LoaderCircle className="spin" size={16} /> : <Scissors size={16} />}
+                      {isSplitting ? 'Splitting...' : 'Split into Clips'}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Auto-Find Source Selector (Scrape Online Viral Videos vs Direct HD vs YouTube) */}
-                <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '12px', color: '#9ca3af' }}>Auto-Find source:</span>
-                  <button
-                    type="button"
-                    onClick={() => setAutoFindSource("scrape")}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '6px',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      border: autoFindSource === "scrape" ? '1px solid #e50914' : '1px solid #272a38',
-                      background: autoFindSource === "scrape" ? 'rgba(229,9,20,0.22)' : '#111218',
-                      color: autoFindSource === "scrape" ? '#ff4d56' : '#9ca3af',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <Sparkles size={13} /> 🔥 Scrape Viral Content Online (Direct Cloud MP4, Zero Bot Checks)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAutoFindSource("direct")}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '6px',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      border: autoFindSource === "direct" ? '1px solid #10b981' : '1px solid #272a38',
-                      background: autoFindSource === "direct" ? 'rgba(16,185,129,0.18)' : '#111218',
-                      color: autoFindSource === "direct" ? '#34d399' : '#9ca3af',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <ShieldCheck size={13} /> ⚡ Mixkit HD
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAutoFindSource("youtube")}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '6px',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      border: autoFindSource === "youtube" ? '1px solid #f59e0b' : '1px solid #272a38',
-                      background: autoFindSource === "youtube" ? 'rgba(245,158,11,0.18)' : '#111218',
-                      color: autoFindSource === "youtube" ? '#fbbf24' : '#9ca3af',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    🎬 YouTube Shorts
-                  </button>
+                <div className="autofind-source-bar">
+                  <span style={{ fontSize: '12px', color: '#9ca3af', flexShrink: 0 }}>Auto-Find source:</span>
+                  <div className="autofind-pills">
+                    <button
+                      type="button"
+                      onClick={() => setAutoFindSource("scrape")}
+                      className={`pill-btn ${autoFindSource === "scrape" ? "active-scrape" : ""}`}
+                    >
+                      <Sparkles size={13} /> 🔥 Scrape Viral Online (Direct MP4)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAutoFindSource("direct")}
+                      className={`pill-btn ${autoFindSource === "direct" ? "active-direct" : ""}`}
+                    >
+                      <ShieldCheck size={13} /> ⚡ Mixkit HD
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAutoFindSource("youtube")}
+                      className={`pill-btn ${autoFindSource === "youtube" ? "active-youtube" : ""}`}
+                    >
+                      🎬 YouTube Shorts
+                    </button>
+                  </div>
                 </div>
 
                 {/* Processing Mode and Online Tools Tip */}
-                <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', fontSize: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ color: '#9ca3af' }}>Runner:</span>
+                <div className="runner-selector-bar">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ color: '#9ca3af', fontSize: '11px', flexShrink: 0 }}>Runner:</span>
                     <button
                       type="button"
                       onClick={() => setProcessMode("cloud")}
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        border: processMode === "cloud" ? '1px solid #e50914' : '1px solid #272a38',
-                        background: processMode === "cloud" ? 'rgba(229,9,20,0.18)' : '#111218',
-                        color: processMode === "cloud" ? '#ff4d56' : '#9ca3af',
-                        cursor: 'pointer'
-                      }}
+                      className={`runner-btn ${processMode === "cloud" ? "active-cloud" : ""}`}
                     >
-                      ☁️ Cloud Runner (GitHub Actions + Cloudinary)
+                      ☁️ Cloud Runner (GitHub)
                     </button>
                     <button
                       type="button"
                       onClick={() => setProcessMode("queue")}
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        border: processMode === "queue" ? '1px solid #38bdf8' : '1px solid #272a38',
-                        background: processMode === "queue" ? 'rgba(56,189,248,0.18)' : '#111218',
-                        color: processMode === "queue" ? '#38bdf8' : '#9ca3af',
-                        cursor: 'pointer'
-                      }}
+                      className={`runner-btn ${processMode === "queue" ? "active-queue" : ""}`}
                     >
-                      🖥️ Desktop Worker (`npm run worker`)
+                      🖥️ Desktop Worker
                     </button>
                   </div>
                   <span style={{ color: '#10b981', fontSize: '11px' }}>
-                    🛡️ 100% Ban-Safe: Live scrapes public domain &amp; CC0 direct MP4 videos!
+                    🛡️ 100% Ban-Safe: Direct MP4 videos
                   </span>
                 </div>
 
@@ -959,9 +909,9 @@ export default function Home() {
                   {clips.map((clip) => {
                     const result = clipResults[clip.partNumber];
                     return (
-                      <div key={clip.partNumber} style={{ border: '1.5px solid #1f2230', borderRadius: '14px', padding: '18px', background: '#151722', boxShadow: '0 8px 25px rgba(0,0,0,0.4)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
-                          <div style={{ flex: 1 }}>
+                      <div key={clip.partNumber} style={{ border: '1.5px solid #1f2230', borderRadius: '14px', padding: '16px', background: '#151722', boxShadow: '0 8px 25px rgba(0,0,0,0.4)', maxWidth: '100%', boxSizing: 'border-box' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap', width: '100%', maxWidth: '100%' }}>
+                          <div style={{ flex: '1 1 200px', minWidth: 0, maxWidth: '100%', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                               <span style={{ background: 'linear-gradient(135deg,#e50914,#b20710)', color: '#fff', fontWeight: 800, fontSize: '11px', padding: '4px 12px', borderRadius: '20px', letterSpacing: '0.05em', boxShadow: '0 0 12px rgba(229,9,20,0.4)' }}>{clip.title}</span>
                               <span style={{ fontSize: '12px', color: '#9ca3af' }}>{Math.round(clip.duration)}s</span>
@@ -1029,7 +979,7 @@ export default function Home() {
             <div className="preview-bottom"><span><span className="quality-dot" /> High Definition</span><span>Zero API costs · 100% Free</span></div>
           </aside>
         </div>
-        <div className="below-stats" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap', whiteSpace: 'nowrap', overflowX: 'auto', gap: '14px', minHeight: '38px', padding: '6px 14px', marginTop: '16px', background: '#0d0e14', border: '1px solid #1c1e28', borderRadius: '8px', fontSize: '11px', color: '#94a3b8' }}>
+        <div className="below-stats">
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', flexShrink: 0 }}>
             <span className="stat-icon" style={{ width: '20px', height: '20px', borderRadius: '4px', flexShrink: 0 }}><Clapperboard size={11} /></span>
             <span><strong style={{ color: '#ffffff', fontWeight: 700 }}>{videos.length}</strong> {videos.length === 1 ? 'clip' : 'clips'} in library</span>
@@ -1039,7 +989,7 @@ export default function Home() {
             <span className="stat-icon warm" style={{ width: '20px', height: '20px', borderRadius: '4px', flexShrink: 0 }}><TrendingUp size={11} /></span>
             <span><strong style={{ color: '#ffffff', fontWeight: 700 }}>Automated Pipeline:</strong> 9:16 cuts + outro</span>
           </div>
-          <button onClick={() => setScreen("library")} style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '10px', fontWeight: 700, color: '#ff3b45', background: 'rgba(229, 9, 20, 0.1)', border: '1px solid rgba(229, 9, 20, 0.25)', padding: '3px 10px', borderRadius: '5px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+          <button onClick={() => setScreen("library")}>
             Open Library <ArrowRight size={11} />
           </button>
         </div>
