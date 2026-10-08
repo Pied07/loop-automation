@@ -4,9 +4,11 @@ import React from "react";
 export async function generatePolaroidStoryCard(params: {
   thumbnailUrl: string;
   title: string;
+  instagramHandle?: string;
 }): Promise<Buffer> {
-  const { thumbnailUrl, title } = params;
+  const { thumbnailUrl, title, instagramHandle } = params;
   const cleanTitle = (title || "VIRAL REEL").replace(/[^\x20-\x7E]/g, "").slice(0, 48);
+  const cleanHandle = (instagramHandle || "the_viral_desk").replace(/[@\s]/g, "");
 
   const element = (
     <div
@@ -40,7 +42,15 @@ export async function generatePolaroidStoryCard(params: {
           textTransform: "uppercase",
         }}
       >
-        <span style={{ color: "#ff3b45", marginRight: 10 }}>★</span>
+        <span
+          style={{
+            width: 14,
+            height: 14,
+            borderRadius: 7,
+            backgroundColor: "#ff3b45",
+            marginRight: 10,
+          }}
+        />
         NEW VIRAL REEL
       </div>
 
@@ -176,7 +186,7 @@ export async function generatePolaroidStoryCard(params: {
             border: "2px solid rgba(255, 255, 255, 0.9)",
           }}
         >
-          WATCH REEL ON @the_viral_desk
+          WATCH REEL ON @{cleanHandle}
         </div>
         <div
           style={{

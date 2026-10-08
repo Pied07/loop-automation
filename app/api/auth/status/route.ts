@@ -20,16 +20,14 @@ export async function GET() {
         const { token } = await client.getAccessToken();
         if (token) {
           connections.push("YouTube");
-        } else {
-          delete tokens.youtube;
-          await writeTokens(tokens);
+          if (token !== tokens.youtube.access_token) {
+            tokens.youtube.access_token = token;
+            await writeTokens(tokens);
+          }
         }
       } catch (ytErr: any) {
-        if (ytErr?.message?.includes("invalid_grant") || ytErr?.message?.includes("revoked")) {
-          delete tokens.youtube;
-          await writeTokens(tokens);
-        } else {
-          // Network hiccup: keep YouTube if credentials exist
+        if (!ytErr?.message?.includes("invalid_grant") && !ytErr?.message?.includes("revoked")) {
+          // Network hiccup or quota limit: keep YouTube if credentials exist
           connections.push("YouTube");
         }
       }

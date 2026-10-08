@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
+import { readTokens, writeTokens } from '@/app/lib/tokens';
 import fs from 'fs';
 import path from 'path';
 
@@ -34,10 +35,12 @@ export async function GET(request: Request) {
     const { tokens } = await oauth2Client.getToken(code);
     
     // Save tokens securely
-    const { readTokens, writeTokens } = await import("@/app/lib/tokens");
-    let existingTokens = await readTokens();
-    
-    existingTokens.youtube = tokens;
+    const existingTokens = await readTokens();
+    existingTokens.youtube = {
+      ...existingTokens.youtube,
+      ...tokens,
+      refresh_token: tokens.refresh_token || existingTokens.youtube?.refresh_token,
+    };
     await writeTokens(existingTokens);
 
     // Redirect back to app with success parameter

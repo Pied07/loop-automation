@@ -1283,12 +1283,20 @@ export default function Home() {
           <p>Are you sure you want to disconnect your {disconnectingPlatform} account? You will need to reconnect to use its features.</p>
           <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
             <button className="secondary-button" style={{ flex: 1 }} onClick={() => setDisconnectingPlatform(null)}>Cancel</button>
-            <button className="primary-button" style={{ flex: 1, background: '#ea4335', borderColor: '#ea4335' }} onClick={() => {
-              const newConns = connections.filter(c => c !== disconnectingPlatform);
+            <button className="primary-button" style={{ flex: 1, background: '#ea4335', borderColor: '#ea4335' }} onClick={async () => {
+              const platformToDisconnect = disconnectingPlatform;
+              const newConns = connections.filter(c => c !== platformToDisconnect);
               setConnections(newConns);
               localStorage.setItem("app_connections", JSON.stringify(newConns));
               setDisconnectingPlatform(null);
-              notify(`${disconnectingPlatform} disconnected.`);
+              try {
+                await fetch("/api/auth/disconnect", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ platform: platformToDisconnect }),
+                });
+              } catch {}
+              notify(`${platformToDisconnect} disconnected.`);
             }}>Disconnect</button>
           </div>
         </section>

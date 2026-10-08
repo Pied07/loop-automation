@@ -579,9 +579,10 @@ async function getOrGenerateStoryCardUrl(params: {
   publicVideoUrl?: string;
   title: string;
   partNumber: number;
+  instagramHandle?: string;
 }): Promise<{ secureUrl?: string; publicId?: string }> {
   try {
-    const { videoPath, publicVideoUrl, title, partNumber } = params;
+    const { videoPath, publicVideoUrl, title, partNumber, instagramHandle } = params;
     let frameUrlOrData = "";
 
     // 1. Try extracting 1s frame locally if videoPath exists
@@ -611,6 +612,7 @@ async function getOrGenerateStoryCardUrl(params: {
     const cardBuffer = await generatePolaroidStoryCard({
       thumbnailUrl: frameUrlOrData,
       title,
+      instagramHandle,
     });
 
     // 4. Upload generated card buffer to Cloudinary
@@ -690,9 +692,10 @@ export async function publishClipAndCleanup(params: {
   let uploadedCloudinaryId: string | undefined;
   let storyCardUrl: string | undefined;
   let uploadedStoryCardId: string | undefined;
-
   const { readTokens } = await import("@/app/lib/tokens");
   const tokens: any = await readTokens();
+
+  const igHandle = tokens.facebook?.instagram_username || "aishortvideos";
 
   // Pre-generate aesthetic Polaroid Story card thumbnail
   try {
@@ -701,6 +704,7 @@ export async function publishClipAndCleanup(params: {
       publicVideoUrl: (isRemote && (clipPath.startsWith("http://") || clipPath.startsWith("https://"))) ? clipPath : undefined,
       title,
       partNumber,
+      instagramHandle: igHandle,
     });
     if (cardData.secureUrl) {
       storyCardUrl = cardData.secureUrl;
@@ -760,11 +764,6 @@ export async function publishClipAndCleanup(params: {
         logs.push(`✅ YouTube: ${youtubeUrl}`);
       } catch (e: any) {
         if (e?.message?.includes("invalid_grant") || e?.message?.includes("revoked")) {
-          try {
-            delete tokens.youtube;
-            const { writeTokens } = await import("@/app/lib/tokens");
-            await writeTokens(tokens);
-          } catch {}
           logs.push("❌ YouTube: Google access expired. Please click 'Connect' on YouTube in Settings to re-authenticate.");
         } else {
           logs.push(`❌ YouTube: ${e.message}`);
@@ -812,6 +811,7 @@ export async function publishClipAndCleanup(params: {
               publicVideoUrl: (isRemote && (clipPath.startsWith("http://") || clipPath.startsWith("https://"))) ? clipPath : undefined,
               title,
               partNumber,
+              instagramHandle: igHandle,
             });
             if (cardData.secureUrl) {
               storyCardUrl = cardData.secureUrl;
@@ -955,6 +955,7 @@ export async function publishClipAndCleanup(params: {
               publicVideoUrl,
               title,
               partNumber,
+              instagramHandle: igHandle,
             });
             if (cardData.secureUrl) {
               storyCardUrl = cardData.secureUrl;
