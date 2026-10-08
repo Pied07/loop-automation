@@ -15,20 +15,16 @@ export async function POST(req: NextRequest) {
     }
 
     const tokens: any = await readTokens();
-    const detectedPlatforms = (Array.isArray(body.platforms) && body.platforms.length > 0)
-      ? body.platforms
-      : [
-          ...(tokens.youtube ? ["YouTube"] : []),
-          ...(tokens.facebook ? ["Facebook"] : []),
-          ...(tokens.instagram ? ["Instagram"] : []),
-        ];
+    const serverPlatforms: string[] = [];
+    if (tokens.youtube?.access_token || tokens.youtube?.refresh_token) serverPlatforms.push("YouTube");
+    if (tokens.facebook?.page_id && tokens.facebook?.page_access_token) serverPlatforms.push("Facebook");
+    if (tokens.facebook?.instagram_user_id || tokens.instagram?.access_token) serverPlatforms.push("Instagram");
 
-    const detectedConnections = (Array.isArray(body.connections) && body.connections.length > 0)
-      ? body.connections
-      : [
-          ...detectedPlatforms,
-          ...(tokens.gmail ? ["Gmail"] : []),
-        ];
+    const requestedPlatforms = Array.isArray(body.platforms) ? body.platforms : [];
+    const detectedPlatforms = Array.from(new Set([...requestedPlatforms, ...serverPlatforms]));
+
+    const serverConnections = [...detectedPlatforms, ...(tokens.gmail?.access_token || tokens.gmail?.refresh_token ? ["Gmail"] : [])];
+    const detectedConnections = Array.from(new Set([...(Array.isArray(body.connections) ? body.connections : []), ...serverConnections]));
 
     if (!detectedPlatforms.length) {
       return NextResponse.json({ error: "No connected social platforms found to publish to." }, { status: 400 });

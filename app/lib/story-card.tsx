@@ -132,7 +132,7 @@ export async function generatePolaroidStoryCard(params: {
               textTransform: "uppercase",
             }}
           >
-            🔥 WATCH FULL REEL
+            🔥 NEW VIRAL REEL
           </div>
           <div
             style={{
@@ -151,7 +151,7 @@ export async function generatePolaroidStoryCard(params: {
         </div>
       </div>
 
-      {/* 3. Bottom Story Link Sticker (Instagram Native Style) */}
+      {/* 3. Bottom Story Link Sticker */}
       <div
         style={{
           display: "flex",
@@ -165,27 +165,27 @@ export async function generatePolaroidStoryCard(params: {
             display: "flex",
             alignItems: "center",
             gap: 16,
-            padding: "24px 62px",
+            padding: "22px 60px",
             borderRadius: 60,
             backgroundColor: "#ffffff",
             color: "#0f172a",
-            fontSize: 36,
+            fontSize: 34,
             fontWeight: 900,
             boxShadow: "0 18px 50px rgba(0, 0, 0, 0.75), 0 0 35px rgba(255, 255, 255, 0.35)",
             border: "2px solid rgba(255, 255, 255, 0.9)",
           }}
         >
-          🔗 TAP TO SEE THE REEL 👆
+          🎬 WATCH REEL ON @the_viral_desk 👆
         </div>
         <div
           style={{
             fontSize: 24,
             fontWeight: 700,
-            color: "rgba(255, 255, 255, 0.75)",
+            color: "rgba(255, 255, 255, 0.8)",
             letterSpacing: 1.5,
           }}
         >
-          WATCH ON REELS & SHORTS
+          TAP PROFILE ➔ WATCH FULL REEL
         </div>
       </div>
     </div>

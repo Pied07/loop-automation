@@ -720,6 +720,18 @@ export async function publishClipAndCleanup(params: {
           process.env.GOOGLE_CLIENT_SECRET
         );
         oauth2Client.setCredentials(tokens.youtube);
+
+        try {
+          const { token } = await oauth2Client.getAccessToken();
+          if (token && token !== tokens.youtube?.access_token) {
+            tokens.youtube.access_token = token;
+            const { writeTokens } = await import("@/app/lib/tokens");
+            await writeTokens(tokens);
+          }
+        } catch (tokErr: any) {
+          console.warn("YouTube token refresh notice:", tokErr.message);
+        }
+
         const youtube = google.youtube({ version: "v3", auth: oauth2Client });
 
         const isShort = !params.totalDuration || params.totalDuration <= 180;
@@ -830,6 +842,22 @@ export async function publishClipAndCleanup(params: {
           }
         } catch (storyErr: any) {
           console.warn("Facebook story notice:", storyErr.message);
+        }
+
+        // Also post Facebook Page Feed update with clickable link to Reel
+        try {
+          await fetch(`https://graph.facebook.com/v26.0/${pageId}/feed`, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              access_token: pageToken,
+              message: `✨ Tap to watch full Reel: ${facebookUrl}\n\n${title}`,
+              link: facebookUrl,
+            }),
+          });
+          logs.push(`✅ Facebook: Feed link post published`);
+        } catch (feedErr: any) {
+          console.warn("Facebook feed notice:", feedErr.message);
         }
       } catch (e: any) {
         logs.push(`❌ Facebook: ${e.message}`);

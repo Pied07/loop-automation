@@ -250,6 +250,20 @@ export default function Home() {
       } else if (existingConns.length > 0) {
         setConnections(existingConns);
       }
+
+      // Always synchronize with server-side connected OAuth platforms
+      fetch("/api/auth/status")
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data.connections) && data.connections.length > 0) {
+            setConnections((prev) => {
+              const combined = Array.from(new Set([...prev, ...data.connections]));
+              localStorage.setItem("app_connections", JSON.stringify(combined));
+              return combined;
+            });
+          }
+        })
+        .catch(() => {});
     }
   }, []);
 
