@@ -87,8 +87,8 @@ function mergeVideoRecords(...groups: VideoRecord[][]): VideoRecord[] {
   const merged = new Map<string, VideoRecord>();
   for (const video of groups.flat()) {
     if (!video || !video.id) continue;
-    // Exclude external API-scraped records
-    if (video.id.startsWith("youtube-") || video.id.startsWith("facebook-") || video.id.startsWith("instagram-")) {
+    // Exclude external youtube channel uploads
+    if (video.id.startsWith("youtube-")) {
       continue;
     }
     const cleanId = video.id.startsWith("session-") ? video.id.slice("session-".length) : video.id;
@@ -225,7 +225,7 @@ export default function Home() {
           const sessionVideos = cachedVideos
             .filter((video: VideoRecord) =>
               Boolean(video?.id && (video.videoUrl || video.youtubeVideoId || video.facebookVideoId || video.instagramVideoId || video.title)) &&
-              !video.id.startsWith("youtube-") && !video.id.startsWith("facebook-") && !video.id.startsWith("instagram-")
+              !video.id.startsWith("youtube-")
             )
             .map((video: VideoRecord) => {
               const cleanId = video.id.startsWith("session-") ? video.id.slice("session-".length) : video.id;
@@ -305,6 +305,19 @@ export default function Home() {
           }
         })
         .catch(() => {});
+
+      fetch("/api/videos/sync-facebook")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data?.success && Array.isArray(data.videos)) {
+            setVideos((current) => {
+              const merged = mergeVideoRecords(current, data.videos);
+              try { localStorage.setItem("tvd-studio-session-videos", JSON.stringify(merged)); } catch {}
+              return merged;
+            });
+          }
+        })
+        .catch(() => {});
     }
   }, []);
 
@@ -329,6 +342,24 @@ export default function Home() {
           });
         }
       });
+
+      // Automatically sync all published Facebook posts into Firebase Firestore
+      fetch("/api/videos/sync-facebook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.uid }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data?.success && Array.isArray(data.videos)) {
+            setVideos((current) => {
+              const merged = mergeVideoRecords(current, data.videos);
+              try { localStorage.setItem("tvd-studio-session-videos", JSON.stringify(merged)); } catch {}
+              return merged;
+            });
+          }
+        })
+        .catch(() => {});
     });
     return () => {
       unsubscribeAuth();
