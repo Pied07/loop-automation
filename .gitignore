@@ -59,3 +59,7 @@ huggingface-worker/
 # Local media files
 *.mp4
 !public/assets/video-outro.mp4
+
+# Local scratch and model cache
+scratch/
+scripts/models/whisper-tiny/*.bin

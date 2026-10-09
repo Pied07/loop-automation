@@ -19,6 +19,15 @@ from typing import List, Dict, Any, Optional
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 
+if sys.platform == "win32":
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 # Check for ML dependencies
 HAS_TORCH = False
 HAS_TRANSFORMERS = False
@@ -59,16 +68,28 @@ def get_blip_models():
     if not (HAS_TORCH and HAS_TRANSFORMERS):
         return None, None
     if _blip_processor is None or _blip_model is None:
+        model_id = "Salesforce/blip-image-captioning-base"
         try:
-            print("🤖 Loading BLIP Vision ML model (Salesforce/blip-image-captioning-base)...")
-            model_id = "Salesforce/blip-image-captioning-base"
-            _blip_processor = BlipProcessor.from_pretrained(model_id)
-            _blip_model = BlipForConditionalGeneration.from_pretrained(model_id)
+            # 1. Try local cache first (instant)
+            _blip_processor = BlipProcessor.from_pretrained(model_id, local_files_only=True)
+            _blip_model = BlipForConditionalGeneration.from_pretrained(model_id, local_files_only=True)
             _blip_model.eval()
-            print("✅ BLIP Vision model ready.")
-        except Exception as e:
-            print(f"Notice: Could not initialize BLIP Vision model ({e})")
-            _blip_processor, _blip_model = None, None
+            print("[ML] BLIP Vision model ready (cached).")
+        except Exception:
+            # 2. Only download if running in cloud runner (GitHub Actions / CI) or explicitly requested
+            is_ci = bool(os.environ.get("GITHUB_ACTIONS") or os.environ.get("CI") or os.environ.get("ENABLE_BLIP_DOWNLOAD"))
+            if is_ci:
+                try:
+                    print("[ML] Downloading BLIP Vision ML model in cloud runner...")
+                    _blip_processor = BlipProcessor.from_pretrained(model_id)
+                    _blip_model = BlipForConditionalGeneration.from_pretrained(model_id)
+                    _blip_model.eval()
+                    print("[ML] BLIP Vision model ready.")
+                except Exception as e:
+                    print(f"[ML] Notice: Could not initialize BLIP Vision model ({e})")
+                    _blip_processor, _blip_model = None, None
+            else:
+                _blip_processor, _blip_model = None, None
     return _blip_processor, _blip_model
 
 
@@ -78,20 +99,45 @@ def get_whisper_model():
     if not HAS_WHISPER:
         return None
     if _whisper_model is None:
+        local_dir = ROOT_DIR / "scripts" / "models" / "whisper-tiny"
+        model_target = str(local_dir) if (local_dir / "model.bin").exists() else "tiny"
         try:
-            print("🎙️ Loading Whisper Speech ML model (tiny)...")
+            print(f"[ML] Loading Whisper Speech ML model ({model_target})...")
             from faster_whisper import WhisperModel
-            _whisper_model = WhisperModel("tiny", device="cpu", compute_type="int8")
-            print("✅ Whisper Speech model ready.")
+            try:
+                _whisper_model = WhisperModel(model_target, device="cpu", compute_type="int8")
+            except Exception:
+                _whisper_model = WhisperModel(model_target, device="cpu", compute_type="float32")
+            print("[ML] Whisper Speech model ready.")
         except Exception as e:
             try:
                 import whisper
                 _whisper_model = whisper.load_model("tiny", device="cpu")
-                print("✅ PyTorch Whisper model ready.")
+                print("[ML] PyTorch Whisper model ready.")
             except Exception as e2:
-                print(f"Notice: Could not initialize Whisper model ({e2})")
+                print(f"[ML] Notice: Could not initialize Whisper model ({e2})")
                 _whisper_model = None
     return _whisper_model
+
+
+FFMPEG_BIN = "ffmpeg"
+if (ROOT_DIR / "ffmpeg.exe").exists():
+    FFMPEG_BIN = str(ROOT_DIR / "ffmpeg.exe")
+elif shutil.which("ffmpeg"):
+    FFMPEG_BIN = shutil.which("ffmpeg")
+
+
+def get_clip_duration(clip_path: str) -> float:
+    """Gets duration in seconds via ffmpeg stderr or ffprobe."""
+    try:
+        res = subprocess.run([FFMPEG_BIN, "-i", clip_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", res.stderr)
+        if m:
+            h, mi, s = float(m.group(1)), float(m.group(2)), float(m.group(3))
+            return max(1.0, h * 3600 + mi * 60 + s)
+    except Exception:
+        pass
+    return 10.0
 
 
 def extract_clip_frames(clip_path: str, num_frames: int = 3) -> List[str]:
@@ -100,22 +146,12 @@ def extract_clip_frames(clip_path: str, num_frames: int = 3) -> List[str]:
     tmp_dir = Path(clip_path).parent / "ml_frames"
     tmp_dir.mkdir(parents=True, exist_ok=True)
 
-    # Probe duration
-    duration = 10.0
-    try:
-        probe = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", clip_path],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True
-        )
-        duration = float(probe.stdout.strip())
-    except Exception:
-        pass
-
+    duration = get_clip_duration(clip_path)
     timestamps = [duration * (i + 1) / (num_frames + 1) for i in range(num_frames)]
     for idx, t in enumerate(timestamps):
         out_frame = tmp_dir / f"frame_{Path(clip_path).stem}_{idx}.jpg"
         cmd = [
-            "ffmpeg", "-y", "-ss", f"{t:.2f}", "-i", clip_path,
+            FFMPEG_BIN, "-y", "-ss", f"{t:.2f}", "-i", clip_path,
             "-vframes", "1", "-q:v", "2", str(out_frame)
         ]
         try:
@@ -132,7 +168,7 @@ def extract_clip_audio(clip_path: str) -> Optional[str]:
     """Extracts 16kHz mono WAV audio from the clip for Whisper."""
     out_wav = Path(clip_path).parent / f"audio_{Path(clip_path).stem}.wav"
     cmd = [
-        "ffmpeg", "-y", "-i", clip_path,
+        FFMPEG_BIN, "-y", "-i", clip_path,
         "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
         str(out_wav)
     ]
@@ -146,7 +182,7 @@ def extract_clip_audio(clip_path: str) -> Optional[str]:
 
 
 def transcribe_audio(audio_path: str) -> str:
-    """Runs Whisper ML transcription on extracted audio."""
+    """Runs Whisper ML transcription on extracted audio using direct waveform buffer."""
     if not audio_path or not os.path.exists(audio_path):
         return ""
 
@@ -155,18 +191,19 @@ def transcribe_audio(audio_path: str) -> str:
         return ""
 
     try:
+        import wave
+        import numpy as np
+
+        with wave.open(audio_path, "rb") as wf:
+            frames = wf.readframes(wf.getnframes())
+            audio_np = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
+
         if hasattr(model, "transcribe"):
-            # Check if it's faster-whisper or openai-whisper
-            from faster_whisper import WhisperModel
-            if isinstance(model, WhisperModel):
-                segments, info = model.transcribe(audio_path, beam_size=1, language="en")
-                text = " ".join([seg.text.strip() for seg in segments if seg.text])
-                return text.strip()
-            else:
-                res = model.transcribe(audio_path, fp16=False)
-                return res.get("text", "").strip()
+            segments, info = model.transcribe(audio_np, beam_size=1)
+            text = " ".join([seg.text.strip() for seg in segments if seg.text])
+            return text.strip()
     except Exception as e:
-        print(f"Notice: Whisper transcription failed ({e})")
+        print(f"[ML] Notice: Whisper transcription failed ({e})")
     return ""
 
 
@@ -192,25 +229,40 @@ def caption_frames(frame_paths: List[str]) -> List[str]:
                 if cap and cap not in captions:
                     captions.append(cap)
             except Exception as fe:
-                print(f"Notice: Frame caption failed ({fe})")
+                print(f"[ML] Notice: Frame caption failed ({fe})")
     except Exception as e:
-        print(f"Notice: BLIP captioning error ({e})")
+        print(f"[ML] Notice: BLIP captioning error ({e})")
     return captions
 
 
 def extract_keywords_from_text(text: str) -> List[str]:
-    """Extracts meaningful topic hashtags from text."""
+    """Extracts meaningful topic hashtags, prioritizing entities and key concepts."""
     stopwords = {
         "this", "that", "there", "then", "with", "from", "your", "what", "how",
         "when", "why", "who", "all", "are", "get", "got", "can", "new", "more",
         "into", "just", "day", "the", "and", "they", "them", "have", "been",
         "some", "will", "would", "about", "like", "look", "looking", "video", "clip",
+        "were", "their", "said", "because", "don't", "dont", "does", "doesn't", "which",
+        "here", "over", "again", "these", "could", "should", "than", "other", "things",
+        "first", "being", "most", "ones", "each", "where", "much", "very", "every",
+        "he", "she", "his", "her", "hers", "him", "you", "your", "yours", "our",
+        "ours", "their", "theirs", "its", "who", "whom", "whose", "it's", "was",
     }
-    raw_words = re.findall(r"[a-zA-Z]{3,15}", text.lower())
     clean_words = []
+
+    # 1. Capitalized Named Entities (e.g. JK Rowling -> jkrowling, Michael Jordan -> michaeljordan)
+    entities = re.findall(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b", text)
+    for ent in entities:
+        ent_tag = re.sub(r"[^a-zA-Z]", "", ent).lower()
+        if ent_tag not in stopwords and len(ent_tag) >= 3 and ent_tag not in clean_words:
+            clean_words.append(ent_tag)
+
+    # 2. Key descriptive words (length >= 4)
+    raw_words = re.findall(r"[a-zA-Z]{4,15}", text.lower())
     for w in raw_words:
         if w not in stopwords and w not in clean_words:
             clean_words.append(w)
+
     return clean_words
 
 
@@ -226,16 +278,14 @@ def generate_metadata_from_video_ml(
     """
     cat_clean = (category or "Trending").strip().title()
 
-    # 1. Extract frames & audio
-    frames = extract_clip_frames(clip_path, num_frames=3)
+    # 1. Extract audio & transcribe speech with Whisper (ultra-fast ~1.5s)
     audio_wav = extract_clip_audio(clip_path)
+    transcript = transcribe_audio(audio_wav) if audio_wav else ""
 
-    # 2. Run Vision ML (BLIP)
+    # 2. Extract frames & run Vision ML
+    frames = extract_clip_frames(clip_path, num_frames=3)
     captions = caption_frames(frames)
     primary_scene = captions[0] if captions else ""
-
-    # 3. Run Audio ML (Whisper)
-    transcript = transcribe_audio(audio_wav) if audio_wav else ""
 
     # Cleanup temporary frame and audio files to keep disk usage at 0 MB
     for f in frames:
@@ -247,21 +297,24 @@ def generate_metadata_from_video_ml(
 
     # 4. Generate Dynamic Title from Video ML output
     clip_title = ""
-    if primary_scene:
-        # Turn "a man and woman smiling in front of a sunset" -> "A Man And Woman Smiling In Front Of A Sunset"
+    if transcript and len(transcript) > 15:
+        # Extract punchy quote/hook sentence from the actual speech
+        sentences = [s.strip() for s in re.split(r"[.!?]", transcript) if len(s.strip()) >= 15]
+        punchy = next(
+            (s for s in sentences if any(w in s.lower() for w in ["succeed", "fail", "love", "never", "remember", "life", "why", "how", "secret", "hard", "win", "dream"])),
+            sentences[0] if sentences else transcript[:50]
+        )
+        clip_title = punchy.strip("\"' ")[:55]
+        if not clip_title.endswith((".", "!", "?")):
+            clip_title = clip_title.strip()
+    elif primary_scene:
         words = primary_scene.split()
         if words and words[0].lower() in ["a", "an", "the"]:
             clean_scene = " ".join(words[1:])
         else:
             clean_scene = primary_scene
         clip_title = clean_scene.capitalize()[:55]
-    elif transcript and len(transcript) > 10:
-        # Extract prominent dialogue phrase
-        sentences = re.split(r"[.!?]", transcript)
-        first_good = next((s.strip() for s in sentences if len(s.strip()) > 8), transcript[:50])
-        clip_title = f'"{first_good[:45]}..."'
     else:
-        # Fallback to category-based title
         clip_title = f"Unbelievable {cat_clean} Moment"
 
     if total_parts > 1:
@@ -269,37 +322,40 @@ def generate_metadata_from_video_ml(
 
     # 5. Generate Dynamic Description from Video ML output
     part_badge = "" if total_parts <= 1 else f"📌 PART {part_num} of {total_parts}\n\n"
-    
+
     desc_lines = [f"{part_badge}✨ {clip_title}\n"]
+    if transcript:
+        # Include the most impactful 1-2 sentences of the speech
+        sentences = [s.strip() for s in re.split(r"[.!?]", transcript) if len(s.strip()) > 10]
+        quote_snippet = ". ".join(sentences[:3]) + "." if sentences else transcript[:200]
+        desc_lines.append(f"\"{quote_snippet}\"\n")
     if primary_scene:
         desc_lines.append(f"👁️ Visual Scene: {primary_scene.capitalize()}.\n")
-    if transcript:
-        desc_lines.append(f'🎙️ Spoken in video: "{transcript}"\n')
 
-    desc_lines.append(f"💬 What are your thoughts on this? Drop a comment below! 👇")
-    desc_lines.append(f"🔔 Follow & Subscribe for daily {cat_clean.lower()} moments!\n")
+    desc_lines.append("💬 What does this mean to you? Drop your reaction below! 👇")
+    desc_lines.append(f"🔔 Follow & Subscribe for daily inspiration & moments!\n")
     desc_lines.append("────────────────────────────")
     desc_lines.append("Fair Use Disclaimer: Curated and analyzed for commentary, education, and entertainment.")
-    
+
     description = "\n".join(desc_lines)
 
     # 6. Generate Video-Specific ML Hashtags
     hashtags = []
-    
-    # Extract tags from visual captions
-    for cap in captions:
-        for tag in extract_keywords_from_text(cap):
-            if tag not in hashtags:
-                hashtags.append(tag)
-            if len(hashtags) >= 6:
-                break
 
-    # Extract tags from audio transcript
+    # Priority 1: High-value tags from speech transcript
     if transcript:
         for tag in extract_keywords_from_text(transcript):
             if tag not in hashtags:
                 hashtags.append(tag)
-            if len(hashtags) >= 9:
+            if len(hashtags) >= 8:
+                break
+
+    # Priority 2: High-value tags from visual scene
+    for cap in captions:
+        for tag in extract_keywords_from_text(cap):
+            if tag not in hashtags:
+                hashtags.append(tag)
+            if len(hashtags) >= 10:
                 break
 
     # Add category tag
@@ -312,12 +368,12 @@ def generate_metadata_from_video_ml(
         if u not in hashtags:
             hashtags.append(u)
 
-    print(f"🎬 Video ML Analysis complete for Part {part_num}:")
-    if primary_scene:
-        print(f"   👁️ Vision: {primary_scene}")
+    print(f"[ML] Video ML Analysis complete for Part {part_num}:")
     if transcript:
-        print(f"   🎙️ Audio: {transcript[:60]}...")
-    print(f"   🏷️ Generated Tags: {['#' + h for h in hashtags[:8]]}")
+        print(f"   [Audio] Speech: {transcript[:60]}...")
+    if primary_scene:
+        print(f"   [Vision] Scene: {primary_scene}")
+    print(f"   [Hashtags] Generated: {['#' + h for h in hashtags[:8]]}")
 
     return {
         "title": clip_title,
