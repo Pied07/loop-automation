@@ -1410,7 +1410,7 @@ const TIKTOK_CATEGORY_KEYWORDS: Record<string, string[]> = {
 };
 
 // 1. Live Trending TikTok Video Scraper (Real creators, millions of views, direct MP4 CDN stream)
-async function scrapeTikTokTrendingVideos(category: string): Promise<{ title: string; url: string; source: string } | null> {
+export async function scrapeTikTokTrendingVideos(category: string): Promise<{ title: string; url: string; source: string } | null> {
   const regions = ["GB", "US", "CA", "AU"];
   // Randomly rotate region so every call gets fresh, varied live content
   const region = regions[Math.floor(Math.random() * regions.length)];
@@ -1596,7 +1596,27 @@ async function searchWikimedia(category: string): Promise<{ title: string; url: 
 export async function scrapeOnlineViralVideo(category: string): Promise<{ url: string; title: string; source: string }> {
   const cleanCat = category?.trim() || "Trending";
 
-  // 1. YouTube Shorts Category Search (100% relevant to category, real viral videos with views)
+  // 1. Live Trending TikTok Videos (Real creators, millions of views, direct unwatermarked CDN MP4 stream)
+  const fromTikTok = await scrapeTikTokTrendingVideos(cleanCat);
+  if (fromTikTok) return fromTikTok;
+
+  // 2. Fallback retry with general Trending on TikTok live feed (guarantees any trending TikTok video)
+  const fallbackTikTok = await scrapeTikTokTrendingVideos("Trending");
+  if (fallbackTikTok) return fallbackTikTok;
+
+  // 3. Mixkit HD real human-filmed video scraper (action/sports/food/nature - direct cloud MP4)
+  const fromMixkit = await searchMixkit(cleanCat);
+  if (fromMixkit) return fromMixkit;
+
+  // 4. Internet Archive live search (direct MP4)
+  const fromArchive = await searchArchiveOrg(cleanCat);
+  if (fromArchive) return fromArchive;
+
+  // 5. Wikimedia Commons live search (direct MP4)
+  const fromWiki = await searchWikimedia(cleanCat);
+  if (fromWiki) return fromWiki;
+
+  // 6. YouTube Shorts Category Search fallback
   const queries = SAFE_CATEGORY_QUERIES[cleanCat] || SAFE_CATEGORY_QUERIES["Trending"] || [];
   if (queries.length > 0) {
     const randomQuery = queries[Math.floor(Math.random() * queries.length)];
@@ -1616,26 +1636,6 @@ export async function scrapeOnlineViralVideo(category: string): Promise<{ url: s
       console.warn("YouTube category search notice:", ytErr.message);
     }
   }
-
-  // 2. Live Trending TikTok Videos (Real creators, millions of views, direct unwatermarked CDN stream)
-  const fromTikTok = await scrapeTikTokTrendingVideos(cleanCat);
-  if (fromTikTok) return fromTikTok;
-
-  // 3. Mixkit HD real human-filmed video scraper (action/sports/food/nature)
-  const fromMixkit = await searchMixkit(cleanCat);
-  if (fromMixkit) return fromMixkit;
-
-  // 4. Internet Archive live search (classic comedy, slapstick, vintage cartoons)
-  const fromArchive = await searchArchiveOrg(cleanCat);
-  if (fromArchive) return fromArchive;
-
-  // 5. Wikimedia Commons live search
-  const fromWiki = await searchWikimedia(cleanCat);
-  if (fromWiki) return fromWiki;
-
-  // 6. Fallback retry with general Trending on TikTok live feed
-  const fallbackTikTok = await scrapeTikTokTrendingVideos("Trending");
-  if (fallbackTikTok) return fallbackTikTok;
 
   // 7. Fallback retry with Mixkit real footage
   const fallbackMixkit = (await searchMixkit("nature")) || (await searchMixkit("lifestyle"));
