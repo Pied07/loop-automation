@@ -104,12 +104,23 @@ def clean_human_title(raw_title: str, category: str = "Trending") -> str:
 
 
 def generate_clip_hashtags(title: str, category: str) -> list:
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from onnx_viral_engine import get_viral_metadata
+        meta = get_viral_metadata(title, category)
+        if meta and meta.get("hashtags"):
+            return meta["hashtags"]
+    except Exception:
+        pass
+
     cat_clean = (category or "Trending").strip().title()
     bank = HASHTAG_BANK.get(cat_clean) or HASHTAG_BANK.get("Trending", [])
+    stopwords = {"this", "that", "clip", "video", "taking", "over", "part", "with", "from", "your", "what", "how", "when", "why", "who", "all", "are", "get", "got", "can", "new", "more", "into", "just", "day", "the", "and"}
     raw_words = re.findall(r"[a-zA-Z]{3,12}", title.lower())
     clean_words = [
         w for w in raw_words 
-        if not re.search(r"[bcdfghjklmnpqrstvwxyz]{5,}", w) 
+        if w not in stopwords
+        and not re.search(r"[bcdfghjklmnpqrstvwxyz]{5,}", w) 
         and w not in bank 
         and w not in UNIVERSAL_HASHTAGS
     ][:4]
@@ -118,7 +129,7 @@ def generate_clip_hashtags(title: str, category: str) -> list:
         clean = tag.lower().replace("#", "").strip()
         if clean and clean not in combined:
             combined.append(clean)
-    return combined[:10] if len(combined) >= 10 else combined[:max(8, len(combined))]
+    return combined[:12] if len(combined) >= 12 else combined[:max(8, len(combined))]
 
 
 
@@ -598,20 +609,28 @@ def run():
         created_clip_files.append(clip_path)
 
         clean_title = clean_human_title(title, CONTENT_CATEGORY)
-        hashtags = generate_clip_hashtags(clean_title, CONTENT_CATEGORY)
-
-        is_single = total_parts <= 1
-        clip_title = clean_title if is_single else f"PART {part_num} | {clean_title[:45]}"
-        part_badge = "" if is_single else f"📌 PART {part_num} of {total_parts}\n\n"
-
-        clip_desc = (
-            f"{part_badge}"
-            f"✨ {clean_title}\n\n"
-            f"💬 What are your thoughts on this? Drop a comment below!\n"
-            f"🔔 Follow & Subscribe for more daily viral clips!\n\n"
-            f"────────────────────────────\n"
-            f"Fair Use Disclaimer: This clip is curated and shared for educational, inspirational, and commentary purposes."
-        )
+        try:
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            from onnx_viral_engine import get_viral_metadata
+            meta = get_viral_metadata(clean_title, CONTENT_CATEGORY, part_num, total_parts)
+            clip_title = meta.get("title") or (clean_title if total_parts <= 1 else f"PART {part_num} | {clean_title[:45]}")
+            clip_desc = meta.get("description") or f"✨ {clean_title}"
+            hashtags = meta.get("hashtags") or generate_clip_hashtags(clean_title, CONTENT_CATEGORY)
+            print(f"⚡ ONNX Viral Engine generated Part {part_num} metadata: {['#' + h for h in hashtags[:6]]}")
+        except Exception as onnx_err:
+            print(f"Notice: ONNX metadata fallback ({onnx_err})")
+            hashtags = generate_clip_hashtags(clean_title, CONTENT_CATEGORY)
+            is_single = total_parts <= 1
+            clip_title = clean_title if is_single else f"PART {part_num} | {clean_title[:45]}"
+            part_badge = "" if is_single else f"📌 PART {part_num} of {total_parts}\n\n"
+            clip_desc = (
+                f"{part_badge}"
+                f"✨ {clean_title}\n\n"
+                f"💬 What are your thoughts on this? Drop a comment below!\n"
+                f"🔔 Follow & Subscribe for more daily viral clips!\n\n"
+                f"────────────────────────────\n"
+                f"Fair Use Disclaimer: This clip is curated and shared for educational, inspirational, and commentary purposes."
+            )
 
         clips_meta.append({
             "partNumber": part_num,

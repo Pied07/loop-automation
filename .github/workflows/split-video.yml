@@ -67,7 +67,7 @@ jobs:
       - name: Install yt-dlp & FFmpeg
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
-          pip install --upgrade "yt-dlp[default,curl-cffi]" requests
+          pip install --upgrade "yt-dlp[default,curl-cffi]" requests onnxruntime numpy
 
       - name: Run Cloud Video Processing
         env:
