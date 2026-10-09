@@ -37,6 +37,7 @@ import {
   WandSparkles,
   X,
   Trash2,
+  RefreshCw,
 } from "lucide-react";
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { useEffect, useState, useRef, type FormEvent } from "react";
@@ -382,12 +383,12 @@ function deduplicateVideos(
       const igId = single.instagramVideoId || extractInstagramId(single.videoUrl);
       result.push({
         ...single,
-        youtube: ytId ? 1 : 0,
-        facebook: fbId ? 1 : 0,
-        instagram: igId ? 1 : 0,
-        youtubeVideoId: ytId || "",
-        facebookVideoId: fbId || "",
-        instagramVideoId: igId || "",
+        youtube: (ytId || single.youtube === 1) ? 1 : 0,
+        facebook: (fbId || single.facebook === 1) ? 1 : 0,
+        instagram: (igId || single.instagram === 1) ? 1 : 0,
+        youtubeVideoId: ytId || single.youtubeVideoId || "",
+        facebookVideoId: fbId || single.facebookVideoId || "",
+        instagramVideoId: igId || single.instagramVideoId || "",
       });
       continue;
     }
@@ -423,9 +424,9 @@ function deduplicateVideos(
       records.find((r) => r.videoUrl && r.videoUrl.startsWith("http"))?.videoUrl || winner.videoUrl;
     const bestThumb = records.find((r) => r.thumbnailUrl && !r.thumbnailUrl.includes("/api/viral-clips/thumbnail?"))?.thumbnailUrl || winner.thumbnailUrl;
 
-    const isYt: 0 | 1 = bestYtId ? 1 : 0;
-    const isFb: 0 | 1 = bestFbId ? 1 : 0;
-    const isIg: 0 | 1 = bestIgId ? 1 : 0;
+    const isYt: 0 | 1 = (Boolean(bestYtId) || records.some((r) => r.youtube === 1)) ? 1 : 0;
+    const isFb: 0 | 1 = (Boolean(bestFbId) || records.some((r) => r.facebook === 1)) ? 1 : 0;
+    const isIg: 0 | 1 = (Boolean(bestIgId) || records.some((r) => r.instagram === 1)) ? 1 : 0;
 
     let bestCreatedAt = winner.createdAt;
     let maxTs = getRecordTimestamp(winner);
@@ -537,7 +538,8 @@ export default function Home() {
   const [mobileNav, setMobileNav] = useState(false);
   const [connections, setConnections] = useState<string[]>([]);
   const [disconnectingPlatform, setDisconnectingPlatform] = useState<string | null>(null);
-  const [platformTab, setPlatformTab] = useState("Self");
+  const [platformTab, setPlatformTab] = useState("All");
+  const [isSyncing, setIsSyncing] = useState(false);
   const [videoToDelete, setVideoToDelete] = useState<VideoRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -666,6 +668,20 @@ export default function Home() {
           } catch {}
         }
       });
+
+      // Synchronize in the background all published posts from YouTube, Facebook & Instagram
+      fetch("/api/videos/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.uid }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data.videos) && data.videos.length > 0) {
+            setVideos((prev) => deduplicateVideos([data.videos, prev], user.uid));
+          }
+        })
+        .catch(() => {});
     });
     return () => {
       unsubscribeAuth();
@@ -1106,6 +1122,29 @@ export default function Home() {
   }
 
 
+  async function syncAllSocials() {
+    setIsSyncing(true);
+    try {
+      const user = auth?.currentUser;
+      const res = await fetch("/api/videos/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user?.uid }),
+      });
+      const data = await res.json();
+      if (Array.isArray(data.videos) && data.videos.length > 0) {
+        setVideos((prev) => deduplicateVideos([data.videos, prev], user?.uid));
+        notify(`Synchronized ${data.videos.length} clips from YouTube, Facebook & Instagram!`);
+      } else {
+        notify("Library is up to date.");
+      }
+    } catch {
+      notify("Failed to sync social videos.");
+    } finally {
+      setIsSyncing(false);
+    }
+  }
+
   function exportCsv() {
     if (!videos.length) {
       notify("Your library is empty. Generated videos will appear here.");
@@ -1244,11 +1283,11 @@ export default function Home() {
 
     let matchesTab = true;
     if (platformTab === "YouTube") {
-      matchesTab = Boolean(video.youtubeVideoId) || (video.youtube === 1 && Boolean(extractYouTubeId(video.videoUrl)));
+      matchesTab = Boolean(video.youtubeVideoId) || video.youtube === 1;
     } else if (platformTab === "Instagram") {
-      matchesTab = Boolean(video.instagramVideoId) || (video.instagram === 1 && Boolean(extractInstagramId(video.videoUrl)));
+      matchesTab = Boolean(video.instagramVideoId) || video.instagram === 1;
     } else if (platformTab === "Facebook") {
-      matchesTab = Boolean(video.facebookVideoId) || (video.facebook === 1 && Boolean(extractFacebookId(video.videoUrl)));
+      matchesTab = Boolean(video.facebookVideoId) || video.facebook === 1;
     }
 
     return matchesFormat && matchesQuery && matchesTab;
@@ -1546,7 +1585,7 @@ export default function Home() {
           </button>
         </div>
       </section>}
-      {screen === "library" && <section className="library-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR CLIPS LIBRARY</div><h1>Viral content, <em>in motion.</em></h1><p>Your published clips with links to YouTube, Facebook, and Instagram.</p></div><button className="secondary-button" onClick={exportCsv}><ArrowDownToLine size={16} /> Export spreadsheet</button></div>
+      {screen === "library" && <section className="library-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR CLIPS LIBRARY</div><h1>Viral content, <em>in motion.</em></h1><p>Your published clips with links to YouTube, Facebook, and Instagram.</p></div><div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}><button className="secondary-button" onClick={syncAllSocials} disabled={isSyncing} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><RefreshCw size={15} style={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} /> {isSyncing ? "Syncing..." : "Sync socials"}</button><button className="secondary-button" onClick={exportCsv}><ArrowDownToLine size={16} /> Export spreadsheet</button></div></div>
       
       <div className="library-tabber">
         {["All", "YouTube", "Facebook", "Instagram"].map(tab => (
@@ -1670,9 +1709,13 @@ export default function Home() {
       {video.status !== 'failed' && <div className="hashtag-row">{Array.from(new Set(video.hashtags || [])).map((tag, idx) => <span key={`${tag}-${idx}`}>#{tag.replace(/^#/, '')}</span>)}</div>}
       <div className="video-card-actions">
         <div className="card-platform-links">
-          {Boolean(video.youtubeVideoId || (video.youtube === 1 && extractYouTubeId(video.videoUrl))) && (
+          {(Boolean(video.youtubeVideoId) || video.youtube === 1) && (
             <a
-              href={`https://www.youtube.com/shorts/${video.youtubeVideoId || extractYouTubeId(video.videoUrl)}`}
+              href={
+                video.youtubeVideoId
+                  ? `https://www.youtube.com/shorts/${video.youtubeVideoId}`
+                  : (video.videoUrl?.includes("youtube.com") ? video.videoUrl : "#")
+              }
               target="_blank"
               rel="noreferrer"
               className="platform-btn yt-btn"
@@ -1682,9 +1725,13 @@ export default function Home() {
               <span>Shorts</span>
             </a>
           )}
-          {Boolean(video.facebookVideoId || (video.facebook === 1 && extractFacebookId(video.videoUrl))) && (
+          {(Boolean(video.facebookVideoId) || video.facebook === 1) && (
             <a
-              href={`https://www.facebook.com/reel/${video.facebookVideoId || extractFacebookId(video.videoUrl)}`}
+              href={
+                video.facebookVideoId
+                  ? `https://www.facebook.com/reel/${video.facebookVideoId}`
+                  : (video.videoUrl?.includes("facebook.com") ? video.videoUrl : "https://www.facebook.com")
+              }
               target="_blank"
               rel="noreferrer"
               className="platform-btn fb-btn"
@@ -1694,12 +1741,12 @@ export default function Home() {
               <span>FB Reel</span>
             </a>
           )}
-          {Boolean(video.instagramVideoId || (video.instagram === 1 && extractInstagramId(video.videoUrl))) && (
+          {(Boolean(video.instagramVideoId) || video.instagram === 1) && (
             <a
               href={
-                (video.instagramVideoId || extractInstagramId(video.videoUrl) || "").startsWith("http")
-                  ? (video.instagramVideoId || extractInstagramId(video.videoUrl))
-                  : `https://www.instagram.com/reel/${video.instagramVideoId || extractInstagramId(video.videoUrl)}`
+                video.instagramVideoId
+                  ? (video.instagramVideoId.startsWith("http") ? video.instagramVideoId : `https://www.instagram.com/reel/${video.instagramVideoId}`)
+                  : (video.videoUrl?.includes("instagram.com") ? video.videoUrl : "https://www.instagram.com/the_viral_desk/reels/")
               }
               target="_blank"
               rel="noreferrer"
