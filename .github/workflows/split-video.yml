@@ -64,10 +64,12 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install yt-dlp & FFmpeg
+      - name: Install yt-dlp, FFmpeg & Multimodal Video ML
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
-          pip install --upgrade "yt-dlp[default,curl-cffi]" requests onnxruntime numpy
+          pip install --upgrade "yt-dlp[default,curl-cffi]" requests onnxruntime numpy pillow
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install transformers faster-whisper
 
       - name: Run Cloud Video Processing
         env:

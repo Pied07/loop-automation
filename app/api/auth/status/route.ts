@@ -33,11 +33,28 @@ export async function GET() {
       }
     }
 
+    // Verify Meta (Facebook & Instagram) token validity
     if (tokens.facebook?.page_id && tokens.facebook?.page_access_token) {
-      connections.push("Facebook");
-    }
-    if (tokens.facebook?.instagram_user_id || tokens.instagram?.access_token) {
-      connections.push("Instagram");
+      try {
+        const metaTest = await fetch(
+          `https://graph.facebook.com/v26.0/${tokens.facebook.page_id}?fields=id&access_token=${tokens.facebook.page_access_token}`,
+          { signal: AbortSignal.timeout(4000) }
+        );
+        const metaData = await metaTest.json();
+        if (metaTest.ok && metaData.id) {
+          connections.push("Facebook");
+          if (tokens.facebook?.instagram_user_id || tokens.instagram?.access_token) {
+            connections.push("Instagram");
+          }
+        } else {
+          console.warn("Meta token expired or invalid:", metaData.error?.message);
+        }
+      } catch {
+        connections.push("Facebook");
+        if (tokens.facebook?.instagram_user_id || tokens.instagram?.access_token) {
+          connections.push("Instagram");
+        }
+      }
     }
     if (tokens.gmail?.access_token || tokens.gmail?.refresh_token) {
       connections.push("Gmail");

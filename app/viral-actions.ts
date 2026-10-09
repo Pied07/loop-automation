@@ -1152,8 +1152,11 @@ export async function publishClipAndCleanup(params: {
 
   const resolvedThumb = storyCardUrl || (facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${facebookVideoId}` : undefined);
 
+  const anySuccess = !!(youtubeVideoId || facebookVideoId || instagramVideoId);
+  const failureReasons = logs.filter((l) => l.startsWith("❌") || l.startsWith("⚠️"));
+
   return {
-    success: true,
+    success: anySuccess,
     youtubeUrl,
     facebookUrl,
     instagramUrl,
@@ -1162,6 +1165,7 @@ export async function publishClipAndCleanup(params: {
     instagramVideoId,
     thumbnailUrl: resolvedThumb,
     gmailSent,
+    error: anySuccess ? undefined : (failureReasons.join(" • ") || "All connected platforms failed to publish."),
     logs,
   };
 }

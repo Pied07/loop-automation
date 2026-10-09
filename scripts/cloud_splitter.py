@@ -91,6 +91,9 @@ def clean_human_title(raw_title: str, category: str = "Trending") -> str:
             "Motivational": ["The Mindset Shift That Changes Everything", "Powerful Motivation You Need Today", "Never Give Up On Your Dreams"],
             "Funny": ["Try Not To Laugh Challenge", "Pure Comedy Gold Moment", "Funniest Video You Will See Today"],
             "Comedy": ["Stand Up Comedy Masterpiece", "Funniest Clip You Will See Today", "Comedy Gold Moments"],
+            "Romance": ["A Love Story That Touches Your Heart", "Unspoken Feelings That Hit Deep In The Heart", "When Someone Truly Means The World To You", "Late Night Thoughts Of Someone You Love"],
+            "Horror": ["Unexplained Mystery Caught At Night", "Spine Chilling Real Paranormal Moment", "Do Not Watch This Alone In The Dark"],
+            "Educational": ["Mind Blowing Fact You Never Knew", "Science Facts That Will Shock You", "History Secret That Changes Everything"],
             "Food": ["Incredible Street Food Chef Skills", "Delicious Cooking Recipe Master", "Mouth Watering Food Everyone Is Craving"],
             "Sports": ["Legendary Athlete Moment Chills", "Incredible Sports Highlight", "Unstoppable Athletic Performance"],
             "Travel": ["Breathtaking Place You Must Visit", "Hidden Paradise On Earth", "Stunning Travel View Before You Die"],
@@ -98,7 +101,8 @@ def clean_human_title(raw_title: str, category: str = "Trending") -> str:
             "Gaming": ["Insane Gaming Clutch Moment", "Epic Gameplay Highlight", "Unbelievable Gaming Reaction"],
             "Music": ["Amazing Live Music Performance", "Incredible Rhythm And Melody", "Viral Sound That Hits Different"],
         }
-        picks = fallbacks.get(category, fallbacks["Trending"])
+        cat_key = category.strip().title() if category else "Trending"
+        picks = fallbacks.get(cat_key, fallbacks["Trending"])
         cleaned = picks[int(time.time()) % len(picks)]
     return re.sub(r"\s+", " ", cleaned).strip()[:80]
 
@@ -611,26 +615,39 @@ def run():
         clean_title = clean_human_title(title, CONTENT_CATEGORY)
         try:
             sys.path.insert(0, str(Path(__file__).resolve().parent))
-            from onnx_viral_engine import get_viral_metadata
-            meta = get_viral_metadata(clean_title, CONTENT_CATEGORY, part_num, total_parts)
+            from video_ml_analyzer import generate_metadata_from_video_ml
+            meta = generate_metadata_from_video_ml(
+                clip_path=str(clip_path),
+                category=CONTENT_CATEGORY,
+                part_num=part_num,
+                total_parts=total_parts,
+            )
             clip_title = meta.get("title") or (clean_title if total_parts <= 1 else f"PART {part_num} | {clean_title[:45]}")
             clip_desc = meta.get("description") or f"✨ {clean_title}"
             hashtags = meta.get("hashtags") or generate_clip_hashtags(clean_title, CONTENT_CATEGORY)
-            print(f"⚡ ONNX Viral Engine generated Part {part_num} metadata: {['#' + h for h in hashtags[:6]]}")
-        except Exception as onnx_err:
-            print(f"Notice: ONNX metadata fallback ({onnx_err})")
-            hashtags = generate_clip_hashtags(clean_title, CONTENT_CATEGORY)
-            is_single = total_parts <= 1
-            clip_title = clean_title if is_single else f"PART {part_num} | {clean_title[:45]}"
-            part_badge = "" if is_single else f"📌 PART {part_num} of {total_parts}\n\n"
-            clip_desc = (
-                f"{part_badge}"
-                f"✨ {clean_title}\n\n"
-                f"💬 What are your thoughts on this? Drop a comment below!\n"
-                f"🔔 Follow & Subscribe for more daily viral clips!\n\n"
-                f"────────────────────────────\n"
-                f"Fair Use Disclaimer: This clip is curated and shared for educational, inspirational, and commentary purposes."
-            )
+            print(f"🎬 Video ML Model generated Part {part_num} metadata: {['#' + h for h in hashtags[:6]]}")
+        except Exception as ml_err:
+            print(f"Notice: Video ML analyzer fallback ({ml_err})")
+            try:
+                from onnx_viral_engine import get_viral_metadata
+                meta = get_viral_metadata(clean_title, CONTENT_CATEGORY, part_num, total_parts)
+                clip_title = meta.get("title") or (clean_title if total_parts <= 1 else f"PART {part_num} | {clean_title[:45]}")
+                clip_desc = meta.get("description") or f"✨ {clean_title}"
+                hashtags = meta.get("hashtags") or generate_clip_hashtags(clean_title, CONTENT_CATEGORY)
+            except Exception as onnx_err:
+                print(f"Notice: ONNX fallback ({onnx_err})")
+                hashtags = generate_clip_hashtags(clean_title, CONTENT_CATEGORY)
+                is_single = total_parts <= 1
+                clip_title = clean_title if is_single else f"PART {part_num} | {clean_title[:45]}"
+                part_badge = "" if is_single else f"📌 PART {part_num} of {total_parts}\n\n"
+                clip_desc = (
+                    f"{part_badge}"
+                    f"✨ {clean_title}\n\n"
+                    f"💬 What are your thoughts on this? Drop a comment below!\n"
+                    f"🔔 Follow & Subscribe for more daily viral clips!\n\n"
+                    f"────────────────────────────\n"
+                    f"Fair Use Disclaimer: This clip is curated and shared for educational, inspirational, and commentary purposes."
+                )
 
         clips_meta.append({
             "partNumber": part_num,
