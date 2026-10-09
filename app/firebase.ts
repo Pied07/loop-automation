@@ -14,7 +14,10 @@ export type VideoRecord = {
   shotstackUrl?: string;
   youtubeVideoId?: string;
   facebookVideoId?: string;
+  facebookStoryId?: string;
+  facebookPostId?: string;
   instagramVideoId?: string;
+  instagramStoryId?: string;
   youtube?: 0 | 1;
   facebook?: 0 | 1;
   instagram?: 0 | 1;

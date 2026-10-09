@@ -644,7 +644,10 @@ export async function publishClipAndCleanup(params: {
   instagramUrl?: string;
   youtubeVideoId?: string;
   facebookVideoId?: string;
+  facebookStoryId?: string;
+  facebookPostId?: string;
   instagramVideoId?: string;
+  instagramStoryId?: string;
   thumbnailUrl?: string;
   storyCardUrl?: string;
   gmailSent?: boolean;
@@ -686,7 +689,10 @@ export async function publishClipAndCleanup(params: {
 
   let youtubeVideoId: string | undefined;
   let facebookVideoId: string | undefined;
+  let facebookStoryId: string | undefined;
+  let facebookPostId: string | undefined;
   let instagramVideoId: string | undefined;
+  let instagramStoryId: string | undefined;
   let youtubeUrl: string | undefined;
   let facebookUrl: string | undefined;
   let instagramUrl: string | undefined;
@@ -854,6 +860,7 @@ export async function publishClipAndCleanup(params: {
               });
               const storyData = await storyRes.json();
               if (storyData?.id || storyData?.success || storyData?.post_id) {
+                facebookStoryId = String(storyData.id || storyData.post_id || upData.id);
                 logs.push(`✅ Facebook: Story published (Polaroid Reel card)`);
               } else {
                 console.warn("Facebook photo_stories error response:", storyData);
@@ -866,7 +873,7 @@ export async function publishClipAndCleanup(params: {
 
         // Also post Facebook Page Feed update with clickable link to Reel
         try {
-          await fetch(`https://graph.facebook.com/v26.0/${pageId}/feed`, {
+          const feedRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/feed`, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: new URLSearchParams({
@@ -875,6 +882,10 @@ export async function publishClipAndCleanup(params: {
               link: facebookUrl,
             }),
           });
+          const feedData = await feedRes.json();
+          if (feedData?.id) {
+            facebookPostId = String(feedData.id);
+          }
           logs.push(`✅ Facebook: Feed link post published`);
         } catch (feedErr: any) {
           console.warn("Facebook feed notice:", feedErr.message);
@@ -887,12 +898,13 @@ export async function publishClipAndCleanup(params: {
     // ─ Instagram (Posts as Reel + Posts Story with Thumbnail Card) ─
     if (platforms.includes("Instagram")) {
       try {
-        const igUserId = tokens.facebook?.instagram_user_id || "17841430707006338";
+        const igUserId = tokens.instagram?.user_id || tokens.facebook?.instagram_user_id || "17841430707006338";
         const instagramToken =
+          tokens.instagram?.access_token ||
           tokens.facebook?.instagram_access_token ||
           tokens.facebook?.instagram_page_access_token ||
           tokens.facebook?.page_access_token;
-        const instagramApi = tokens.facebook?.instagram_access_token
+        const instagramApi = tokens.instagram?.access_token
           ? "https://graph.instagram.com/v26.0"
           : "https://graph.facebook.com/v26.0";
         if (!instagramToken || !igUserId) throw new Error("Instagram not connected.");
@@ -1001,7 +1013,9 @@ export async function publishClipAndCleanup(params: {
                   headers: { "Content-Type": "application/x-www-form-urlencoded" },
                   body: new URLSearchParams({ access_token: instagramToken, creation_id: storyCreationId }),
                 });
+                const pubStoryData = await pubStoryRes.json().catch(() => ({}));
                 if (pubStoryRes.ok) {
+                  instagramStoryId = String(pubStoryData?.id || storyCreationId);
                   logs.push(`✅ Instagram: Story published (Polaroid Reel card)`);
                 }
               }
@@ -1166,7 +1180,10 @@ export async function publishClipAndCleanup(params: {
     instagramUrl,
     youtubeVideoId,
     facebookVideoId,
+    facebookStoryId,
+    facebookPostId,
     instagramVideoId,
+    instagramStoryId,
     thumbnailUrl: resolvedThumb,
     storyCardUrl,
     gmailSent,

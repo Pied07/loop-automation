@@ -42,7 +42,7 @@ import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndP
 import { useEffect, useState, useRef, type FormEvent } from "react";
 import { auth, firebaseConfigured, database, type VideoRecord } from "./firebase";
 import { doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
-import { deleteFromYouTube, deleteFromFacebook } from "./actions";
+import { deleteFromYouTube, deleteFromFacebook, deleteFromInstagram } from "./actions";
 import { FaYoutube, FaInstagram, FaFacebookF } from "react-icons/fa6";
 import { SiGmail } from "react-icons/si";
 
@@ -401,6 +401,57 @@ export default function Home() {
     }
   }
 
+  function syncJobClips(receivedClips: any[], sourceTitle?: string) {
+    setClips(receivedClips);
+    if (sourceTitle) setSourceTitle(sourceTitle);
+    const autoPublishedRecords: VideoRecord[] = receivedClips
+      .filter((c: any) => c.youtubeVideoId || c.facebookVideoId || c.instagramVideoId)
+      .map((c: any) => ({
+        id: `clip-${c.partNumber}-${Date.now()}`,
+        title: c.title,
+        description: c.description,
+        captions: "",
+        hashtags: (c.hashtags || []).map((h: string) => `#${h}`),
+        videoUrl: c.publicUrl || c.url || "",
+        youtubeVideoId: c.youtubeVideoId || "",
+        facebookVideoId: c.facebookVideoId || "",
+        facebookStoryId: c.facebookStoryId || "",
+        facebookPostId: c.facebookPostId || "",
+        instagramVideoId: c.instagramVideoId || "",
+        instagramStoryId: c.instagramStoryId || "",
+        youtube: (c.youtubeVideoId || c.youtubeUrl) ? 1 : 0,
+        facebook: (c.facebookVideoId || c.facebookUrl) ? 1 : 0,
+        instagram: (c.instagramVideoId || c.instagramUrl) ? 1 : 0,
+        thumbnailUrl:
+          (c.youtubeVideoId ? `https://i.ytimg.com/vi/${c.youtubeVideoId}/hqdefault.jpg` : undefined) ||
+          (c.facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${c.facebookVideoId}` : undefined),
+        format: selectedCategory,
+        createdAt: new Date().toISOString().slice(0, 10),
+        status: "completed",
+        sessionOnly: true,
+      }));
+    if (autoPublishedRecords.length > 0) {
+      setVideos((prev) => mergeVideoRecords(autoPublishedRecords, prev));
+      const cached = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]") as VideoRecord[];
+      localStorage.setItem("tvd-studio-session-videos", JSON.stringify(mergeVideoRecords(autoPublishedRecords, cached)));
+    }
+    const preloadedResults: Record<number, ClipPublishResult> = {};
+    for (const c of receivedClips) {
+      if (c.youtubeVideoId || c.facebookVideoId || c.instagramVideoId) {
+        preloadedResults[c.partNumber] = {
+          status: "done",
+          youtubeUrl: c.youtubeUrl || (c.youtubeVideoId ? `https://www.youtube.com/shorts/${c.youtubeVideoId}` : undefined),
+          facebookUrl: c.facebookUrl || (c.facebookVideoId ? `https://www.facebook.com/reel/${c.facebookVideoId}` : undefined),
+          instagramUrl: c.instagramUrl || (c.instagramVideoId ? `https://www.instagram.com/reel/${c.instagramVideoId}` : undefined),
+          logs: ["✅ Published via pipeline"],
+        };
+      }
+    }
+    if (Object.keys(preloadedResults).length > 0) {
+      setClipResults((prev) => ({ ...preloadedResults, ...prev }));
+    }
+  }
+
   async function handleSplitVideo(overrideUrl?: string) {
     const targetUrl = typeof overrideUrl === "string" ? overrideUrl.trim() : videoUrl.trim();
     if (!targetUrl) {
@@ -476,8 +527,7 @@ export default function Home() {
                 clearInterval(pollInterval);
                 setSplitProgress(100);
                 setSplitStep(`✅ ${job.clips.length} clips ready!`);
-                setClips(job.clips);
-                if (job.sourceTitle) setSourceTitle(job.sourceTitle);
+                syncJobClips(job.clips, job.sourceTitle);
                 setIsSplitting(false);
                 notify(`Split complete: ${job.clips.length} clips ready! Review and publish below.`);
               } else if (job.status === "failed" && !finished) {
@@ -508,8 +558,7 @@ export default function Home() {
                 unsub();
                 setSplitProgress(100);
                 setSplitStep(`✅ ${job.clips.length} clips ready!`);
-                setClips(job.clips);
-                if (job.sourceTitle) setSourceTitle(job.sourceTitle);
+                syncJobClips(job.clips, job.sourceTitle);
                 setIsSplitting(false);
                 notify(`Split complete: ${job.clips.length} clips ready! Review and publish below.`);
               } else if (job.status === "failed" && !finished) {
@@ -530,8 +579,7 @@ export default function Home() {
       const receivedClips = Array.isArray(data.clips) ? data.clips : [];
       setSplitProgress(100);
       setSplitStep(`✅ ${receivedClips.length} clips ready!`);
-      setClips(receivedClips);
-      if (data.sourceTitle) setSourceTitle(data.sourceTitle);
+      syncJobClips(receivedClips, data.sourceTitle);
       notify(`Split into ${receivedClips.length} clips! Review and publish below.`);
       setIsSplitting(false);
     } catch (err: any) {
@@ -595,9 +643,13 @@ export default function Home() {
         videoUrl: (clip.publicUrl && clip.publicUrl.startsWith("http")) ? clip.publicUrl : (data.youtubeUrl || data.facebookUrl || data.instagramUrl || ""),
         youtubeVideoId: data.youtubeVideoId || "",
         facebookVideoId: data.facebookVideoId || "",
+        facebookStoryId: data.facebookStoryId || "",
+        facebookPostId: data.facebookPostId || "",
         instagramVideoId: data.instagramVideoId || "",
+        instagramStoryId: data.instagramStoryId || "",
         youtube: youtubeVal,
         facebook: facebookVal,
+        instagram: instagramVal,
         thumbnailUrl:
           (data.youtubeVideoId ? `https://i.ytimg.com/vi/${data.youtubeVideoId}/hqdefault.jpg` : undefined) ||
           (data.facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${data.facebookVideoId}` : undefined) ||
@@ -695,32 +747,61 @@ export default function Home() {
     }
   }
 
-  async function executeDelete(deleteFromYouTubeToo: boolean) {
+  async function executeDelete(deleteFromSocialsToo: boolean) {
     if (!videoToDelete || (!videoToDelete.sessionOnly && !auth?.currentUser)) return;
     const target = videoToDelete;
     setIsDeleting(true);
     try {
-      if (deleteFromYouTubeToo && target.youtubeVideoId) {
-        await deleteFromYouTube(target.youtubeVideoId);
+      if (deleteFromSocialsToo && target.youtubeVideoId) {
+        await deleteFromYouTube(target.youtubeVideoId).catch((e) => console.warn("YouTube delete notice:", e.message));
       }
-      if (deleteFromYouTubeToo && target.facebookVideoId) {
-        await deleteFromFacebook(target.facebookVideoId);
+      if (deleteFromSocialsToo && (target.facebookVideoId || target.facebook === 1)) {
+        await deleteFromFacebook(target.facebookVideoId || "", {
+          feedPostId: target.facebookPostId,
+          storyId: target.facebookStoryId,
+          title: target.title,
+        }).catch((e) => console.warn("Facebook delete notice:", e.message));
+      }
+      if (deleteFromSocialsToo && (target.instagramVideoId || target.instagram === 1 || connections.includes("Instagram"))) {
+        await deleteFromInstagram(target.instagramVideoId, {
+          storyId: target.instagramStoryId,
+          title: target.title,
+        }).catch((e) => console.warn("Instagram delete notice:", e.message));
       }
 
-      if (target.sessionOnly || target.youtubeVideoId || target.facebookVideoId) {
-        const cachedVideos = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]") as VideoRecord[];
-        localStorage.setItem("tvd-studio-session-videos", JSON.stringify(cachedVideos.filter((video) => video.id !== target.id && video.youtubeVideoId !== target.youtubeVideoId && video.facebookVideoId !== target.facebookVideoId)));
-      }
+      const cachedVideos = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]") as VideoRecord[];
+      localStorage.setItem(
+        "tvd-studio-session-videos",
+        JSON.stringify(
+          cachedVideos.filter(
+            (video) =>
+              video.id !== target.id &&
+              (!target.youtubeVideoId || video.youtubeVideoId !== target.youtubeVideoId) &&
+              (!target.facebookVideoId || video.facebookVideoId !== target.facebookVideoId) &&
+              (!target.instagramVideoId || video.instagramVideoId !== target.instagramVideoId)
+          )
+        )
+      );
+
       if (target.youtubeVideoId) {
         const hiddenVideoIds = JSON.parse(localStorage.getItem("tvd-studio-hidden-youtube-videos") || "[]") as string[];
         if (!hiddenVideoIds.includes(target.youtubeVideoId)) localStorage.setItem("tvd-studio-hidden-youtube-videos", JSON.stringify([...hiddenVideoIds, target.youtubeVideoId]));
       }
-      setVideos((current) => current.filter((video) => {
-        if (target.youtubeVideoId) return video.youtubeVideoId !== target.youtubeVideoId;
-        if (target.facebookVideoId) return video.facebookVideoId !== target.facebookVideoId;
-        return video.id !== target.id;
-      }));
-      setToast(deleteFromYouTubeToo && (target.youtubeVideoId || target.facebookVideoId) ? "Video removed from socials and your library." : "Video removed from your library.");
+
+      setVideos((current) =>
+        current.filter((video) => {
+          if (target.youtubeVideoId && video.youtubeVideoId && video.youtubeVideoId === target.youtubeVideoId) return false;
+          if (target.facebookVideoId && video.facebookVideoId && video.facebookVideoId === target.facebookVideoId) return false;
+          if (target.instagramVideoId && video.instagramVideoId && video.instagramVideoId === target.instagramVideoId) return false;
+          return video.id !== target.id;
+        })
+      );
+
+      setToast(
+        deleteFromSocialsToo && (target.youtubeVideoId || target.facebookVideoId || target.instagramVideoId || target.facebook === 1 || target.instagram === 1)
+          ? "Video removed from socials and your library."
+          : "Video removed from your library."
+      );
       setVideoToDelete(null);
     } catch (error: any) {
       setToast(error.message);
@@ -1127,7 +1208,7 @@ export default function Home() {
       {video.status !== 'failed' && <div className="hashtag-row">{Array.from(new Set(video.hashtags || [])).map((tag, idx) => <span key={`${tag}-${idx}`}>#{tag.replace(/^#/, '')}</span>)}</div>}
       <div className="video-card-actions">
         <div className="card-platform-links">
-          {video.youtube === 1 && (
+          {(video.youtube === 1 || Boolean(video.youtubeVideoId)) && (
             <a
               href={video.youtubeVideoId ? `https://www.youtube.com/shorts/${video.youtubeVideoId}` : (video.videoUrl || "#")}
               target="_blank"
@@ -1139,7 +1220,7 @@ export default function Home() {
               <span>Shorts</span>
             </a>
           )}
-          {video.facebook === 1 && (
+          {(video.facebook === 1 || Boolean(video.facebookVideoId)) && (
             <a
               href={video.facebookVideoId ? `https://www.facebook.com/reel/${video.facebookVideoId}` : "https://www.facebook.com"}
               target="_blank"
@@ -1151,7 +1232,7 @@ export default function Home() {
               <span>FB Reel</span>
             </a>
           )}
-          {video.instagram === 1 && (
+          {(video.instagram === 1 || Boolean(video.instagramVideoId) || (video.facebook === 1 && connections.includes("Instagram"))) && (
             <a
               href={video.instagramVideoId ? `https://www.instagram.com/reel/${video.instagramVideoId}` : "https://www.instagram.com"}
               target="_blank"
@@ -1326,7 +1407,7 @@ export default function Home() {
             <button className="primary-button" disabled={isDeleting} onClick={() => executeDelete(false)} style={{ justifyContent: 'center' }}>
               {isDeleting ? <LoaderCircle className="spin" size={17} /> : "Remove from Library Only"}
             </button>
-            { (videoToDelete.youtubeVideoId || videoToDelete.facebookVideoId) && (
+            { (videoToDelete.youtubeVideoId || videoToDelete.facebookVideoId || videoToDelete.instagramVideoId || videoToDelete.youtube === 1 || videoToDelete.facebook === 1 || videoToDelete.instagram === 1) && (
               <button className="secondary-button" disabled={isDeleting} onClick={() => executeDelete(true)} style={{ justifyContent: 'center', borderColor: '#ea4335', color: '#ea4335', backgroundColor: '#ea433511' }}>
                 {isDeleting ? <LoaderCircle className="spin" size={17} /> : "Delete from Library & Socials"}
               </button>

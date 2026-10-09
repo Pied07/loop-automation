@@ -715,6 +715,15 @@ def run():
                 with urllib.request.urlopen(pub_req, timeout=90) as presp:
                     pdata = json.loads(presp.read().decode("utf-8"))
                     print(f"Auto-published part {clip_item['partNumber']}: {pdata.get('logs', [])}")
+                    if pdata.get("youtubeVideoId"): clip_item["youtubeVideoId"] = pdata["youtubeVideoId"]
+                    if pdata.get("facebookVideoId"): clip_item["facebookVideoId"] = pdata["facebookVideoId"]
+                    if pdata.get("instagramVideoId"): clip_item["instagramVideoId"] = pdata["instagramVideoId"]
+                    if pdata.get("youtubeUrl"): clip_item["youtubeUrl"] = pdata["youtubeUrl"]
+                    if pdata.get("facebookUrl"): clip_item["facebookUrl"] = pdata["facebookUrl"]
+                    if pdata.get("instagramUrl"): clip_item["instagramUrl"] = pdata["instagramUrl"]
+                    if pdata.get("facebookStoryId"): clip_item["facebookStoryId"] = pdata["facebookStoryId"]
+                    if pdata.get("facebookPostId"): clip_item["facebookPostId"] = pdata["facebookPostId"]
+                    if pdata.get("instagramStoryId"): clip_item["instagramStoryId"] = pdata["instagramStoryId"]
             except Exception as pe:
                 print(f"Notice: Auto-publish part {clip_item['partNumber']} notice: {pe}")
 
