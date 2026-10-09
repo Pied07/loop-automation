@@ -1402,15 +1402,15 @@ const TIKTOK_CATEGORY_KEYWORDS: Record<string, string[]> = {
   "Motivational": ["motivation", "mindset", "success", "grind", "nevergiveup", "focus", "discipline", "life", "quote", "inspire", "hardwork", "hustle", "gymmotivation"],
   "Horror": ["horror", "scary", "spooky", "creepy", "paranormal", "ghost", "mystery", "thriller", "dark", "chilling", "haunted", "unexplained"],
   "Educational": ["facts", "didyouknow", "science", "learn", "history", "educational", "interesting", "knowledge", "discovery", "school", "space", "biology"],
-  "Romance": ["love", "romance", "couple", "relationship", "crush", "heart", "cute", "sweet", "wholesome", "feelings", "marriage", "partner"],
-  "Adventure": ["adventure", "outdoor", "extreme", "hiking", "action", "travel", "climbing", "explore", "wild", "skate", "surf", "camping", "expedition"],
-  "Music": ["music", "song", "sing", "dance", "lyrics", "sound", "rap", "cover", "beat", "banger", "guitar", "piano", "vocals", "singer"],
-  "Food": ["food", "recipe", "cooking", "chef", "tasty", "delicious", "eat", "dinner", "cake", "kitchen", "bake", "lunch", "streetfood", "snack"],
-  "Nature": ["nature", "wildlife", "animal", "earth", "ocean", "forest", "dog", "cat", "puppy", "pet", "birds", "landscape"],
-  "Sports": ["sports", "football", "soccer", "gym", "workout", "athlete", "goals", "basketball", "training", "fitness", "run", "champion", "tennis", "fight", "ufc", "boxing"],
-  "Gaming": ["gaming", "game", "gamer", "play", "gta", "fortnite", "roblox", "minecraft", "streamer", "twitch", "gameplay", "clip"],
-  "Travel": ["travel", "explore", "vacation", "trip", "place", "city", "beautiful", "hotel", "flight", "beach", "view", "wanderlust", "destination"],
-  "Fashion": ["fashion", "style", "ootd", "outfit", "clothes", "dress", "model", "drip", "fit", "beauty", "makeup", "look"],
+  "Romance": ["romance", "romantic", "couplegoals", "relationshipgoals", "lovestory", "inlove", "boyfriend", "girlfriend", "dating", "proposal", "wedding", "truelove", "mylove", "soulmate"],
+  "Adventure": ["adventure", "outdoor expedition", "extreme sports", "hiking", "action sports", "climbing", "skydiving", "skateboarding", "surfing", "camping", "expedition"],
+  "Music": ["music video", "song cover", "singing", "lyrics", "rap freestyle", "banger song", "guitar solo", "piano cover", "vocals", "live concert"],
+  "Food": ["recipe", "cooking", "chef", "delicious food", "tasty recipe", "dinner recipe", "baking", "street food", "kitchen recipe"],
+  "Nature": ["nature wildlife", "wild animals", "ocean wildlife", "forest nature", "animal rescue", "wildlife sanctuary", "planet earth"],
+  "Sports": ["football highlights", "soccer skills", "gym workout", "athlete training", "basketball dunk", "fitness motivation", "ufc knockout", "boxing fight"],
+  "Gaming": ["gaming clip", "gameplay", "fortnite gameplay", "roblox gameplay", "minecraft build", "streamer moment", "twitch clip"],
+  "Travel": ["travel vlog", "vacation destination", "travel guide", "flight travel", "beach resort", "wanderlust travel"],
+  "Fashion": ["fashion style", "ootd fashion", "outfit transition", "streetwear style", "runway fashion", "model runway"],
 };
 
 // 1. Live Trending TikTok Video Scraper (Real creators, millions of views, direct MP4 CDN stream)
@@ -1443,7 +1443,8 @@ export async function scrapeTikTokTrendingVideos(category: string): Promise<{ ti
 
     const catKws = TIKTOK_CATEGORY_KEYWORDS[category] || [];
     let matched = valid.filter((v) => {
-      const text = `${v.title} ${v.author?.nickname || ""} ${v.author?.unique_id || ""}`.toLowerCase();
+      // Strictly search video title so author handles like @cute_outfits never trigger Romance
+      const text = String(v.title).toLowerCase();
       return catKws.some((k) => text.includes(k));
     });
 
@@ -1478,66 +1479,7 @@ export async function scrapeTikTokTrendingVideos(category: string): Promise<{ ti
   return null;
 }
 
-// 2. Mixkit Live HD Video Scraper (Real human-filmed action, romance, food, sports, nature footage)
-async function searchMixkit(category: string): Promise<{ title: string; url: string; source: string } | null> {
-  const catMap: Record<string, string> = {
-    "Trending": "lifestyle",
-    "Motivational": "lifestyle",
-    "Funny": "comedy",
-    "Comedy": "comedy",
-    "Educational": "technology",
-    "Nature": "nature",
-    "Sports": "sports",
-    "Gaming": "technology",
-    "Travel": "travel",
-    "Food": "food",
-    "Fashion": "lifestyle",
-    "Romance": "romance",
-    "Adventure": "adventure",
-    "Horror": "horror",
-    "Music": "music",
-  };
-
-  const defaultTitles: Record<string, string[]> = {
-    "Romance": ["Sweet Romantic Couple Moment", "Heartfelt Love & Romance Story", "Cherished Romantic Connection"],
-    "Horror": ["Chilling Night Mystery", "Dark Haunting Atmosphere", "Spooky Paranormal Encounter"],
-    "Adventure": ["Extreme Action Expedition", "Epic Outdoor Wilderness Adventure", "Thrilling Mountain Exploration"],
-    "Food": ["Delicious Gourmet Culinary Creation", "Mouthwatering Kitchen Recipe", "Artisanal Chef Masterpiece"],
-    "Comedy": ["Hilarious Slapstick Comedy", "Unfiltered Laugh-Out-Loud Humor", "Relatable Comedy Moment"],
-    "Motivational": ["Unstoppable Mindset & Success Motivation", "Rise to Greatness Inspiration", "Relentless Focus & Grind"],
-    "Educational": ["Fascinating Scientific Discovery", "Mind-Expanding Insight", "Curious World Wonders"],
-    "Music": ["Rhythmic Acoustic Beats", "Soulful Harmonic Melody", "Energetic Musical Soundscape"],
-    "Trending": ["Viral Phenomenon Trending Clip", "Hypnotic Aesthetic Visuals", "Must-See Trending Moment"],
-  };
-
-  const targetCategory = catMap[category] || "lifestyle";
-  try {
-    const res = await fetch(`https://mixkit.co/free-stock-video/${targetCategory}/`, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-      },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return null;
-    const html = await res.text();
-    const mp4Matches = [...new Set([...html.matchAll(/https:\/\/assets\.mixkit\.co\/videos\/(\d+)\/\1\-(?:720|1080)\.mp4/g)].map((m) => m[0]))];
-    if (mp4Matches.length > 0) {
-      const picked = mp4Matches[Math.floor(Math.random() * mp4Matches.length)];
-      const titleOptions = defaultTitles[category] || [`Viral ${category} Moment`];
-      const pickedTitle = titleOptions[Math.floor(Math.random() * titleOptions.length)];
-      return {
-        title: pickedTitle,
-        url: picked,
-        source: `Mixkit HD (${category} • Direct Cloud MP4)`,
-      };
-    }
-  } catch (e) {
-    console.warn("Mixkit direct search fallback notice:", e);
-  }
-  return null;
-}
-
-// 3. Internet Archive Live API (Classic comedy, vintage cartoons, iconic public moments)
+// 2. Internet Archive Live API (Classic comedy, vintage cartoons, iconic audio-rich moments)
 async function searchArchiveOrg(category: string): Promise<{ title: string; url: string; source: string } | null> {
   const queryMap: Record<string, string> = {
     "Trending": "innovation discovery future viral",
@@ -1575,7 +1517,7 @@ async function searchArchiveOrg(category: string): Promise<{ title: string; url:
         return {
           title: doc.title || `Classic ${category} Clip`,
           url: `https://archive.org/download/${doc.identifier}/${encodeURIComponent(mp4.name)}`,
-          source: "Internet Archive (Direct Cloud MP4, Zero Bot Checks)",
+          source: "Internet Archive (Sound Audio • Direct Cloud MP4)",
         };
       }
     }
@@ -1583,7 +1525,7 @@ async function searchArchiveOrg(category: string): Promise<{ title: string; url:
   return null;
 }
 
-// 4. Wikimedia Commons Live API (High quality community-filmed videos)
+// 3. Wikimedia Commons Live API (High quality community-filmed videos)
 async function searchWikimedia(category: string): Promise<{ title: string; url: string; source: string } | null> {
   try {
     const url = `https://commons.wikimedia.org/w/api.php?action=query&list=search&srnamespace=6&srsearch=filetype:video+${encodeURIComponent(category)}&srlimit=15&format=json`;
@@ -1624,21 +1566,17 @@ export async function scrapeOnlineViralVideo(category: string): Promise<{ url: s
   const cleanCat = category?.trim() || "Trending";
   const isTrending = cleanCat.toLowerCase() === "trending" || cleanCat.toLowerCase() === "viral";
 
-  // 1. If Trending: scrape live trending TikTok videos feed directly
+  // 1. If Trending: scrape live trending TikTok videos (real creators, viral music, speech, sound)
   if (isTrending) {
     const fromTikTok = await scrapeTikTokTrendingVideos("Trending");
     if (fromTikTok) return fromTikTok;
   } else {
-    // 2. If specific category (Romance, Horror, Adventure, etc.): check for keyword-matched TikTok
+    // 2. Specific Category: Check for keyword-matched TikTok videos (with audio)
     const fromTikTok = await scrapeTikTokTrendingVideos(cleanCat);
     if (fromTikTok) return fromTikTok;
   }
 
-  // 3. Mixkit HD category scraper (100% genuine category video footage: Romance, Horror, Adventure, Food, etc.)
-  const fromMixkit = await searchMixkit(cleanCat);
-  if (fromMixkit) return fromMixkit;
-
-  // 4. YouTube Shorts category search (100% relevant viral Shorts for that category)
+  // 3. YouTube Shorts category search (100% relevant viral Shorts with full audio, voices, music)
   const queries = SAFE_CATEGORY_QUERIES[cleanCat] || SAFE_CATEGORY_QUERIES["Trending"] || [];
   if (queries.length > 0) {
     const randomQuery = queries[Math.floor(Math.random() * queries.length)];
@@ -1659,22 +1597,19 @@ export async function scrapeOnlineViralVideo(category: string): Promise<{ url: s
     }
   }
 
-  // 5. Internet Archive live search (direct MP4)
+  // 4. Internet Archive live search (vintage comedy/cartoons with audio)
   const fromArchive = await searchArchiveOrg(cleanCat);
   if (fromArchive) return fromArchive;
 
-  // 6. Wikimedia Commons live search (direct MP4)
+  // 5. Wikimedia Commons live search
   const fromWiki = await searchWikimedia(cleanCat);
   if (fromWiki) return fromWiki;
 
-  // 7. Ultimate fallback only if all category-specific sources failed
+  // 6. Fallback: High engagement TikTok video with real audio
   const fallbackTikTok = await scrapeTikTokTrendingVideos("Trending");
   if (fallbackTikTok) return fallbackTikTok;
 
-  const fallbackMixkit = (await searchMixkit("nature")) || (await searchMixkit("lifestyle"));
-  if (fallbackMixkit) return fallbackMixkit;
-
-  throw new Error(`Could not find a live viral video stream for "${cleanCat}". Please paste a video URL directly.`);
+  throw new Error(`Could not find a viral video with audio for "${cleanCat}". Please paste a video URL directly.`);
 }
 
 export async function findSafeRoyaltyFreeVideo(category: string): Promise<{ url: string; title: string; source: string }> {

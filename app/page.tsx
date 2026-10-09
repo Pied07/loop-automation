@@ -544,7 +544,7 @@ export default function Home() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processMode, setProcessMode] = useState<"cloud" | "queue">("cloud");
-  const [autoFindSource, setAutoFindSource] = useState<"scrape" | "direct" | "youtube">("scrape");
+  const [autoFindSource, setAutoFindSource] = useState<"scrape" | "youtube">("scrape");
   const [autoPilotEnabled, setAutoPilotEnabled] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1376,14 +1376,7 @@ export default function Home() {
                       onClick={() => setAutoFindSource("scrape")}
                       className={`pill-btn ${autoFindSource === "scrape" ? "active-scrape" : ""}`}
                     >
-                      <Sparkles size={13} /> 🔥 Scrape Viral Online (Direct MP4)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAutoFindSource("direct")}
-                      className={`pill-btn ${autoFindSource === "direct" ? "active-direct" : ""}`}
-                    >
-                      <ShieldCheck size={13} /> ⚡ Mixkit HD
+                      <Sparkles size={13} /> 🔥 Scrape Viral Online (TikTok Direct MP4)
                     </button>
                     <button
                       type="button"
