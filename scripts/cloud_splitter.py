@@ -677,6 +677,10 @@ def run():
     for meta in clips_meta:
         fname = meta["filename"]
         pub_url = url_map.get(fname, "")
+        thumb_url = ""
+        if pub_url and "res.cloudinary.com" in pub_url:
+            thumb_url = re.sub(r"/video/upload/(?:v\d+/)?", "/video/upload/so_2,f_auto,q_auto/", pub_url)
+            thumb_url = re.sub(r"\.[^.]+$", ".jpg", thumb_url)
         clips.append({
             "partNumber": meta["partNumber"],
             "title": meta["title"],
@@ -687,6 +691,7 @@ def run():
             "url": pub_url,
             "clipPath": pub_url,
             "publicUrl": pub_url,
+            "thumbnailUrl": thumb_url,
             "storagePath": f"cloudinary/{USER_ID}/{JOB_ID}/{Path(fname).stem}",
             **({"cloudinaryPublicId": cloudinary_public_id(JOB_ID, fname)} if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET else {}),
         })

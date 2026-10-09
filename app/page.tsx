@@ -190,12 +190,15 @@ export default function Home() {
               const yt: 0 | 1 = (video.youtube !== undefined ? video.youtube : (video.youtubeVideoId ? 1 : 0)) as 0 | 1;
               const fb: 0 | 1 = (video.facebook !== undefined ? video.facebook : (video.facebookVideoId ? 1 : 0)) as 0 | 1;
               const ig: 0 | 1 = (video.instagram !== undefined ? video.instagram : (video.instagramVideoId ? 1 : 0)) as 0 | 1;
+              // Ignore any legacy Polaroid cards saved in local storage
+              const cleanThumb = video.thumbnailUrl && video.thumbnailUrl.includes("story_polaroid") ? undefined : video.thumbnailUrl;
               return {
                 ...video,
                 id: cleanId,
                 youtube: yt,
                 facebook: fb,
                 instagram: ig,
+                thumbnailUrl: cleanThumb,
               };
             });
           window.setTimeout(() => setVideos(sessionVideos), 0);
@@ -583,7 +586,14 @@ export default function Home() {
       const facebookVal: 0 | 1 = (data.facebookUrl || data.facebookVideoId) ? 1 : 0;
       const instagramVal: 0 | 1 = (data.instagramUrl || data.instagramVideoId) ? 1 : 0;
 
-      // Add to video library
+      // Add to video library with clean video frame thumbnail
+      const cleanPoster =
+        (clip.publicUrl && clip.publicUrl.includes("res.cloudinary.com"))
+          ? clip.publicUrl.replace(/\/video\/upload\/(?:v\d+\/)?/, "/video/upload/so_2,f_auto,q_auto/").replace(/\.[^.]+$/, ".jpg")
+          : (data.thumbnailUrl && !data.thumbnailUrl.includes("story_polaroid"))
+          ? data.thumbnailUrl
+          : (data.youtubeVideoId ? `https://i.ytimg.com/vi/${data.youtubeVideoId}/hqdefault.jpg` : undefined);
+
       const newRecord: VideoRecord = {
         id: `clip-${clip.partNumber}-${Date.now()}`,
         title: clip.title,
@@ -597,7 +607,7 @@ export default function Home() {
         youtube: youtubeVal,
         facebook: facebookVal,
         instagram: instagramVal,
-        thumbnailUrl: data.thumbnailUrl || (data.facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${data.facebookVideoId}` : undefined),
+        thumbnailUrl: cleanPoster || (data.facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${data.facebookVideoId}` : undefined),
         format: selectedCategory,
         createdAt: new Date().toISOString().slice(0, 10),
         status: "completed",
@@ -1043,11 +1053,20 @@ export default function Home() {
       return m && m[1]?.length === 11 ? m[1] : "";
     })();
 
+    const isCloudinary = video.videoUrl && video.videoUrl.includes("res.cloudinary.com");
+    const cloudinaryPoster = isCloudinary
+      ? video.videoUrl.replace(/\/video\/upload\/(?:v\d+\/)?/, "/video/upload/so_2,f_auto,q_auto/").replace(/\.[^.]+$/, ".jpg")
+      : "";
+
+    const cleanStoredThumb = video.thumbnailUrl && !video.thumbnailUrl.includes("story_polaroid")
+      ? video.thumbnailUrl
+      : "";
+
     const thumbUrl =
-      video.thumbnailUrl ||
+      cloudinaryPoster ||
       (ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : "") ||
+      cleanStoredThumb ||
       (video.facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${video.facebookVideoId}` : "") ||
-      (video.videoUrl && video.videoUrl.includes("res.cloudinary.com") ? video.videoUrl.replace(/\.[^.]+$/, ".jpg") : "") ||
       `/api/viral-clips/thumbnail?format=${encodeURIComponent(video.format || "Trending")}`;
 
     const targetLink = ytId
