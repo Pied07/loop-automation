@@ -58,6 +58,10 @@ export async function POST(req: NextRequest) {
       if (!item.id) continue;
       const title = item.title || item.description?.split("\n")[0]?.slice(0, 70) || "Viral Clip";
       const desc = item.description || "";
+      // Discard teaser posts or click-to-watch links
+      if (/tap to watch/i.test(title) || /tap to watch/i.test(desc) || /^https?:\/\//i.test(title) || /facebook\.com\/reel\//i.test(title)) {
+        continue;
+      }
       const prefix = title.match(/^([^:]{2,24}):/)?.[1]?.trim();
       const format = knownFormats.find((k) => k.toLowerCase() === (prefix || "").toLowerCase()) || "Trending";
       const thumb = item.thumbnails?.data?.[0]?.uri || `/api/viral-clips/thumbnail?facebookId=${item.id}`;

@@ -83,54 +83,86 @@ const formats = [
 
 type Screen = "home" | "studio" | "library" | "settings";
 
+function isGarbageRecord(video: VideoRecord): boolean {
+  if (!video) return true;
+  const title = (video.title || "").trim();
+  const desc = (video.description || "").trim();
+  // Filter click-to-watch / tap-to-watch teasers or feed post shares
+  if (/tap to watch/i.test(title) || /tap to watch/i.test(desc)) return true;
+  // Filter posts where title starts with a URL or contains reel links
+  if (/^https?:\/\//i.test(title)) return true;
+  if (/facebook\.com\/reel\//i.test(title) || /instagram\.com\/reel\//i.test(title)) return true;
+  // Filter empty titles or hashtags-only titles
+  if (!title || /^#+/.test(title)) return true;
+  return false;
+}
+
 function mergeVideoRecords(...groups: VideoRecord[][]): VideoRecord[] {
   const merged = new Map<string, VideoRecord>();
   for (const video of groups.flat()) {
     if (!video || !video.id) continue;
+    // Discard any garbage, teaser, or post-share records
+    if (isGarbageRecord(video)) continue;
     // Exclude external youtube channel uploads
     if (video.id.startsWith("youtube-")) {
       continue;
     }
     const cleanId = video.id.startsWith("session-") ? video.id.slice("session-".length) : video.id;
-    // Normalize title to alphanumeric slug so cross-posted FB & IG entries merge together
-    const titleSlug = (video.title || "")
+
+    // Base title extracted before separators like "—", "-", or ":"
+    const baseTitle = (video.title || "").split(/[—–\-\:]/)[0].trim();
+    const baseTitleSlug = baseTitle
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "")
+      .slice(0, 24);
+
+    const fullTitleSlug = (video.title || "")
       .toLowerCase()
       .replace(/[^a-z0-9]/g, "")
       .slice(0, 32);
 
     const key =
-      titleSlug.length >= 6 ? `title-${titleSlug}` :
       video.facebookVideoId ? `fb-${video.facebookVideoId}` :
       video.youtubeVideoId ? `yt-${video.youtubeVideoId}` :
       video.instagramVideoId ? `ig-${video.instagramVideoId}` :
+      baseTitleSlug.length >= 6 ? `title-${baseTitleSlug}` :
+      fullTitleSlug.length >= 6 ? `title-${fullTitleSlug}` :
       cleanId;
 
     const existing = merged.get(key);
     const score = (item: VideoRecord) =>
+      (item.videoUrl && item.videoUrl.includes("res.cloudinary.com") ? 500 : 0) +
+      (item.thumbnailUrl && !item.thumbnailUrl.includes("/api/viral-clips/thumbnail?") ? 200 : 0) +
       (item.captions?.length || 0) +
-      (item.videoUrl && !item.videoUrl.includes("youtube.com/") ? 100 : 0) +
-      (item.thumbnailUrl ? 50 : 0) +
-      (item.hashtags?.length || 0) +
+      (item.title?.length || 0) +
+      (item.hashtags?.length || 0) * 5 +
       ((item.youtube || 0) * 10) +
       ((item.facebook || 0) * 10) +
       ((item.instagram || 0) * 10);
-    if (!existing || score(video) >= score(existing)) {
-      merged.set(key, {
-        ...(existing || {}),
-        ...video,
-        id: existing?.id || cleanId,
-        youtube: (video.youtube === 1 || existing?.youtube === 1 || Boolean(video.youtubeVideoId || existing?.youtubeVideoId)) ? 1 : 0,
-        facebook: (video.facebook === 1 || existing?.facebook === 1 || Boolean(video.facebookVideoId || existing?.facebookVideoId)) ? 1 : 0,
-        instagram: (video.instagram === 1 || existing?.instagram === 1 || Boolean(video.instagramVideoId || existing?.instagramVideoId) || video.facebook === 1 || existing?.facebook === 1) ? 1 : 0,
-        youtubeVideoId: video.youtubeVideoId || existing?.youtubeVideoId,
-        facebookVideoId: video.facebookVideoId || existing?.facebookVideoId,
-        facebookStoryId: video.facebookStoryId || existing?.facebookStoryId,
-        facebookPostId: video.facebookPostId || existing?.facebookPostId,
-        instagramVideoId: video.instagramVideoId || existing?.instagramVideoId,
-        instagramStoryId: video.instagramStoryId || existing?.instagramStoryId,
-        thumbnailUrl: video.thumbnailUrl || existing?.thumbnailUrl,
-      });
-    }
+
+    const winner = score(video) >= (existing ? score(existing) : -1) ? video : existing!;
+    const other = winner === video ? existing : video;
+
+    merged.set(key, {
+      ...(other || {}),
+      ...winner,
+      id: (winner.id && !winner.id.startsWith("fb-")) ? winner.id : (other?.id || winner.id),
+      title: (winner.title && winner.title.length >= (other?.title?.length || 0)) ? winner.title : (other?.title || winner.title),
+      description: (winner.description && winner.description.length >= (other?.description?.length || 0)) ? winner.description : (other?.description || winner.description),
+      videoUrl: (winner.videoUrl && winner.videoUrl.includes("http")) ? winner.videoUrl : (other?.videoUrl || winner.videoUrl),
+      thumbnailUrl: (winner.thumbnailUrl && !winner.thumbnailUrl.includes("/api/viral-clips/thumbnail?"))
+        ? winner.thumbnailUrl
+        : (other?.thumbnailUrl || winner.thumbnailUrl),
+      youtube: (winner.youtube === 1 || other?.youtube === 1 || Boolean(winner.youtubeVideoId || other?.youtubeVideoId)) ? 1 : 0,
+      facebook: (winner.facebook === 1 || other?.facebook === 1 || Boolean(winner.facebookVideoId || other?.facebookVideoId)) ? 1 : 0,
+      instagram: (winner.instagram === 1 || other?.instagram === 1 || Boolean(winner.instagramVideoId || other?.instagramVideoId) || winner.facebook === 1 || other?.facebook === 1) ? 1 : 0,
+      youtubeVideoId: winner.youtubeVideoId || other?.youtubeVideoId,
+      facebookVideoId: winner.facebookVideoId || other?.facebookVideoId,
+      facebookStoryId: winner.facebookStoryId || other?.facebookStoryId,
+      facebookPostId: winner.facebookPostId || other?.facebookPostId,
+      instagramVideoId: winner.instagramVideoId || other?.instagramVideoId,
+      instagramStoryId: winner.instagramStoryId || other?.instagramStoryId,
+    });
   }
   return [...merged.values()].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
 }
@@ -231,7 +263,8 @@ export default function Home() {
           const sessionVideos = cachedVideos
             .filter((video: VideoRecord) =>
               Boolean(video?.id && (video.videoUrl || video.youtubeVideoId || video.facebookVideoId || video.instagramVideoId || video.title)) &&
-              !video.id.startsWith("youtube-")
+              !video.id.startsWith("youtube-") &&
+              !isGarbageRecord(video)
             )
             .map((video: VideoRecord) => {
               const cleanId = video.id.startsWith("session-") ? video.id.slice("session-".length) : video.id;
@@ -311,19 +344,6 @@ export default function Home() {
           }
         })
         .catch(() => {});
-
-      fetch("/api/videos/sync-facebook")
-        .then((res) => res.json())
-        .then((data) => {
-          if (data?.success && Array.isArray(data.videos)) {
-            setVideos((current) => {
-              const merged = mergeVideoRecords(current, data.videos);
-              try { localStorage.setItem("tvd-studio-session-videos", JSON.stringify(merged)); } catch {}
-              return merged;
-            });
-          }
-        })
-        .catch(() => {});
     }
   }, []);
 
@@ -340,32 +360,21 @@ export default function Home() {
       setScreen("studio");
       // Synchronize in real-time with videos saved under the user's Firestore account
       unsubVideos = listenToVideos(user.uid, (firestoreVideos) => {
-        if (Array.isArray(firestoreVideos) && firestoreVideos.length > 0) {
+        if (Array.isArray(firestoreVideos)) {
+          // Permanently delete any garbage records stored in Firestore
+          for (const v of firestoreVideos) {
+            if (isGarbageRecord(v)) {
+              deleteVideo(user.uid, v.id).catch(() => {});
+            }
+          }
+          const validVideos = firestoreVideos.filter((v) => !isGarbageRecord(v));
           setVideos((current) => {
-            const merged = mergeVideoRecords(current, firestoreVideos);
+            const merged = mergeVideoRecords(current, validVideos);
             try { localStorage.setItem("tvd-studio-session-videos", JSON.stringify(merged)); } catch {}
             return merged;
           });
         }
       });
-
-      // Automatically sync all published Facebook posts into Firebase Firestore
-      fetch("/api/videos/sync-facebook", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.uid }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data?.success && Array.isArray(data.videos)) {
-            setVideos((current) => {
-              const merged = mergeVideoRecords(current, data.videos);
-              try { localStorage.setItem("tvd-studio-session-videos", JSON.stringify(merged)); } catch {}
-              return merged;
-            });
-          }
-        })
-        .catch(() => {});
     });
     return () => {
       unsubscribeAuth();
