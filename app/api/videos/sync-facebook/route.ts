@@ -28,20 +28,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Facebook Page is not connected." }, { status: 400 });
     }
 
-    // Fetch up to 100 published videos/reels from Facebook Page
-    const fbRes = await fetch(
-      `https://graph.facebook.com/v26.0/${pageId}/videos?fields=id,title,description,created_time,thumbnails,permalink_url&limit=100&access_token=${pageToken}`,
-      { cache: "no-store", signal: AbortSignal.timeout(10000) }
-    );
+    // Fetch all published videos and reels using pagination cursors
+    const allItemsMap = new Map<string, any>();
+    let nextVideosUrl: string | null = `https://graph.facebook.com/v26.0/${pageId}/videos?fields=id,title,description,created_time,thumbnails,permalink_url&limit=50&access_token=${pageToken}`;
 
-    if (!fbRes.ok) {
-      const err = await fbRes.json().catch(() => ({}));
-      return NextResponse.json({ success: false, error: err?.error?.message || "Failed to fetch Facebook Page videos" }, { status: 500 });
+    let videoPages = 0;
+    while (nextVideosUrl && videoPages < 6) {
+      videoPages++;
+      try {
+        const res: Response = await fetch(nextVideosUrl, { cache: "no-store", signal: AbortSignal.timeout(8000) });
+        if (!res.ok) break;
+        const data: any = await res.json();
+        for (const item of (data.data || [])) {
+          if (item?.id) allItemsMap.set(item.id, item);
+        }
+        nextVideosUrl = data?.paging?.next || null;
+      } catch {
+        break;
+      }
     }
 
-    const fbData = await fbRes.json();
-    const items = Array.isArray(fbData?.data) ? fbData.data : [];
+    // Also check video_reels endpoint for any reels published to the Page
+    try {
+      const reelsRes = await fetch(
+        `https://graph.facebook.com/v26.0/${pageId}/video_reels?fields=id,description,created_time,thumbnails,permalink_url&limit=50&access_token=${pageToken}`,
+        { cache: "no-store", signal: AbortSignal.timeout(8000) }
+      );
+      if (reelsRes.ok) {
+        const reelsData = await reelsRes.json();
+        for (const item of (reelsData.data || [])) {
+          if (item?.id && !allItemsMap.has(item.id)) allItemsMap.set(item.id, item);
+        }
+      }
+    } catch {}
 
+    const items = Array.from(allItemsMap.values());
     const syncedVideos: VideoRecord[] = [];
     const knownFormats = ["Trending", "Horror", "Historical", "Motivational", "Sci-Fi", "Mystery", "Philosophy", "Adventure", "Romance", "Anime", "ASMR", "Music", "Food"];
 
