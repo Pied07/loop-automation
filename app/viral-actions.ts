@@ -646,6 +646,7 @@ export async function publishClipAndCleanup(params: {
   facebookVideoId?: string;
   instagramVideoId?: string;
   thumbnailUrl?: string;
+  storyCardUrl?: string;
   gmailSent?: boolean;
   error?: string;
   logs: string[];
@@ -1150,7 +1151,10 @@ export async function publishClipAndCleanup(params: {
     // so library cards always display an aesthetic, high-res thumbnail preview!
   }
 
-  const resolvedThumb = storyCardUrl || (facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${facebookVideoId}` : undefined);
+  // Return standard video thumbnail (YouTube hqdefault or Facebook thumbnail), never the story card
+  const resolvedThumb =
+    (youtubeVideoId ? `https://i.ytimg.com/vi/${youtubeVideoId}/hqdefault.jpg` : undefined) ||
+    (facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${facebookVideoId}` : undefined);
 
   const anySuccess = !!(youtubeVideoId || facebookVideoId || instagramVideoId);
   const failureReasons = logs.filter((l) => l.startsWith("❌") || l.startsWith("⚠️"));
@@ -1164,6 +1168,7 @@ export async function publishClipAndCleanup(params: {
     facebookVideoId,
     instagramVideoId,
     thumbnailUrl: resolvedThumb,
+    storyCardUrl,
     gmailSent,
     error: anySuccess ? undefined : (failureReasons.join(" • ") || "All connected platforms failed to publish."),
     logs,
