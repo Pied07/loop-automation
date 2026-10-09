@@ -46,8 +46,16 @@ export const database = app ? getFirestore(app) : null;
 export const storage = app ? getStorage(app) : null;
 
 function normalizeVideoRecord(video: VideoRecord): VideoRecord {
-  if (video.videoUrl || video.youtubeVideoId) return { ...video, status: "completed" };
-  return video.status === "failed" ? video : { ...video, status: "completed" };
+  const yt: 0 | 1 = (video.youtube !== undefined ? video.youtube : (video.youtubeVideoId ? 1 : 0)) as 0 | 1;
+  const fb: 0 | 1 = (video.facebook !== undefined ? video.facebook : (video.facebookVideoId ? 1 : 0)) as 0 | 1;
+  const ig: 0 | 1 = (video.instagram === 1 || Boolean(video.instagramVideoId) || fb === 1 || Boolean(video.facebookVideoId) ? 1 : 0) as 0 | 1;
+  return {
+    ...video,
+    youtube: yt,
+    facebook: fb,
+    instagram: ig,
+    status: video.status || "completed",
+  };
 }
 
 export async function getVideos(userId: string): Promise<VideoRecord[]> {

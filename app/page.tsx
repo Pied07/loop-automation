@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { useEffect, useState, useRef, type FormEvent } from "react";
-import { auth, firebaseConfigured, database, type VideoRecord } from "./firebase";
+import { auth, firebaseConfigured, database, listenToVideos, saveVideo, deleteVideo, type VideoRecord } from "./firebase";
 import { doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
 import { deleteFromYouTube, deleteFromFacebook, deleteFromInstagram } from "./actions";
 import { FaYoutube, FaInstagram, FaFacebookF } from "react-icons/fa6";
@@ -86,12 +86,41 @@ type Screen = "home" | "studio" | "library" | "settings";
 function mergeVideoRecords(...groups: VideoRecord[][]): VideoRecord[] {
   const merged = new Map<string, VideoRecord>();
   for (const video of groups.flat()) {
-    const key = video.youtubeVideoId || video.id;
+    if (!video || !video.id) continue;
+    const cleanId = video.id.startsWith("session-") ? video.id.slice("session-".length) : video.id;
+    const key =
+      video.youtubeVideoId ? `yt-${video.youtubeVideoId}` :
+      video.facebookVideoId ? `fb-${video.facebookVideoId}` :
+      video.instagramVideoId ? `ig-${video.instagramVideoId}` :
+      cleanId;
     const existing = merged.get(key);
-    const score = (item: VideoRecord) => (item.captions?.length || 0) + (item.videoUrl && !item.videoUrl.includes("youtube.com/") ? 100 : 0) + (item.hashtags?.length || 0);
-    if (!existing || score(video) >= score(existing)) merged.set(key, video);
+    const score = (item: VideoRecord) =>
+      (item.captions?.length || 0) +
+      (item.videoUrl && !item.videoUrl.includes("youtube.com/") ? 100 : 0) +
+      (item.thumbnailUrl ? 50 : 0) +
+      (item.hashtags?.length || 0) +
+      ((item.youtube || 0) * 10) +
+      ((item.facebook || 0) * 10) +
+      ((item.instagram || 0) * 10);
+    if (!existing || score(video) >= score(existing)) {
+      merged.set(key, {
+        ...(existing || {}),
+        ...video,
+        id: cleanId,
+        youtube: (video.youtube === 1 || existing?.youtube === 1 || Boolean(video.youtubeVideoId || existing?.youtubeVideoId)) ? 1 : 0,
+        facebook: (video.facebook === 1 || existing?.facebook === 1 || Boolean(video.facebookVideoId || existing?.facebookVideoId)) ? 1 : 0,
+        instagram: (video.instagram === 1 || existing?.instagram === 1 || Boolean(video.instagramVideoId || existing?.instagramVideoId) || video.facebook === 1 || existing?.facebook === 1) ? 1 : 0,
+        youtubeVideoId: video.youtubeVideoId || existing?.youtubeVideoId,
+        facebookVideoId: video.facebookVideoId || existing?.facebookVideoId,
+        facebookStoryId: video.facebookStoryId || existing?.facebookStoryId,
+        facebookPostId: video.facebookPostId || existing?.facebookPostId,
+        instagramVideoId: video.instagramVideoId || existing?.instagramVideoId,
+        instagramStoryId: video.instagramStoryId || existing?.instagramStoryId,
+        thumbnailUrl: video.thumbnailUrl || existing?.thumbnailUrl,
+      });
+    }
   }
-  return [...merged.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return [...merged.values()].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
 }
 
 function StyleImageCard({ s, isSelected, onClick }: { s: any, isSelected: boolean, onClick: () => void }) {
@@ -181,10 +210,13 @@ export default function Home() {
       } catch {}
 
       try {
-        const cachedVideos = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]");
-        if (Array.isArray(cachedVideos)) {
+        const tvd = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]");
+        const loop = JSON.parse(localStorage.getItem("loop-studio-session-videos") || "[]");
+        const raw = JSON.parse(localStorage.getItem("videos") || "[]");
+        const cachedVideos = [...(Array.isArray(tvd) ? tvd : []), ...(Array.isArray(loop) ? loop : []), ...(Array.isArray(raw) ? raw : [])];
+        if (cachedVideos.length > 0) {
           const sessionVideos = cachedVideos
-            .filter((video: VideoRecord) => video?.sessionOnly && (video.videoUrl || video.youtubeVideoId || video.facebookVideoId || video.instagramVideoId))
+            .filter((video: VideoRecord) => Boolean(video?.id && (video.videoUrl || video.youtubeVideoId || video.facebookVideoId || video.instagramVideoId || video.title)))
             .map((video: VideoRecord) => {
               const cleanId = video.id.startsWith("session-") ? video.id.slice("session-".length) : video.id;
               const yt: 0 | 1 = (video.youtube !== undefined ? video.youtube : (video.youtubeVideoId ? 1 : 0)) as 0 | 1;
@@ -200,11 +232,9 @@ export default function Home() {
                 thumbnailUrl: cleanThumb,
               };
             });
-          window.setTimeout(() => setVideos(sessionVideos), 0);
+          window.setTimeout(() => setVideos((prev) => mergeVideoRecords(prev, sessionVideos)), 0);
         }
-      } catch {
-        localStorage.removeItem("tvd-studio-session-videos");
-      }
+      } catch {}
       const stored = localStorage.getItem("app_connections");
       const existingConns: string[] = stored ? JSON.parse(stored) : [];
 
@@ -253,7 +283,7 @@ export default function Home() {
         setConnections(existingConns);
       }
 
-      // Always synchronize with server-side connected OAuth platforms (keeps all devices in 100% sync)
+      // 1. Always synchronize with server-side connected OAuth platforms (keeps all devices in 100% sync)
       fetch("/api/auth/status")
         .then((res) => res.json())
         .then((data) => {
@@ -263,18 +293,58 @@ export default function Home() {
           }
         })
         .catch(() => {});
+
+      // 2. Automatically recover all published videos across YouTube, Facebook, and Instagram
+      fetch("/api/videos/published")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data?.success && Array.isArray(data.videos) && data.videos.length > 0) {
+            let hiddenIds: string[] = [];
+            try {
+              hiddenIds = JSON.parse(localStorage.getItem("tvd-studio-hidden-youtube-videos") || "[]");
+            } catch {}
+            const visible = data.videos.filter((v: VideoRecord) => !v.youtubeVideoId || !hiddenIds.includes(v.youtubeVideoId));
+            setVideos((current) => {
+              const merged = mergeVideoRecords(current, visible);
+              try { localStorage.setItem("tvd-studio-session-videos", JSON.stringify(merged)); } catch {}
+              return merged;
+            });
+            const currentUser = auth?.currentUser;
+            if (currentUser) {
+              visible.forEach((v: VideoRecord) => saveVideo(currentUser.uid, v).catch(() => {}));
+            }
+          }
+        })
+        .catch(() => {});
     }
   }, []);
 
   useEffect(() => {
     if (!auth) return;
+    let unsubVideos: (() => void) | undefined;
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      if (!user) return;
+      if (!user) {
+        if (unsubVideos) unsubVideos();
+        return;
+      }
       setDisplayName(user.displayName || user.email?.split("@")[0] || "Creator");
       setSignedIn(true);
       setScreen("studio");
+      // Synchronize in real-time with videos saved under the user's Firestore account
+      unsubVideos = listenToVideos(user.uid, (firestoreVideos) => {
+        if (Array.isArray(firestoreVideos) && firestoreVideos.length > 0) {
+          setVideos((current) => {
+            const merged = mergeVideoRecords(current, firestoreVideos);
+            try { localStorage.setItem("tvd-studio-session-videos", JSON.stringify(merged)); } catch {}
+            return merged;
+          });
+        }
+      });
     });
-    return () => unsubscribeAuth();
+    return () => {
+      unsubscribeAuth();
+      if (unsubVideos) unsubVideos();
+    };
   }, []);
 
   
@@ -434,6 +504,10 @@ export default function Home() {
       setVideos((prev) => mergeVideoRecords(autoPublishedRecords, prev));
       const cached = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]") as VideoRecord[];
       localStorage.setItem("tvd-studio-session-videos", JSON.stringify(mergeVideoRecords(autoPublishedRecords, cached)));
+      const currentUser = auth?.currentUser;
+      if (currentUser) {
+        autoPublishedRecords.forEach((r) => saveVideo(currentUser.uid, r).catch(() => {}));
+      }
     }
     const preloadedResults: Record<number, ClipPublishResult> = {};
     for (const c of receivedClips) {
@@ -659,9 +733,13 @@ export default function Home() {
         status: "completed",
         sessionOnly: true,
       };
-      setVideos((prev) => [newRecord, ...prev]);
+      setVideos((prev) => mergeVideoRecords([newRecord], prev));
       const cached = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]") as VideoRecord[];
       localStorage.setItem("tvd-studio-session-videos", JSON.stringify(mergeVideoRecords([newRecord], cached)));
+      const currentUser = auth?.currentUser;
+      if (currentUser) {
+        saveVideo(currentUser.uid, newRecord).catch(() => {});
+      }
       notify(`${clip.title} published successfully!`);
     } catch (err: any) {
       setClipResults((prev) => ({ ...prev, [clip.partNumber]: { status: "error", error: err.message, logs: [] } }));
@@ -748,7 +826,7 @@ export default function Home() {
   }
 
   async function executeDelete(deleteFromSocialsToo: boolean) {
-    if (!videoToDelete || (!videoToDelete.sessionOnly && !auth?.currentUser)) return;
+    if (!videoToDelete) return;
     const target = videoToDelete;
     setIsDeleting(true);
     try {
@@ -767,6 +845,11 @@ export default function Home() {
           storyId: target.instagramStoryId,
           title: target.title,
         }).catch((e) => console.warn("Instagram delete notice:", e.message));
+      }
+
+      const currentUser = auth?.currentUser;
+      if (currentUser) {
+        deleteVideo(currentUser.uid, target.id).catch(() => {});
       }
 
       const cachedVideos = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]") as VideoRecord[];
