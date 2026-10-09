@@ -180,6 +180,141 @@ function normalizeTitle(title?: string): string {
   return cleaned.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+function extractBaseTitle(title?: string): string {
+  if (!title) return "";
+  const cleaned = cleanTitle(title);
+  const firstPart = cleaned.split(/[—–\-\|:\"“”]/)[0].trim();
+  return normalizeTitle(firstPart);
+}
+
+function normalizeDescription(desc?: string): string {
+  if (!desc) return "";
+  return desc.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 50);
+}
+
+function getHashtagsSignature(hashtags?: string[]): string {
+  if (!hashtags || hashtags.length < 3) return "";
+  const cleaned = hashtags
+    .map((h) => h.toLowerCase().replace(/[^a-z0-9]/g, ""))
+    .filter((h) => h.length >= 3)
+    .sort();
+  if (cleaned.length < 3) return "";
+  return cleaned.join(",");
+}
+
+function extractPartNumber(title?: string): number | null {
+  if (!title) return null;
+  const match = title.match(/\b(?:part|pt|episode|ep)\s*(\d+)\b/i);
+  return match ? Number(match[1]) : null;
+}
+
+function areConflictingParts(titleA?: string, titleB?: string): boolean {
+  const partA = extractPartNumber(titleA);
+  const partB = extractPartNumber(titleB);
+  if (partA !== null && partB !== null && partA !== partB) {
+    return true;
+  }
+  return false;
+}
+
+function getTitleQualityScore(t?: string): number {
+  if (!t) return 0;
+  let score = 100;
+  if (/[a-zA-Z0-9]\s*["']?\s*$/.test(t) && t.length >= 65 && t.length <= 75) {
+    score -= 30;
+  }
+  if (/\b(?:going t|the c|watch m|see t)\s*$/i.test(t)) {
+    score -= 50;
+  }
+  if (t.includes("—") || t.includes("–")) {
+    const parts = t.split(/[—–]/);
+    if (parts.length >= 2 && normalizeTitle(parts[0]) && normalizeTitle(parts[1]).includes(normalizeTitle(parts[0]))) {
+      score -= 40;
+    }
+  }
+  return score;
+}
+
+function areSameVideo(a: VideoRecord, b: VideoRecord): boolean {
+  if (!a || !b) return false;
+
+  // Never merge different parts of a multi-part series
+  if (areConflictingParts(a.title, b.title)) {
+    return false;
+  }
+
+  // 1. Direct ID match
+  const cleanIdA = a.id?.startsWith("session-") ? a.id.slice(8) : a.id;
+  const cleanIdB = b.id?.startsWith("session-") ? b.id.slice(8) : b.id;
+  if (cleanIdA && cleanIdB && cleanIdA === cleanIdB) return true;
+
+  // 2. YouTube ID match
+  const ytA = a.youtubeVideoId || extractYouTubeId(a.videoUrl);
+  const ytB = b.youtubeVideoId || extractYouTubeId(b.videoUrl);
+  if (ytA && ytB && ytA === ytB) return true;
+
+  // 3. Facebook ID match
+  const fbA = a.facebookVideoId || extractFacebookId(a.videoUrl) || (a.id?.startsWith("fb-") ? a.id.slice(3) : "");
+  const fbB = b.facebookVideoId || extractFacebookId(b.videoUrl) || (b.id?.startsWith("fb-") ? b.id.slice(3) : "");
+  if (fbA && fbB && fbA === fbB) return true;
+
+  // 4. Instagram ID match
+  const igA = a.instagramVideoId || extractInstagramId(a.videoUrl) || (a.id?.startsWith("ig-") ? a.id.slice(3) : "");
+  const igB = b.instagramVideoId || extractInstagramId(b.videoUrl) || (b.id?.startsWith("ig-") ? b.id.slice(3) : "");
+  if (igA && igB && igA === igB) return true;
+
+  // 5. Cloudinary public ID match
+  const cIdA = extractCloudinaryId(a.videoUrl) || extractCloudinaryId(a.thumbnailUrl);
+  const cIdB = extractCloudinaryId(b.videoUrl) || extractCloudinaryId(b.thumbnailUrl);
+  if (cIdA && cIdB && cIdA === cIdB) return true;
+
+  // 6. Direct video URL match (non-social URLs)
+  const urlA = normalizeVideoUrl(a.videoUrl);
+  const urlB = normalizeVideoUrl(b.videoUrl);
+  if (urlA && urlB && urlA === urlB && !urlA.includes("youtube.com") && !urlA.includes("facebook.com") && !urlA.includes("instagram.com")) {
+    return true;
+  }
+
+  // 7. Exact normalized title match
+  const normTitleA = normalizeTitle(a.title);
+  const normTitleB = normalizeTitle(b.title);
+  if (normTitleA && normTitleB && normTitleA.length >= 6 && normTitleA === normTitleB) {
+    return true;
+  }
+
+  // 8. Base title match (e.g. "I'm going to see the car — ✨ ..." vs "I'm going to see the car")
+  const baseTitleA = extractBaseTitle(a.title);
+  const baseTitleB = extractBaseTitle(b.title);
+  if (baseTitleA && baseTitleB && baseTitleA.length >= 6 && baseTitleA === baseTitleB) {
+    return true;
+  }
+
+  // 9. Title prefix match
+  if (normTitleA && normTitleB && Math.min(normTitleA.length, normTitleB.length) >= 8) {
+    if (normTitleA.startsWith(normTitleB) || normTitleB.startsWith(normTitleA)) {
+      return true;
+    }
+  }
+
+  // 10. Description match
+  const descA = normalizeDescription(a.description);
+  const descB = normalizeDescription(b.description);
+  if (descA && descB && descA.length >= 15 && descA === descB) {
+    return true;
+  }
+
+  // 11. Hashtags match
+  const tagsA = getHashtagsSignature(a.hashtags);
+  const tagsB = getHashtagsSignature(b.hashtags);
+  if (tagsA && tagsB && tagsA.length >= 20 && tagsA === tagsB) {
+    if (baseTitleA && baseTitleB && (baseTitleA.includes(baseTitleB.slice(0, 5)) || baseTitleB.includes(baseTitleA.slice(0, 5)))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 class DisjointSet {
   parent: number[];
   constructor(n: number) {
@@ -221,56 +356,12 @@ function deduplicateVideos(
 
   const dsu = new DisjointSet(rawList.length);
 
-  const cleanIdMap = new Map<string, number>();
-  const ytMap = new Map<string, number>();
-  const fbMap = new Map<string, number>();
-  const igMap = new Map<string, number>();
-  const cloudinaryMap = new Map<string, number>();
-  const urlMap = new Map<string, number>();
-  const titleMap = new Map<string, number>();
-
+  // Compare every pair to connect duplicate records across platforms
   for (let i = 0; i < rawList.length; i++) {
-    const v = rawList[i];
-    const cleanId = v.id.startsWith("session-") ? v.id.slice("session-".length) : v.id;
-    if (cleanId) {
-      if (cleanIdMap.has(cleanId)) dsu.union(i, cleanIdMap.get(cleanId)!);
-      else cleanIdMap.set(cleanId, i);
-    }
-
-    const ytId = v.youtubeVideoId || extractYouTubeId(v.videoUrl);
-    if (ytId) {
-      if (ytMap.has(ytId)) dsu.union(i, ytMap.get(ytId)!);
-      else ytMap.set(ytId, i);
-    }
-
-    const fbId = v.facebookVideoId || extractFacebookId(v.videoUrl) || (v.id.startsWith("fb-") ? v.id.slice(3) : "");
-    if (fbId) {
-      if (fbMap.has(fbId)) dsu.union(i, fbMap.get(fbId)!);
-      else fbMap.set(fbId, i);
-    }
-
-    const igId = v.instagramVideoId || extractInstagramId(v.videoUrl) || (v.id.startsWith("ig-") ? v.id.slice(3) : "");
-    if (igId) {
-      if (igMap.has(igId)) dsu.union(i, igMap.get(igId)!);
-      else igMap.set(igId, i);
-    }
-
-    const cId = extractCloudinaryId(v.videoUrl) || extractCloudinaryId(v.thumbnailUrl);
-    if (cId) {
-      if (cloudinaryMap.has(cId)) dsu.union(i, cloudinaryMap.get(cId)!);
-      else cloudinaryMap.set(cId, i);
-    }
-
-    const normUrl = normalizeVideoUrl(v.videoUrl);
-    if (normUrl && !normUrl.includes("youtube.com") && !normUrl.includes("facebook.com") && !normUrl.includes("instagram.com") && normUrl.length > 10) {
-      if (urlMap.has(normUrl)) dsu.union(i, urlMap.get(normUrl)!);
-      else urlMap.set(normUrl, i);
-    }
-
-    const normTitle = normalizeTitle(v.title);
-    if (normTitle && normTitle.length >= 6) {
-      if (titleMap.has(normTitle)) dsu.union(i, titleMap.get(normTitle)!);
-      else titleMap.set(normTitle, i);
+    for (let j = i + 1; j < rawList.length; j++) {
+      if (areSameVideo(rawList[i], rawList[j])) {
+        dsu.union(i, j);
+      }
     }
   }
 
@@ -308,6 +399,8 @@ function deduplicateVideos(
       (r.hashtags || []).forEach((h) => allHashtags.add(h));
     }
 
+    const bestTitle = records.slice().sort((a, b) => getTitleQualityScore(b.title) - getTitleQualityScore(a.title))[0]?.title || winner.title;
+    const bestDesc = records.slice().sort((a, b) => (b.description?.length || 0) - (a.description?.length || 0))[0]?.description || winner.description;
     const bestYtId = records.find((r) => r.youtubeVideoId)?.youtubeVideoId || winner.youtubeVideoId;
     const bestFbId = records.find((r) => r.facebookVideoId)?.facebookVideoId || winner.facebookVideoId;
     const bestFbStoryId = records.find((r) => r.facebookStoryId)?.facebookStoryId || winner.facebookStoryId;
@@ -335,8 +428,8 @@ function deduplicateVideos(
     const mergedRecord: VideoRecord = {
       ...winner,
       id: winner.id,
-      title: winner.title,
-      description: winner.description,
+      title: bestTitle,
+      description: bestDesc,
       hashtags: Array.from(allHashtags),
       videoUrl: bestVideoUrl,
       thumbnailUrl: bestThumb,
@@ -361,6 +454,7 @@ function deduplicateVideos(
           deleteVideo(userId, r.id).catch(() => {});
         }
       }
+      saveVideo(userId, mergedRecord).catch(() => {});
     }
   }
 
