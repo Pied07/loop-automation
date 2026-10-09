@@ -204,16 +204,6 @@ async function handleSync(req: NextRequest) {
       }
     }
 
-    // Persist raw items to Firestore if userId provided
-    if (userId && database && rawList.length > 0) {
-      for (const rec of rawList) {
-        try {
-          const { id, ...data } = rec;
-          await setDoc(doc(database, "users", userId, "videos", id), data, { merge: true });
-        } catch {}
-      }
-    }
-
     return NextResponse.json({
       success: true,
       count: rawList.length,

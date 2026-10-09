@@ -679,6 +679,7 @@ export default function Home() {
         .then((data) => {
           if (Array.isArray(data.videos) && data.videos.length > 0) {
             setVideos((prev) => deduplicateVideos([data.videos, prev], user.uid));
+            data.videos.forEach((r: VideoRecord) => saveVideo(user.uid, r).catch(() => {}));
           }
         })
         .catch(() => {});
@@ -1134,6 +1135,9 @@ export default function Home() {
       const data = await res.json();
       if (Array.isArray(data.videos) && data.videos.length > 0) {
         setVideos((prev) => deduplicateVideos([data.videos, prev], user?.uid));
+        if (user) {
+          data.videos.forEach((r: VideoRecord) => saveVideo(user.uid, r).catch(() => {}));
+        }
         notify(`Synchronized ${data.videos.length} clips from YouTube, Facebook & Instagram!`);
       } else {
         notify("Library is up to date.");
