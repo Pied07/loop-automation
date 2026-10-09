@@ -1,28 +1,32 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { collection, doc, getDocs, getFirestore, orderBy, query, onSnapshot, setDoc, where, writeBatch } from "firebase/firestore";
+import { collection, doc, getDocs, getFirestore, query, onSnapshot, setDoc, where, writeBatch, deleteDoc } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 export type VideoRecord = {
   id: string;
+  userId?: string;
   title: string;
   description: string;
-  captions: string;
+  captions?: string;
   hashtags: string[];
-  videoUrl: string;
-  json2videoUrl?: string;
-  shotstackUrl?: string;
+  thumbnailUrl?: string;
+  videoUrl?: string;
+  cloudinaryUrl?: string;
+  cloudinaryPublicId?: string;
+  youtube?: 0 | 1;
   youtubeVideoId?: string;
+  youtubeUrl?: string;
+  facebook?: 0 | 1;
   facebookVideoId?: string;
+  facebookUrl?: string;
   facebookStoryId?: string;
   facebookPostId?: string;
-  instagramVideoId?: string;
-  instagramStoryId?: string;
-  youtube?: 0 | 1;
-  facebook?: 0 | 1;
   instagram?: 0 | 1;
-  thumbnailUrl?: string;
-  format: string;
+  instagramVideoId?: string;
+  instagramUrl?: string;
+  instagramStoryId?: string;
+  format?: string;
   createdAt: string;
   status?: "completed" | "failed";
   sessionOnly?: boolean;
@@ -45,33 +49,56 @@ export const auth = app ? getAuth(app) : null;
 export const database = app ? getFirestore(app) : null;
 export const storage = app ? getStorage(app) : null;
 
-function normalizeVideoRecord(video: VideoRecord): VideoRecord {
-  const yt: 0 | 1 = (video.youtube !== undefined ? video.youtube : (video.youtubeVideoId ? 1 : 0)) as 0 | 1;
-  const fb: 0 | 1 = (video.facebook !== undefined ? video.facebook : (video.facebookVideoId ? 1 : 0)) as 0 | 1;
-  const ig: 0 | 1 = (video.instagram !== undefined ? video.instagram : (video.instagramVideoId ? 1 : 0)) as 0 | 1;
+function normalizeVideoRecord(video: any): VideoRecord {
+  const yt: 0 | 1 = video.youtube === 1 ? 1 : (video.youtube === 0 ? 0 : (Boolean(video.youtubeVideoId || video.youtubeUrl) ? 1 : 0));
+  const fb: 0 | 1 = video.facebook === 1 ? 1 : (video.facebook === 0 ? 0 : (Boolean(video.facebookVideoId || video.facebookUrl) ? 1 : 0));
+  const ig: 0 | 1 = video.instagram === 1 ? 1 : (video.instagram === 0 ? 0 : (Boolean(video.instagramVideoId || video.instagramUrl) ? 1 : 0));
+
+  const ytUrl = yt === 1 ? (video.youtubeUrl || (video.youtubeVideoId ? `https://www.youtube.com/shorts/${video.youtubeVideoId}` : "")) : "";
+  const fbUrl = fb === 1 ? (video.facebookUrl || (video.facebookVideoId ? `https://www.facebook.com/reel/${video.facebookVideoId}` : "")) : "";
+  const igUrl = ig === 1 ? (video.instagramUrl || (video.instagramVideoId ? (video.instagramVideoId.startsWith("http") ? video.instagramVideoId : `https://www.instagram.com/reel/${video.instagramVideoId}`) : "")) : "";
+
   return {
     ...video,
+    id: String(video.id || ""),
+    userId: String(video.userId || ""),
+    title: video.title || "Untitled Clip",
+    description: video.description || "",
+    captions: video.captions || "",
+    hashtags: Array.isArray(video.hashtags) ? video.hashtags : [],
+    thumbnailUrl: video.thumbnailUrl || "",
+    videoUrl: video.videoUrl || "",
+    cloudinaryUrl: video.cloudinaryUrl || "",
+    cloudinaryPublicId: video.cloudinaryPublicId || "",
     youtube: yt,
+    youtubeVideoId: yt === 1 ? (video.youtubeVideoId || "") : "",
+    youtubeUrl: ytUrl,
     facebook: fb,
+    facebookVideoId: fb === 1 ? (video.facebookVideoId || "") : "",
+    facebookUrl: fbUrl,
     instagram: ig,
+    instagramVideoId: ig === 1 ? (video.instagramVideoId || "") : "",
+    instagramUrl: igUrl,
+    format: video.format || "Trending",
+    createdAt: video.createdAt || new Date().toISOString(),
     status: video.status || "completed",
   };
 }
 
 export async function getVideos(userId: string): Promise<VideoRecord[]> {
   if (!database) return [];
-  const videoQuery = query(collection(database, "users", userId, "videos"));
-  const snapshot = await getDocs(videoQuery);
-  return snapshot.docs.map((video) => normalizeVideoRecord({ id: video.id, ...video.data() } as VideoRecord));
+  const q = query(collection(database, "videos"), where("userId", "==", userId));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => normalizeVideoRecord({ id: doc.id, ...doc.data() }));
 }
 
 export function listenToVideos(userId: string, callback: (videos: VideoRecord[]) => void) {
   if (!database) return () => {};
-  const videoQuery = query(collection(database, "users", userId, "videos"));
+  const q = query(collection(database, "videos"), where("userId", "==", userId));
   return onSnapshot(
-    videoQuery,
+    q,
     (snapshot) => {
-      callback(snapshot.docs.map((video) => normalizeVideoRecord({ id: video.id, ...video.data() } as VideoRecord)));
+      callback(snapshot.docs.map((doc) => normalizeVideoRecord({ id: doc.id, ...doc.data() })));
     },
     (error) => {
       console.warn("Firestore listenToVideos error:", error);
@@ -79,22 +106,43 @@ export function listenToVideos(userId: string, callback: (videos: VideoRecord[])
   );
 }
 
-export async function saveVideo(userId: string, video: VideoRecord): Promise<void> {
+export async function saveVideo(userId: string, video: Partial<VideoRecord> & { id: string }): Promise<void> {
   if (!database) throw new Error("Firestore is not configured");
   const { id, sessionOnly: _sessionOnly, ...record } = video;
-  await setDoc(doc(database, "users", userId, "videos", id), record, { merge: true });
+  const youtubeVal: 0 | 1 = record.youtube === 1 ? 1 : 0;
+  const facebookVal: 0 | 1 = record.facebook === 1 ? 1 : 0;
+  const instagramVal: 0 | 1 = record.instagram === 1 ? 1 : 0;
+  const cleanRecord = {
+    ...record,
+    id,
+    userId,
+    youtube: youtubeVal,
+    facebook: facebookVal,
+    instagram: instagramVal,
+    youtubeUrl: youtubeVal === 1 ? (record.youtubeUrl || (record.youtubeVideoId ? `https://www.youtube.com/shorts/${record.youtubeVideoId}` : "")) : "",
+    facebookUrl: facebookVal === 1 ? (record.facebookUrl || (record.facebookVideoId ? `https://www.facebook.com/reel/${record.facebookVideoId}` : "")) : "",
+    instagramUrl: instagramVal === 1 ? (record.instagramUrl || (record.instagramVideoId ? (record.instagramVideoId.startsWith("http") ? record.instagramVideoId : `https://www.instagram.com/reel/${record.instagramVideoId}`) : "")) : "",
+  };
+  await setDoc(doc(database, "videos", id), cleanRecord, { merge: true });
 }
-
-import { deleteDoc } from "firebase/firestore";
 
 export async function deleteVideo(userId: string, videoId: string): Promise<void> {
   if (!database) throw new Error("Firebase not configured");
-  await deleteDoc(doc(database, "users", userId, "videos", videoId));
+  await deleteDoc(doc(database, "videos", videoId));
+}
+
+export async function clearAllUserVideos(userId: string): Promise<void> {
+  if (!database) return;
+  const q = query(collection(database, "videos"), where("userId", "==", userId));
+  const snapshot = await getDocs(q);
+  const batch = writeBatch(database);
+  snapshot.docs.forEach((d) => batch.delete(d.ref));
+  await batch.commit();
 }
 
 export async function deleteVideosByYouTubeId(userId: string, youtubeVideoId: string): Promise<void> {
   if (!database) throw new Error("Firebase not configured");
-  const videosQuery = query(collection(database, "users", userId, "videos"), where("youtubeVideoId", "==", youtubeVideoId));
+  const videosQuery = query(collection(database, "videos"), where("userId", "==", userId), where("youtubeVideoId", "==", youtubeVideoId));
   const snapshot = await getDocs(videosQuery);
   if (snapshot.empty) return;
   const batch = writeBatch(database);
@@ -104,7 +152,7 @@ export async function deleteVideosByYouTubeId(userId: string, youtubeVideoId: st
 
 export async function deleteVideosByFacebookId(userId: string, facebookVideoId: string): Promise<void> {
   if (!database) throw new Error("Firebase not configured");
-  const videosQuery = query(collection(database, "users", userId, "videos"), where("facebookVideoId", "==", facebookVideoId));
+  const videosQuery = query(collection(database, "videos"), where("userId", "==", userId), where("facebookVideoId", "==", facebookVideoId));
   const snapshot = await getDocs(videosQuery);
   if (snapshot.empty) return;
   const batch = writeBatch(database);
