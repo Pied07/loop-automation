@@ -85,8 +85,6 @@ type Screen = "home" | "studio" | "library" | "settings";
 
 function isGarbageRecord(video: VideoRecord): boolean {
   if (!video) return true;
-  // External channel videos not created/published from this web app
-  if (video.id?.startsWith("youtube-") || video.id?.startsWith("yt-")) return true;
   const title = (video.title || "").trim();
   const desc = (video.description || "").trim();
   // Filter click-to-watch / tap-to-watch teasers or feed post shares
@@ -1123,7 +1121,7 @@ export default function Home() {
         client_id: clientId || "",
         redirect_uri: targetUri,
         response_type: "code",
-        scope: "pages_show_list,pages_read_engagement,pages_manage_posts",
+        scope: "pages_show_list,pages_read_engagement,pages_manage_posts,public_profile",
         auth_type: "rerequest",
       });
       url = `https://www.facebook.com/v26.0/dialog/oauth?${params}`;
@@ -1134,7 +1132,7 @@ export default function Home() {
         client_id: clientId || "",
         redirect_uri: targetUri,
         response_type: "code",
-        scope: "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement",
+        scope: "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement,public_profile",
         auth_type: "rerequest",
       });
       url = `https://www.facebook.com/v26.0/dialog/oauth?${params}`;
