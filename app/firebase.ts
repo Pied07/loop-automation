@@ -48,7 +48,7 @@ export const storage = app ? getStorage(app) : null;
 function normalizeVideoRecord(video: VideoRecord): VideoRecord {
   const yt: 0 | 1 = (video.youtube !== undefined ? video.youtube : (video.youtubeVideoId ? 1 : 0)) as 0 | 1;
   const fb: 0 | 1 = (video.facebook !== undefined ? video.facebook : (video.facebookVideoId ? 1 : 0)) as 0 | 1;
-  const ig: 0 | 1 = (video.instagram === 1 || Boolean(video.instagramVideoId) || fb === 1 || Boolean(video.facebookVideoId) ? 1 : 0) as 0 | 1;
+  const ig: 0 | 1 = (video.instagram !== undefined ? video.instagram : (video.instagramVideoId ? 1 : 0)) as 0 | 1;
   return {
     ...video,
     youtube: yt,

@@ -413,7 +413,7 @@ function deduplicateVideos(
 
     const isYt = records.some((r) => r.youtube === 1 || Boolean(r.youtubeVideoId)) ? 1 : 0;
     const isFb = records.some((r) => r.facebook === 1 || Boolean(r.facebookVideoId)) ? 1 : 0;
-    const isIg = records.some((r) => r.instagram === 1 || Boolean(r.instagramVideoId) || r.facebook === 1 || Boolean(r.facebookVideoId)) ? 1 : 0;
+    const isIg = records.some((r) => r.instagram === 1 || Boolean(r.instagramVideoId)) ? 1 : 0;
 
     let bestCreatedAt = winner.createdAt;
     let maxTs = getRecordTimestamp(winner);
@@ -638,8 +638,14 @@ export default function Home() {
             }
           }
           const validVideos = firestoreVideos.filter((v) => !isGarbageRecord(v));
+          let cached: VideoRecord[] = [];
+          try {
+            const stored = localStorage.getItem("tvd-studio-session-videos");
+            if (stored) cached = JSON.parse(stored);
+          } catch {}
+          const combined = [...validVideos, ...(Array.isArray(cached) ? cached.filter(c => !isGarbageRecord(c)) : [])];
           // Authoritative list from database: deduplicate and show recent created first
-          const deduplicated = deduplicateVideos(validVideos, user.uid);
+          const deduplicated = deduplicateVideos(combined, user.uid);
           setVideos(deduplicated);
           try {
             localStorage.setItem("tvd-studio-session-videos", JSON.stringify(deduplicated));
@@ -1228,7 +1234,7 @@ export default function Home() {
     if (platformTab === "YouTube") {
       matchesTab = video.youtube === 1 || Boolean(video.youtubeVideoId);
     } else if (platformTab === "Instagram") {
-      matchesTab = video.instagram === 1 || Boolean(video.instagramVideoId) || video.facebook === 1 || Boolean(video.facebookVideoId);
+      matchesTab = video.instagram === 1 || Boolean(video.instagramVideoId);
     } else if (platformTab === "Facebook") {
       matchesTab = video.facebook === 1 || Boolean(video.facebookVideoId);
     }
@@ -1672,7 +1678,7 @@ export default function Home() {
               <span>FB Reel</span>
             </a>
           )}
-          {(video.instagram === 1 || Boolean(video.instagramVideoId) || video.facebook === 1 || Boolean(video.facebookVideoId)) && (
+          {(video.instagram === 1 || Boolean(video.instagramVideoId)) && (
             <a
               href={
                 video.instagramVideoId
