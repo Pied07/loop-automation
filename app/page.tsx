@@ -533,7 +533,38 @@ export default function Home() {
   const [processMode, setProcessMode] = useState<"cloud" | "queue">("cloud");
   const [autoFindSource, setAutoFindSource] = useState<"scrape" | "direct" | "youtube">("scrape");
   const [autoPilotEnabled, setAutoPilotEnabled] = useState(false);
+  const [isSyncingSocials, setIsSyncingSocials] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function syncAllSocialVideos(manual = false, targetUserId?: string) {
+    if (isSyncingSocials) return;
+    setIsSyncingSocials(true);
+    if (manual) notify("Syncing published videos from YouTube, Facebook & Instagram...");
+    try {
+      const res = await fetch("/api/videos/sync", { method: "POST" });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.videos) && data.videos.length > 0) {
+        const uid = targetUserId || auth?.currentUser?.uid;
+        if (uid && database) {
+          for (const v of data.videos) {
+            saveVideo(uid, v).catch(() => {});
+          }
+        }
+        setVideos((prev) => {
+          const combined = deduplicateVideos([...data.videos, ...prev], uid);
+          try { localStorage.setItem("tvd-studio-session-videos", JSON.stringify(combined)); } catch {}
+          return combined;
+        });
+        if (manual) notify(`Synced ${data.videos.length} published videos!`);
+      } else if (manual) {
+        notify("No published videos found on social accounts.");
+      }
+    } catch (e: any) {
+      if (manual) notify(`Sync notice: ${e.message}`);
+    } finally {
+      setIsSyncingSocials(false);
+    }
+  }
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -635,6 +666,8 @@ export default function Home() {
       setDisplayName(user.displayName || user.email?.split("@")[0] || "Creator");
       setSignedIn(true);
       setScreen("studio");
+      // Auto-sync published social videos into the user's database
+      syncAllSocialVideos(false, user.uid);
       // Synchronize in real-time with videos saved under the user's Firestore account
       unsubVideos = listenToVideos(user.uid, (firestoreVideos) => {
         if (Array.isArray(firestoreVideos)) {
@@ -661,6 +694,12 @@ export default function Home() {
       if (unsubVideos) unsubVideos();
     };
   }, []);
+
+  useEffect(() => {
+    if (screen === "library") {
+      syncAllSocialVideos(false);
+    }
+  }, [screen]);
 
   
 
@@ -1243,7 +1282,7 @@ export default function Home() {
     return matchesFormat && matchesQuery && matchesTab;
   }).sort((a, b) => getRecordTimestamp(b) - getRecordTimestamp(a));
 
-  const PAGE_SIZE = 20;
+  const PAGE_SIZE = 40;
   const totalPages = Math.max(1, Math.ceil(filteredVideos.length / PAGE_SIZE));
   const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
   const paginatedVideos = filteredVideos.slice((safeCurrentPage - 1) * PAGE_SIZE, safeCurrentPage * PAGE_SIZE);
@@ -1531,7 +1570,7 @@ export default function Home() {
           </button>
         </div>
       </section>}
-      {screen === "library" && <section className="library-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR CLIPS LIBRARY</div><h1>Viral content, <em>in motion.</em></h1><p>Your published clips with links to YouTube, Facebook, and Instagram.</p></div><button className="secondary-button" onClick={exportCsv}><ArrowDownToLine size={16} /> Export spreadsheet</button></div>
+      {screen === "library" && <section className="library-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR CLIPS LIBRARY</div><h1>Viral content, <em>in motion.</em></h1><p>Your published clips with links to YouTube, Facebook, and Instagram.</p></div><div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}><button className="secondary-button" onClick={() => syncAllSocialVideos(true)} disabled={isSyncingSocials} title="Fetch all published videos from YouTube, Facebook & Instagram">{isSyncingSocials ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />} {isSyncingSocials ? "Syncing..." : "Sync Socials"}</button><button className="secondary-button" onClick={exportCsv}><ArrowDownToLine size={16} /> Export spreadsheet</button></div></div>
       
       <div className="library-tabber">
         {["All", "YouTube", "Facebook", "Instagram"].map(tab => (
