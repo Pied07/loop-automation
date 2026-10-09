@@ -964,10 +964,15 @@ export async function publishClipAndCleanup(params: {
           body: new URLSearchParams({ access_token: instagramToken, creation_id: creationId }),
         });
         const publishData = await publishRes.json();
-        if (!publishRes.ok || publishData.error) throw new Error(publishData.error?.message || `HTTP ${publishRes.status}`);
-
         instagramVideoId = publishData.id;
         instagramUrl = `https://www.instagram.com/reel/${instagramVideoId}`;
+        try {
+          const permalinkRes = await fetch(`${instagramApi}/${instagramVideoId}?fields=permalink&access_token=${instagramToken}`);
+          const permalinkData = await permalinkRes.json();
+          if (permalinkData?.permalink) {
+            instagramUrl = permalinkData.permalink;
+          }
+        } catch {}
         logs.push(`✅ Instagram: Reel published (${instagramUrl})`);
 
         // 2. Post as Instagram Story (Designed Polaroid Story card)
