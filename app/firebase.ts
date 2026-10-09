@@ -87,59 +87,90 @@ export function normalizeVideoRecord(video: any): VideoRecord {
 
 export async function getVideos(userId: string): Promise<VideoRecord[]> {
   if (!database) return [];
+  const map = new Map<string, VideoRecord>();
+
+  try {
+    const subSnap = await getDocs(collection(database, "users", userId, "videos"));
+    subSnap.docs.forEach((doc) => {
+      const v = normalizeVideoRecord({ id: doc.id, ...doc.data() });
+      if (v.id) map.set(v.id, v);
+    });
+  } catch (err) {
+    console.warn("Subcollection getVideos notice:", err);
+  }
+
   try {
     const userIds = [userId, "auto-pilot", "creator"];
     const q = query(collection(database, "videos"), where("userId", "in", userIds));
     const snapshot = await getDocs(q);
-    if (!snapshot.empty) {
-      return snapshot.docs.map((doc) => normalizeVideoRecord({ id: doc.id, ...doc.data() }));
-    }
+    snapshot.docs.forEach((doc) => {
+      const v = normalizeVideoRecord({ id: doc.id, ...doc.data() });
+      if (v.id) map.set(v.id, v);
+    });
   } catch (err) {
     console.warn("Top-level getVideos notice:", err);
   }
-  try {
-    const subSnap = await getDocs(collection(database, "users", userId, "videos"));
-    return subSnap.docs.map((doc) => normalizeVideoRecord({ id: doc.id, ...doc.data() }));
-  } catch {
-    return [];
-  }
+
+  return Array.from(map.values()).sort((a, b) => {
+    const ta = new Date(a.createdAt || 0).getTime();
+    const tb = new Date(b.createdAt || 0).getTime();
+    return tb - ta;
+  });
 }
 
 export function listenToVideos(userId: string, callback: (videos: VideoRecord[]) => void) {
   if (!database) return () => {};
-  let unsubFallback: (() => void) | undefined;
-  let topLoaded = false;
 
   const userIds = [userId, "auto-pilot", "creator"];
+  let topDocs: VideoRecord[] = [];
+  let subDocs: VideoRecord[] = [];
+
+  const emitCombined = () => {
+    const map = new Map<string, VideoRecord>();
+    for (const v of subDocs) {
+      if (v.id) map.set(v.id, v);
+    }
+    for (const v of topDocs) {
+      if (v.id) map.set(v.id, v);
+    }
+    const combined = Array.from(map.values()).sort((a, b) => {
+      const ta = new Date(a.createdAt || 0).getTime();
+      const tb = new Date(b.createdAt || 0).getTime();
+      return tb - ta;
+    });
+    callback(combined);
+  };
+
   const qTop = query(collection(database, "videos"), where("userId", "in", userIds));
   const unsubTop = onSnapshot(
     qTop,
     (snapshot) => {
-      topLoaded = true;
-      callback(snapshot.docs.map((doc) => normalizeVideoRecord({ id: doc.id, ...doc.data() })));
+      topDocs = snapshot.docs.map((doc) => normalizeVideoRecord({ id: doc.id, ...doc.data() }));
+      emitCombined();
     },
     (error) => {
-      console.warn("Firestore top-level listen error (deploy firestore.rules for 'videos'):", error);
-      if (!topLoaded && !unsubFallback && database) {
-        try {
-          const qSub = collection(database, "users", userId, "videos");
-          unsubFallback = onSnapshot(
-            qSub,
-            (subSnap) => {
-              callback(subSnap.docs.map((doc) => normalizeVideoRecord({ id: doc.id, ...doc.data() })));
-            },
-            (subErr) => {
-              console.warn("Firestore fallback listen error:", subErr);
-            }
-          );
-        } catch {}
-      }
+      console.warn("Firestore top-level listen notice:", error);
     }
   );
 
+  let unsubSub = () => {};
+  try {
+    const qSub = collection(database, "users", userId, "videos");
+    unsubSub = onSnapshot(
+      qSub,
+      (snapshot) => {
+        subDocs = snapshot.docs.map((doc) => normalizeVideoRecord({ id: doc.id, ...doc.data() }));
+        emitCombined();
+      },
+      (error) => {
+        console.warn("Firestore user subcollection listen notice:", error);
+      }
+    );
+  } catch {}
+
   return () => {
     unsubTop();
-    if (unsubFallback) unsubFallback();
+    unsubSub();
   };
 }
 

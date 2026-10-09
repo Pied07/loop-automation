@@ -1053,7 +1053,8 @@ export async function publishClipAndCleanup(params: {
     await Promise.allSettled(publishTasks);
 
     // ─ Gmail notification (RFC 2047 MIME encoded subject to avoid garbled encoding) ─
-    if (platforms.includes("Gmail") || (tokens.gmail?.access_token && (youtubeUrl || facebookUrl || instagramUrl))) {
+    const hasGmailConfig = platforms.includes("Gmail") || !!(tokens.gmail?.access_token || tokens.gmail?.refresh_token);
+    if (hasGmailConfig && (youtubeUrl || facebookUrl || instagramUrl)) {
       try {
         const { google } = require("googleapis");
         const oauth2Client = new google.auth.OAuth2(
@@ -1064,14 +1065,17 @@ export async function publishClipAndCleanup(params: {
         const gmail = google.gmail({ version: "v1", auth: oauth2Client });
 
         let recipient = userEmail?.trim() || "";
-        if (!recipient && oauth2Client.credentials.id_token) {
+        if (!recipient && tokens.gmail?.email) {
+          recipient = tokens.gmail.email;
+        }
+        if (!recipient && tokens.gmail?.id_token) {
           try {
-            const ticket = await oauth2Client.verifyIdToken({
-              idToken: oauth2Client.credentials.id_token,
-              audience: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-            });
-            recipient = ticket.getPayload()?.email || "";
+            const payload = JSON.parse(Buffer.from(tokens.gmail.id_token.split('.')[1], 'base64').toString());
+            if (payload?.email) recipient = payload.email;
           } catch {}
+        }
+        if (!recipient) {
+          recipient = "loop.automation.07@gmail.com";
         }
 
         if (recipient) {

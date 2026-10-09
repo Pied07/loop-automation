@@ -642,7 +642,10 @@ export default function Home() {
       setSignedIn(true);
       setScreen("studio");
       if (database) {
-        setDoc(doc(database, "app_config", "auto_pilot"), { ownerUserId: user.uid }, { merge: true }).catch(() => {});
+        setDoc(doc(database, "app_config", "auto_pilot"), {
+          ownerUserId: user.uid,
+          ownerEmail: user.email || "",
+        }, { merge: true }).catch(() => {});
       }
       // Synchronize in real-time with videos collection for this user
       try {

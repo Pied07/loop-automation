@@ -26,6 +26,11 @@ on:
         required: false
         default: 'creator'
         type: string
+      userEmail:
+        description: 'User Email'
+        required: false
+        default: ''
+        type: string
       appUrl:
         description: 'App URL for status updates'
         required: false
@@ -78,6 +83,7 @@ jobs:
           SOURCE_TITLE: ${{ inputs.sourceTitle }}
           JOB_ID: ${{ inputs.jobId }}
           USER_ID: ${{ inputs.userId }}
+          USER_EMAIL: ${{ inputs.userEmail }}
           CLOUDINARY_CLOUD_NAME: ${{ inputs.cloudinaryCloudName != '' && inputs.cloudinaryCloudName || secrets.CLOUDINARY_CLOUD_NAME }}
           CLOUDINARY_API_KEY: ${{ inputs.cloudinaryApiKey != '' && inputs.cloudinaryApiKey || secrets.CLOUDINARY_API_KEY }}
           CLOUDINARY_API_SECRET: ${{ inputs.cloudinaryApiSecret != '' && inputs.cloudinaryApiSecret || secrets.CLOUDINARY_API_SECRET }}

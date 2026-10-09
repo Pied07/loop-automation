@@ -37,6 +37,7 @@ CONTENT_CATEGORY = os.environ.get("CONTENT_CATEGORY", "Trending").strip()
 SOURCE_TITLE = os.environ.get("SOURCE_TITLE", "").strip()
 JOB_ID = os.environ.get("JOB_ID", f"job_{int(time.time())}").strip()
 USER_ID = os.environ.get("USER_ID", "creator").strip()
+USER_EMAIL = os.environ.get("USER_EMAIL", "").strip()
 APP_URL = os.environ.get("APP_URL", "https://the-viral-desk.vercel.app").rstrip("/")
 
 CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "").strip()
@@ -707,6 +708,8 @@ def run():
                     "cloudinaryPublicId": clip_item.get("cloudinaryPublicId"),
                     "category": CONTENT_CATEGORY,
                     "userId": USER_ID,
+                    "userEmail": USER_EMAIL,
+                    "connections": ["YouTube", "Facebook", "Instagram", "Gmail"],
                 }
                 pub_req = urllib.request.Request(
                     f"{APP_URL}/api/viral-clips/publish",
