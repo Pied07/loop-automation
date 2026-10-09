@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publishClipAndCleanup } from "@/app/viral-actions";
 import { readTokens } from "@/app/lib/tokens";
+import { database } from "@/app/firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -42,6 +44,61 @@ export async function POST(req: NextRequest) {
       connections: detectedConnections,
       cloudinaryPublicId,
     });
+
+    if (result && (result.success || result.youtubeVideoId || result.facebookVideoId || result.instagramVideoId)) {
+      try {
+        let targetUserId = body.userId;
+        if (!targetUserId || targetUserId === "auto-pilot" || targetUserId === "creator") {
+          if (database) {
+            try {
+              const autoSnap = await getDoc(doc(database, "app_config", "auto_pilot"));
+              if (autoSnap.exists() && autoSnap.data()?.ownerUserId) {
+                targetUserId = autoSnap.data().ownerUserId;
+              }
+            } catch {}
+          }
+        }
+        if (!targetUserId) targetUserId = "auto-pilot";
+
+        const ytVal: 0 | 1 = (result.youtubeUrl || result.youtubeVideoId) ? 1 : 0;
+        const fbVal: 0 | 1 = (result.facebookUrl || result.facebookVideoId) ? 1 : 0;
+        const igVal: 0 | 1 = (result.instagramUrl || result.instagramVideoId) ? 1 : 0;
+
+        const recordId = cloudinaryPublicId
+          ? `clip-${cloudinaryPublicId}`
+          : (result.youtubeVideoId ? `yt-${result.youtubeVideoId}` : (result.facebookVideoId ? `fb-${result.facebookVideoId}` : `clip-${partNumber}-${Date.now()}`));
+
+        const record = {
+          id: recordId,
+          userId: targetUserId,
+          title: title || "Viral Clip",
+          description: description || "",
+          hashtags: Array.isArray(hashtags) ? hashtags.map((h: string) => h.startsWith("#") ? h : `#${h}`) : [],
+          format: body.category || body.contentCategory || "Trending",
+          createdAt: new Date().toISOString(),
+          status: "completed",
+          youtube: ytVal,
+          youtubeVideoId: result.youtubeVideoId || "",
+          youtubeUrl: result.youtubeUrl || (result.youtubeVideoId ? `https://www.youtube.com/shorts/${result.youtubeVideoId}` : ""),
+          facebook: fbVal,
+          facebookVideoId: result.facebookVideoId || "",
+          facebookUrl: result.facebookUrl || (result.facebookVideoId ? `https://www.facebook.com/reel/${result.facebookVideoId}` : ""),
+          facebookStoryId: result.facebookStoryId || "",
+          facebookPostId: result.facebookPostId || "",
+          instagram: igVal,
+          instagramVideoId: result.instagramVideoId || "",
+          instagramUrl: result.instagramUrl || (result.instagramVideoId ? `https://www.instagram.com/reel/${result.instagramVideoId}` : ""),
+          instagramStoryId: result.instagramStoryId || "",
+          thumbnailUrl: result.thumbnailUrl || (result.youtubeVideoId ? `https://i.ytimg.com/vi/${result.youtubeVideoId}/hqdefault.jpg` : (result.facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${result.facebookVideoId}` : "")),
+        };
+
+        if (database) {
+          await setDoc(doc(database, "videos", recordId), record, { merge: true });
+        }
+      } catch (saveErr: any) {
+        console.warn("Auto-save published video notice:", saveErr.message);
+      }
+    }
 
     return NextResponse.json(result);
   } catch (err: any) {

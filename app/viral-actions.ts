@@ -454,45 +454,55 @@ export async function downloadAndSplitVideo(
 
 // ─── Generate Clip Metadata (100% rule-based, zero AI, works forever) ─────────
 
-// Category-specific hashtag banks
+// Category-specific hashtag banks for all 9 UI categories
 const HASHTAG_BANK: Record<string, string[]> = {
-  "Motivational":   ["motivation","mindset","success","inspiration","hustle","grind","nevergiveup","goals","growth","discipline","winners","bestadvice","lifelessons","selfdevelopment","unstoppable","positivemindset","bossmindset","winning","ambition","levelup"],
-  "Funny":          ["funny","humor","comedy","laugh","lol","hilarious","memes","trynottolaugh","funnyclips","funnyvideo","comedycentral","fails","epicfails","funnymoments","laughing","jokes","funnyshorts","prank","trending","funnystuff"],
-  "Educational":    ["education","learning","knowledge","facts","didyouknow","science","history","interestingfacts","funfacts","study","mindblowing","learneveryday","amazingfacts","wisdom","schooloflife","curious","informative","discovery","explainer","learnmore"],
-  "Nature":         ["nature","wildlife","earth","beautiful","naturelover","outdoors","wilderness","animals","photography","landscape","scenery","naturalbeauty","ecology","planet","stunning","peaceful","adventure","explore","biodiversity","amazingnature"],
-  "Sports":         ["sports","athlete","fitness","training","workout","champions","winning","game","highlights","sportsmotivation","dedication","teamwork","passion","performance","legendary","records","goals","unstoppable","competition","sportslife"],
-  "Music":          ["music","viral","trending","hiphop","pop","rnb","beats","newmusic","musicvideo","banger","fire","playlist","musically","vibe","musiclover","singer","artist","dance","live","charttopper"],
-  "Gaming":         ["gaming","gamer","gameplay","videogames","twitch","streaming","gamerlife","games","ps5","xbox","pcgaming","epicmoments","clutch","winning","gaming2024","gamingcommunity","esports","highlights","satisfying","glitch"],
-  "Travel":         ["travel","explore","adventure","wanderlust","vacation","travelblogger","travelphotography","worldtravel","beautifulplaces","holiday","travelgram","destination","backpacking","travellife","tourism","culture","nature","experience","globetrotter","mustvisit"],
-  "Food":           ["food","foodie","delicious","cooking","recipe","foodlover","yummy","chef","tasty","homemade","foodphotography","eat","instafood","mealprep","foodies","foodblog","dinner","lunch","breakfast","munchies"],
-  "Fashion":        ["fashion","style","outfit","ootd","streetstyle","trendy","fashionista","model","clothing","aesthetics","look","outfitinspo","stylish","wear","trend","fashionblogger","vibe","aesthetic","swagger","drip"],
+  "Trending":     ["trending","viral","fyp","foryou","viralvideo","mustwatch","explorepage","explore","reels","shorts","viralpost","trendingnow","internetgold","curiosity","foryoupage","entertainment","topvideo","trendalert","instaviral","socialmedia","bestclips","algorithm"],
+  "Comedy":       ["comedy","funny","humor","laugh","lol","hilarious","memes","standup","prank","joke","fails","sketch","funnymoments","comedycentral","parody","relatable","trynottolaugh","comedyvideo","comedyshorts","laughoutloud","funnymemes","humorous"],
+  "Funny":        ["funny","humor","comedy","laugh","lol","hilarious","memes","trynottolaugh","funnyclips","funnyvideo","comedycentral","fails","epicfails","funnymoments","laughing","jokes","funnyshorts","prank","trending","funnystuff","comedian"],
+  "Motivational": ["motivation","mindset","success","inspiration","hustle","grind","nevergiveup","goals","growth","discipline","winners","bestadvice","lifelessons","selfdevelopment","unstoppable","positivemindset","bossmindset","winning","ambition","levelup","mentality","hardwork"],
+  "Horror":       ["horror","scary","spooky","creepy","paranormal","ghost","mystery","thriller","dark","chilling","haunted","urbanlegends","terrifying","jumpscare","nightmare","horrortok","truehorror","spookyseason","unexplained","supernatural","horrorclips","creepyfacts"],
+  "Educational":  ["education","learning","knowledge","facts","didyouknow","science","history","interestingfacts","funfacts","study","mindblowing","learneveryday","amazingfacts","wisdom","schooloflife","curious","informative","discovery","explainer","learnmore","curiosity","dailyknowledge"],
+  "Romance":      ["romance","love","relationship","couplegoals","wholesome","crush","truelove","heartwarming","cute","sweet","emotional","couple","romancevibes","feelings","unspokenlove","marriage","soulmate","lovestory","relationshipadvice","lovetok","purelove","sweetheart"],
+  "Adventure":    ["adventure","outdoors","explore","wilderness","extreme","hiking","travel","camping","wanderlust","nature","action","climbing","mountains","survival","adrenaline","wildlife","expedition","offroad","breathtaking","roadtrip","daredevil","actionshots"],
+  "Music":        ["music","viralmusic","sound","song","beats","hiphop","pop","instrumental","vocals","performance","talent","musician","livemusic","cover","singing","guitar","piano","vibes","playlist","banger","musictok","acoustics"],
+  "Food":         ["food","foodie","delicious","cooking","recipe","chef","tasty","streetfood","yummy","eat","instafood","mealprep","foodlover","kitchen","baking","dinner","fastfood","foodtok","satisfyingfood","mouthwatering","foodreview","snack"],
+  "Nature":       ["nature","wildlife","earth","beautiful","naturelover","outdoors","wilderness","animals","photography","landscape","scenery","naturalbeauty","ecology","planet","stunning","peaceful","adventure","explore","biodiversity","amazingnature"],
+  "Sports":       ["sports","athlete","fitness","training","workout","champions","winning","game","highlights","sportsmotivation","dedication","teamwork","passion","performance","legendary","records","goals","unstoppable","competition","sportslife"],
+  "Gaming":       ["gaming","gamer","gameplay","videogames","twitch","streaming","gamerlife","games","ps5","xbox","pcgaming","epicmoments","clutch","winning","gaming2024","gamingcommunity","esports","highlights","satisfying","glitch"],
+  "Travel":       ["travel","explore","adventure","wanderlust","vacation","travelblogger","travelphotography","worldtravel","beautifulplaces","holiday","travelgram","destination","backpacking","travellife","tourism","culture","nature","experience","globetrotter","mustvisit"],
+  "Fashion":      ["fashion","style","outfit","ootd","streetstyle","trendy","fashionista","model","clothing","aesthetics","look","outfitinspo","stylish","wear","trend","fashionblogger","vibe","aesthetic","swagger","drip"],
 };
 
 // Fallback universal hashtags
-const UNIVERSAL_HASHTAGS = ["viral","trending","foryou","fyp","reels","shorts","explore","share","mustwatch","viralvideo","watchthis","followformore","content","socialmedia","entertainment"];
+const UNIVERSAL_HASHTAGS = ["viral","trending","foryou","fyp","reels","shorts","explore","share","mustwatch","viralvideo","watchthis","followformore","content","socialmedia","entertainment","trendingreels","explorepage"];
 
 // Part-based hooks (rotate based on part number)
 const HOOKS: Record<string, string[]> = {
-  "Motivational":   ["This one will change how you think 🔥","If you're going through a tough time, watch this 💪","This clip hits different when you needed it most ⚡","One of the most powerful moments in the entire series 🎯","Stop scrolling — this is exactly what you need to hear today 🙌"],
-  "Funny":          ["You will NOT be able to stop laughing 😂","Warning: do not watch this in public 🤣","This one got me in tears 💀","This is the funniest thing I've seen all week 😭","Bro I can't stop rewatching this 😂🔥"],
-  "Educational":    ["Most people don't know this 🤯","This fact will blow your mind 🧠","They don't teach this in school 📚","One of the most eye-opening clips I've come across 👀","After seeing this, you'll never look at it the same way 💡"],
-  "Nature":         ["Nature never ceases to amaze me 🌿","Our planet is absolutely breathtaking 🌍","This is why I love the natural world 🦋","Moments like these remind us how beautiful life is 🌅","Pure magic captured on camera 📷"],
-  "Sports":         ["This moment gave me chills 🏆","Absolute SCENES! 🔥","This is why sports are beautiful 💯","Nobody expected this to happen 😤","Legendary performance right here 🐐"],
-  "Gaming":         ["Nobody saw this coming 🎮","This clip broke the internet 💥","The reaction says everything 👀","Insane skill level right here 🔥","This is why we love gaming 🎯"],
-  "Music":          ["This track is on another level 🎵","The vibe is unreal 🔥","You need this on your playlist NOW 🎶","Can't stop listening to this 🎤","Pure fire, no skip 🔥"],
-  "Travel":         ["I can't believe places like this exist 😍","This destination is absolutely stunning 🌏","Adding this to the bucket list immediately ✈️","The views here are unreal 🏔️","This is why travel changes you forever 🌅"],
-  "Food":           ["The way this came together is insane 🍽️","One bite and you'll understand why this went viral 😋","This recipe is next level 👨‍🍳","Warning: this will make you very hungry 🤤","Absolutely mouth-watering 🔥"],
-  "Fashion":        ["The fit is immaculate 🔥","This look is absolutely everything 💅","Style goals right here ✨","The drip is unreal 👑","This is how you do it 💯"],
+  "Trending":     ["This clip is taking over the internet 🔥","You have to see this to believe it 👀","The whole internet is talking about this ⚡","Wait until you see what happens next 😱","One of the most viral moments this week 🎯"],
+  "Comedy":       ["Try not to laugh challenge 😂","Warning: do not watch this in public 🤣","This had me in tears 💀","Funniest clip you'll see all day 😭","Bro I can't stop rewatching this 😂🔥"],
+  "Motivational": ["This one will change how you think 🔥","If you're going through a tough time, watch this 💪","This clip hits different when you needed it most ⚡","One of the most powerful moments in the entire series 🎯","Stop scrolling — this is exactly what you need to hear today 🙌"],
+  "Funny":        ["You will NOT be able to stop laughing 😂","Warning: do not watch this in public 🤣","This one got me in tears 💀","This is the funniest thing I've seen all week 😭","Bro I can't stop rewatching this 😂🔥"],
+  "Horror":       ["Do not watch this alone in the dark 🌑","This spine-chilling moment gave me chills 👻","Unexplained real mystery caught on tape 👀","Spooky encounter you won't be able to forget 😱","Watch closely — something isn't right here 🚪"],
+  "Educational":  ["Most people don't know this 🤯","This fact will blow your mind 🧠","They don't teach this in school 📚","One of the most eye-opening clips I've come across 👀","After seeing this, you'll never look at it the same way 💡"],
+  "Romance":      ["A love story that touches your heart ❤️","Unspoken feelings that hit deep in the heart ✨","When someone truly means the world to you 💍","Late night thoughts of someone you love 💕","Tag someone who gives you butterflies 🦋"],
+  "Adventure":    ["The adrenaline rush is unreal 🏔️","This outdoor moment will leave you speechless 🌊","Action-packed adventure you have to witness 🔥","Pushing human limits to the absolute edge 🧗","Earth's wild side captured on camera 🏕️"],
+  "Music":        ["This live performance gave me absolute chills 🎵","The vocals and rhythm are pure magic 🔥","You need this track on your playlist NOW 🎶","Can't stop listening to this on repeat 🎤","Pure musical talent right here ✨"],
+  "Food":         ["The way this came together is mouth-watering 🍽️","One bite and you'll understand why this went viral 😋","Street food master at work 👨‍🍳","Warning: this will make you extremely hungry 🤤","Absolutely incredible cooking skills 🔥"],
+  "Nature":       ["Nature never ceases to amaze me 🌿","Our planet is absolutely breathtaking 🌍","This is why I love the natural world 🦋","Moments like these remind us how beautiful life is 🌅","Pure magic captured on camera 📷"],
+  "Sports":       ["This moment gave me chills 🏆","Absolute SCENES! 🔥","This is why sports are beautiful 💯","Nobody expected this to happen 😤","Legendary performance right here 🐐"],
+  "Gaming":       ["Nobody saw this coming 🎮","This clip broke the internet 💥","The reaction says everything 👀","Insane skill level right here 🔥","This is why we love gaming 🎯"],
+  "Travel":       ["I can't believe places like this exist 😍","This destination is absolutely stunning 🌏","Adding this to the bucket list immediately ✈️","The views here are unreal 🏔️","This is why travel changes you forever 🌅"],
+  "Fashion":      ["The fit is immaculate 🔥","This look is absolutely everything 💅","Style goals right here ✨","The drip is unreal 👑","This is how you do it 💯"],
 };
 
 // CTA (Call to action) endings
 const CTAS = [
-  "Follow for more clips like this!",
+  "Follow for more daily viral clips!",
   "Save this and share it with someone who needs to see it!",
-  "Drop a 🔥 if you agree!",
-  "Tag someone who needs this!",
+  "Drop a 🔥 if you loved this!",
+  "Tag someone who needs to watch this!",
   "Turn on notifications so you never miss a part!",
-  "Which part did you like most? Comment below!",
+  "What are your thoughts? Drop a comment below!",
   "Like and follow for the full series!",
   "Share this with your friends — they'll thank you later!",
 ];
@@ -507,15 +517,19 @@ export async function cleanViralTitle(rawTitle: string, category = "Trending"): 
   if (!title || isHash || title.length < 4) {
     const fallbacks: Record<string, string[]> = {
       Trending: ["Trending Viral Internet Moment", "Must Watch Viral Video", "This Clip Is Taking Over Social Media"],
+      Comedy: ["Stand Up Comedy Masterpiece", "Funniest Clip You Will See Today", "Comedy Gold Moments"],
       Motivational: ["The Mindset Shift That Changes Everything", "Powerful Motivation You Need Today", "Never Give Up On Your Dreams"],
       Funny: ["Try Not To Laugh Challenge", "Pure Comedy Gold Moment", "Funniest Video You Will See Today"],
-      Comedy: ["Stand Up Comedy Masterpiece", "Funniest Clip You Will See Today", "Comedy Gold Moments"],
+      Horror: ["Spine Chilling Real Mystery", "Unexplained Paranormal Encounter", "Do Not Watch This Alone In The Dark"],
+      Educational: ["Mind Blowing Fact You Never Knew", "Science Facts That Will Shock You", "History Secret That Changes Everything"],
+      Romance: ["A Love Story That Touches Your Heart", "Unspoken Feelings That Hit Deep", "When Someone Truly Means Everything"],
+      Adventure: ["Extreme Outdoor Adventure Highlight", "Breathtaking Adrenaline Moment", "Pushing Limits In The Wild"],
+      Music: ["Amazing Live Music Performance", "Incredible Rhythm And Melody", "Viral Sound That Hits Different"],
       Food: ["Incredible Street Food Chef Skills", "Delicious Cooking Recipe Master", "Mouth Watering Food Everyone Is Craving"],
       Sports: ["Legendary Athlete Moment Chills", "Incredible Sports Highlight", "Unstoppable Athletic Performance"],
       Travel: ["Breathtaking Place You Must Visit", "Hidden Paradise On Earth", "Stunning Travel View Before You Die"],
       Nature: ["Incredible Wildlife Encounter Caught On Camera", "Nature Never Ceases To Amaze", "Wild Animals Beautiful Moment"],
       Gaming: ["Insane Gaming Clutch Moment", "Epic Gameplay Highlight", "Unbelievable Gaming Reaction"],
-      Music: ["Amazing Live Music Performance", "Incredible Rhythm And Melody", "Viral Sound That Hits Different"],
     };
     const list = fallbacks[category] || fallbacks.Trending;
     return list[Math.floor(Math.random() * list.length)];
@@ -534,7 +548,7 @@ export async function generateClipMetadata(params: {
   const { partNumber, totalParts, sourceTitle, contentCategory, clipDuration } = params;
 
   const cleanTitle = await cleanViralTitle(sourceTitle, contentCategory);
-  const categoryHooks = HOOKS[contentCategory] || HOOKS["Motivational"];
+  const categoryHooks = HOOKS[contentCategory] || HOOKS["Trending"];
   const hook = pickRandom(categoryHooks, partNumber - 1);
   const cta = pickRandom(CTAS, partNumber + 1);
 
@@ -558,15 +572,15 @@ export async function generateClipMetadata(params: {
   ].join("\n");
 
   // Post-respective hashtags: clean words from title + niche tags + platform tags
-  const bankTags = (HASHTAG_BANK[contentCategory] || HASHTAG_BANK["Motivational"] || []).slice(0, 10);
+  const bankTags = (HASHTAG_BANK[contentCategory] || HASHTAG_BANK["Trending"] || []).slice(0, 16);
   const rawWords = cleanTitle.match(/[a-zA-Z]{3,12}/g) || [];
   const cleanTitleTags = rawWords
     .map((w) => w.toLowerCase())
     .filter((w) => !/[bcdfghjklmnpqrstvwxyz]{5,}/i.test(w) && !bankTags.includes(w) && !UNIVERSAL_HASHTAGS.includes(w))
-    .slice(0, 4);
+    .slice(0, 5);
 
-  const combined = [...new Set([...cleanTitleTags, ...bankTags.slice(0, 6), "shorts", "reels", "viral", "fyp"])];
-  const hashtags = combined.slice(0, 10);
+  const combined = [...new Set([...cleanTitleTags, ...bankTags, "shorts", "reels", "viral", "fyp", "trending", "explore", "foryou", "viralvideo", "watchthis"])];
+  const hashtags = combined.slice(0, 24);
 
   return { description, hashtags };
 }
@@ -723,314 +737,320 @@ export async function publishClipAndCleanup(params: {
   }
 
   try {
+    const publishTasks: Promise<void>[] = [];
+
     // ─ YouTube (Posts as YouTube Short if <= 180s) ─
     if (platforms.includes("YouTube")) {
-      try {
-        const { google } = require("googleapis");
-        const oauth2Client = new google.auth.OAuth2(
-          process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-          process.env.GOOGLE_CLIENT_SECRET
-        );
-        oauth2Client.setCredentials(tokens.youtube);
-
+      publishTasks.push((async () => {
         try {
-          const { token } = await oauth2Client.getAccessToken();
-          if (token && token !== tokens.youtube?.access_token) {
-            tokens.youtube.access_token = token;
-            const { writeTokens } = await import("@/app/lib/tokens");
-            await writeTokens(tokens);
+          const { google } = require("googleapis");
+          const oauth2Client = new google.auth.OAuth2(
+            process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_CLIENT_SECRET
+          );
+          oauth2Client.setCredentials(tokens.youtube);
+
+          try {
+            const { token } = await oauth2Client.getAccessToken();
+            if (token && token !== tokens.youtube?.access_token) {
+              tokens.youtube.access_token = token;
+              const { writeTokens } = await import("@/app/lib/tokens");
+              await writeTokens(tokens);
+            }
+          } catch (tokErr: any) {
+            console.warn("YouTube token refresh notice:", tokErr.message);
           }
-        } catch (tokErr: any) {
-          console.warn("YouTube token refresh notice:", tokErr.message);
-        }
 
-        const youtube = google.youtube({ version: "v3", auth: oauth2Client });
+          const youtube = google.youtube({ version: "v3", auth: oauth2Client });
 
-        const isShort = !params.totalDuration || params.totalDuration <= 180;
-        const cleanTitleWithShorts = isShort && !fullTitle.toLowerCase().includes("#shorts")
-          ? `${fullTitle.slice(0, 90)} #Shorts`
-          : fullTitle.slice(0, 100);
+          const isShort = !params.totalDuration || params.totalDuration <= 180;
+          const cleanTitleWithShorts = isShort && !fullTitle.toLowerCase().includes("#shorts")
+            ? `${fullTitle.slice(0, 90)} #Shorts`
+            : fullTitle.slice(0, 100);
 
-        const res = await youtube.videos.insert({
-          part: ["snippet", "status"],
-          requestBody: {
-            snippet: {
-              title: cleanTitleWithShorts,
-              description: fullDescription,
-              tags: [...hashtags.slice(0, 12), "Shorts", "shorts", "viral"],
-              categoryId: "22",
+          const res = await youtube.videos.insert({
+            part: ["snippet", "status"],
+            requestBody: {
+              snippet: {
+                title: cleanTitleWithShorts,
+                description: fullDescription,
+                tags: [...hashtags.slice(0, 18), "Shorts", "shorts", "viral"],
+                categoryId: "22",
+              },
+              status: { privacyStatus: "public", selfDeclaredMadeForKids: false },
             },
-            status: { privacyStatus: "public", selfDeclaredMadeForKids: false },
-          },
-          media: {
-            mimeType: "video/mp4",
-            body: fs.createReadStream(/*turbopackIgnore: true*/ absolutePath),
-          },
-        });
+            media: {
+              mimeType: "video/mp4",
+              body: fs.createReadStream(/*turbopackIgnore: true*/ absolutePath),
+            },
+          });
 
-        youtubeVideoId = res.data.id;
-        youtubeUrl = isShort
-          ? `https://www.youtube.com/shorts/${youtubeVideoId}`
-          : `https://www.youtube.com/watch?v=${youtubeVideoId}`;
-        logs.push(`✅ YouTube: ${youtubeUrl}`);
-      } catch (e: any) {
-        const errMsg = e?.response?.data?.error?.message || e?.message || "";
-        const errReason = e?.response?.data?.error?.errors?.[0]?.reason || "";
-        if (errMsg.includes("invalid_grant") || errMsg.includes("revoked")) {
-          logs.push("❌ YouTube: Google access expired. Please click 'Connect' on YouTube in Settings to re-authenticate.");
-        } else if (errReason === "uploadLimitExceeded" || errMsg.includes("exceeded the number of videos")) {
-          logs.push("⚠️ YouTube Daily Upload Limit Reached: YouTube allows ~5-10 uploads per day for standard channels. Enable Advanced Features in YouTube Studio -> Channel -> Feature Eligibility to unlock 100/day, or wait for the 24-hr reset.");
-        } else if (errReason === "quotaExceeded" || errMsg.includes("quota")) {
-          logs.push("⚠️ YouTube Daily API Quota Reached: YouTube Data API free limit (10,000 units/day) reached. Quota resets daily at midnight PST.");
-        } else {
-          logs.push(`❌ YouTube: ${errMsg || e.message}`);
+          youtubeVideoId = res.data.id;
+          youtubeUrl = isShort
+            ? `https://www.youtube.com/shorts/${youtubeVideoId}`
+            : `https://www.youtube.com/watch?v=${youtubeVideoId}`;
+          logs.push(`✅ YouTube: ${youtubeUrl}`);
+        } catch (e: any) {
+          const errMsg = e?.response?.data?.error?.message || e?.message || "";
+          const errReason = e?.response?.data?.error?.errors?.[0]?.reason || "";
+          if (errMsg.includes("invalid_grant") || errMsg.includes("revoked")) {
+            logs.push("❌ YouTube: Google access expired. Please click 'Connect' on YouTube in Settings to re-authenticate.");
+          } else if (errReason === "uploadLimitExceeded" || errMsg.includes("exceeded the number of videos")) {
+            logs.push("⚠️ YouTube Daily Upload Limit Reached: YouTube allows ~5-10 uploads per day for standard channels. Enable Advanced Features in YouTube Studio -> Channel -> Feature Eligibility to unlock 100/day, or wait for the 24-hr reset.");
+          } else if (errReason === "quotaExceeded" || errMsg.includes("quota")) {
+            logs.push("⚠️ YouTube Daily API Quota Reached: YouTube Data API free limit (10,000 units/day) reached. Quota resets daily at midnight PST.");
+          } else {
+            logs.push(`❌ YouTube: ${errMsg || e.message}`);
+          }
         }
-      }
+      })());
     }
 
     // ─ Facebook (Posts as Reel + Creates Story card linking to Reel) ─
     if (platforms.includes("Facebook")) {
-      try {
-        const pageId = tokens.facebook?.page_id;
-        const pageToken = tokens.facebook?.page_access_token;
-        if (!pageId || !pageToken) throw new Error("Facebook not connected.");
-
-        // Upload as file stream via multipart
-        const fileBuffer = fs.readFileSync(/*turbopackIgnore: true*/ absolutePath);
-        const formData = new FormData();
-        formData.append("access_token", pageToken);
-        formData.append("title", fullTitle.slice(0, 100));
-        formData.append("description", fullDescription);
-        formData.append("published", "true");
-        formData.append(
-          "source",
-          new Blob([fileBuffer], { type: "video/mp4" }),
-          `clip_part${partNumber}.mp4`
-        );
-
-        const postRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/videos`, {
-          method: "POST",
-          body: formData,
-          signal: AbortSignal.timeout(180000),
-        });
-        const postData = await postRes.json();
-        if (!postRes.ok || postData.error) throw new Error(postData.error?.message || `HTTP ${postRes.status}`);
-
-        facebookVideoId = postData.id;
-        facebookUrl = `https://www.facebook.com/reel/${facebookVideoId}`;
-        logs.push(`✅ Facebook: ${facebookUrl}`);
-
-        // Also post Facebook Page Story (using designed Polaroid Story card)
+      publishTasks.push((async () => {
         try {
-          if (!storyCardUrl) {
-            const cardData = await getOrGenerateStoryCardUrl({
-              videoPath: absolutePath,
-              publicVideoUrl: (isRemote && (clipPath.startsWith("http://") || clipPath.startsWith("https://"))) ? clipPath : undefined,
-              title,
-              partNumber,
-              instagramHandle: igHandle,
-            });
-            if (cardData.secureUrl) {
-              storyCardUrl = cardData.secureUrl;
-              uploadedStoryCardId = cardData.publicId;
-            }
-          }
+          const pageId = tokens.facebook?.page_id;
+          const pageToken = tokens.facebook?.page_access_token;
+          if (!pageId || !pageToken) throw new Error("Facebook not connected.");
 
-          if (storyCardUrl) {
-            // Step 1: Upload photo as unpublished to prepare for Story
-            const upRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/photos`, {
-              method: "POST",
-              headers: { "Content-Type": "application/x-www-form-urlencoded" },
-              body: new URLSearchParams({
-                access_token: pageToken,
-                url: storyCardUrl,
-                published: "false",
-              }),
-            });
-            const upData = await upRes.json();
-            if (upData?.id) {
-              // Step 2: Publish photo to Facebook Page Stories
-              const storyRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/photo_stories`, {
+          // Upload as file stream via multipart
+          const fileBuffer = fs.readFileSync(/*turbopackIgnore: true*/ absolutePath);
+          const formData = new FormData();
+          formData.append("access_token", pageToken);
+          formData.append("title", fullTitle.slice(0, 100));
+          formData.append("description", fullDescription);
+          formData.append("published", "true");
+          formData.append(
+            "source",
+            new Blob([fileBuffer], { type: "video/mp4" }),
+            `clip_part${partNumber}.mp4`
+          );
+
+          const postRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/videos`, {
+            method: "POST",
+            body: formData,
+            signal: AbortSignal.timeout(90000),
+          });
+          const postData = await postRes.json();
+          if (!postRes.ok || postData.error) throw new Error(postData.error?.message || `HTTP ${postRes.status}`);
+
+          facebookVideoId = postData.id;
+          facebookUrl = `https://www.facebook.com/reel/${facebookVideoId}`;
+          logs.push(`✅ Facebook: ${facebookUrl}`);
+
+          // Also post Facebook Page Story (using designed Polaroid Story card)
+          try {
+            if (!storyCardUrl) {
+              const cardData = await getOrGenerateStoryCardUrl({
+                videoPath: absolutePath,
+                publicVideoUrl: (isRemote && (clipPath.startsWith("http://") || clipPath.startsWith("https://"))) ? clipPath : undefined,
+                title,
+                partNumber,
+                instagramHandle: igHandle,
+              });
+              if (cardData.secureUrl) {
+                storyCardUrl = cardData.secureUrl;
+                uploadedStoryCardId = cardData.publicId;
+              }
+            }
+
+            if (storyCardUrl) {
+              const upRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/photos`, {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: new URLSearchParams({
                   access_token: pageToken,
-                  photo_id: upData.id,
+                  url: storyCardUrl,
+                  published: "false",
                 }),
               });
-              const storyData = await storyRes.json();
-              if (storyData?.id || storyData?.success || storyData?.post_id) {
-                facebookStoryId = String(storyData.id || storyData.post_id || upData.id);
-                logs.push(`✅ Facebook: Story published (Polaroid Reel card)`);
-              } else {
-                console.warn("Facebook photo_stories error response:", storyData);
+              const upData = await upRes.json();
+              if (upData?.id) {
+                const storyRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/photo_stories`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                  body: new URLSearchParams({
+                    access_token: pageToken,
+                    photo_id: upData.id,
+                  }),
+                });
+                const storyData = await storyRes.json();
+                if (storyData?.id || storyData?.success || storyData?.post_id) {
+                  facebookStoryId = String(storyData.id || storyData.post_id || upData.id);
+                  logs.push(`✅ Facebook: Story published (Polaroid Reel card)`);
+                }
               }
             }
+          } catch (storyErr: any) {
+            console.warn("Facebook story notice:", storyErr.message);
           }
-        } catch (storyErr: any) {
-          console.warn("Facebook story notice:", storyErr.message);
-        }
 
-        // Also post Facebook Page Feed update with clickable link to Reel
-        try {
-          const feedRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/feed`, {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-              access_token: pageToken,
-              message: `✨ Tap to watch full Reel: ${facebookUrl}\n\n${title}`,
-              link: facebookUrl,
-            }),
-          });
-          const feedData = await feedRes.json();
-          if (feedData?.id) {
-            facebookPostId = String(feedData.id);
+          // Also post Facebook Page Feed update with clickable link to Reel
+          try {
+            const feedRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/feed`, {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({
+                access_token: pageToken,
+                message: `✨ Tap to watch full Reel: ${facebookUrl}\n\n${title}`,
+                link: facebookUrl,
+              }),
+            });
+            const feedData = await feedRes.json();
+            if (feedData?.id) {
+              facebookPostId = String(feedData.id);
+            }
+            logs.push(`✅ Facebook: Feed link post published`);
+          } catch (feedErr: any) {
+            console.warn("Facebook feed notice:", feedErr.message);
           }
-          logs.push(`✅ Facebook: Feed link post published`);
-        } catch (feedErr: any) {
-          console.warn("Facebook feed notice:", feedErr.message);
+        } catch (e: any) {
+          logs.push(`❌ Facebook: ${e.message}`);
         }
-      } catch (e: any) {
-        logs.push(`❌ Facebook: ${e.message}`);
-      }
+      })());
     }
 
     // ─ Instagram (Posts as Reel + Posts Story with Thumbnail Card) ─
     if (platforms.includes("Instagram")) {
-      try {
-        const igUserId = tokens.instagram?.user_id || tokens.facebook?.instagram_user_id || "17841424354654362";
-        const instagramToken =
-          tokens.instagram?.access_token ||
-          tokens.facebook?.instagram_access_token ||
-          tokens.facebook?.instagram_page_access_token ||
-          tokens.facebook?.page_access_token;
-        const instagramApi = "https://graph.facebook.com/v26.0";
-        if (!instagramToken || !igUserId) throw new Error("Instagram not connected.");
-
-        // Meta Instagram API requires a direct accessible MP4 video file URL
-        let publicVideoUrl = (isRemote && (clipPath.startsWith("http://") || clipPath.startsWith("https://"))) ? clipPath : "";
-        if (!publicVideoUrl) {
-          try {
-            const { uploadVideoToCloudinary } = await import("@/app/cloudinary-upload");
-            const publicId = `ig_clip_${Date.now()}_part${partNumber}`;
-            const uploadRes = await uploadVideoToCloudinary(absolutePath, publicId);
-            publicVideoUrl = uploadRes.secureUrl;
-            uploadedCloudinaryId = uploadRes.publicId;
-          } catch (cErr: any) {
-            console.warn("Cloudinary upload for Instagram:", cErr.message);
-          }
-        }
-
-        if (!publicVideoUrl) {
-          throw new Error("Instagram Reels require a direct video file. Please configure Cloudinary in .env or provide a public video URL.");
-        }
-
-        // 1. Post Instagram Reel
-        const createRes = await fetch(`${instagramApi}/${igUserId}/media`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            access_token: instagramToken,
-            media_type: "REELS",
-            video_url: publicVideoUrl,
-            caption: `${title}\n\n${description}\n\n${formattedHashtags.join(" ")}`,
-            share_to_feed: "true",
-          }),
-        });
-        const createData = await createRes.json();
-        if (!createRes.ok || createData.error) throw new Error(createData.error?.message || `HTTP ${createRes.status}`);
-
-        const creationId = createData.id;
-        let finished = false;
-        for (let i = 0; i < 25; i++) {
-          await new Promise((r) => setTimeout(r, 4000));
-          const statusUrl = new URL(`${instagramApi}/${creationId}`);
-          statusUrl.search = new URLSearchParams({
-            fields: "status_code,status",
-            access_token: instagramToken,
-          }).toString();
-          const statusRes = await fetch(statusUrl, { cache: "no-store" });
-          const statusData = await statusRes.json();
-          if (statusData.status_code === "FINISHED") { finished = true; break; }
-          if (statusData.status_code === "ERROR") throw new Error(statusData.status || "Instagram processing failed.");
-        }
-        if (!finished) throw new Error("Instagram processing timed out.");
-
-        const publishRes = await fetch(`${instagramApi}/${igUserId}/media_publish`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({ access_token: instagramToken, creation_id: creationId }),
-        });
-        const publishData = await publishRes.json();
-        instagramVideoId = publishData.id;
-        instagramUrl = `https://www.instagram.com/reel/${instagramVideoId}`;
+      publishTasks.push((async () => {
         try {
-          const permalinkRes = await fetch(`${instagramApi}/${instagramVideoId}?fields=permalink&access_token=${instagramToken}`);
-          const permalinkData = await permalinkRes.json();
-          if (permalinkData?.permalink) {
-            instagramUrl = permalinkData.permalink;
-          }
-        } catch {}
-        logs.push(`✅ Instagram: Reel published (${instagramUrl})`);
+          const igUserId = tokens.instagram?.user_id || tokens.facebook?.instagram_user_id || "17841424354654362";
+          const instagramToken =
+            tokens.instagram?.access_token ||
+            tokens.facebook?.instagram_access_token ||
+            tokens.facebook?.instagram_page_access_token ||
+            tokens.facebook?.page_access_token;
+          const instagramApi = "https://graph.facebook.com/v26.0";
+          if (!instagramToken || !igUserId) throw new Error("Instagram not connected.");
 
-        // 2. Post as Instagram Story (Designed Polaroid Story card)
-        try {
-          if (!storyCardUrl) {
-            const cardData = await getOrGenerateStoryCardUrl({
-              videoPath: absolutePath,
-              publicVideoUrl,
-              title,
-              partNumber,
-              instagramHandle: igHandle,
-            });
-            if (cardData.secureUrl) {
-              storyCardUrl = cardData.secureUrl;
-              uploadedStoryCardId = cardData.publicId;
+          let publicVideoUrl = (isRemote && (clipPath.startsWith("http://") || clipPath.startsWith("https://"))) ? clipPath : "";
+          if (!publicVideoUrl) {
+            try {
+              const { uploadVideoToCloudinary } = await import("@/app/cloudinary-upload");
+              const publicId = `ig_clip_${Date.now()}_part${partNumber}`;
+              const uploadRes = await uploadVideoToCloudinary(absolutePath, publicId);
+              publicVideoUrl = uploadRes.secureUrl;
+              uploadedCloudinaryId = uploadRes.publicId;
+            } catch (cErr: any) {
+              console.warn("Cloudinary upload for Instagram:", cErr.message);
             }
           }
 
-          if (storyCardUrl) {
-            const storyRes = await fetch(`${instagramApi}/${igUserId}/media`, {
-              method: "POST",
-              headers: { "Content-Type": "application/x-www-form-urlencoded" },
-              body: new URLSearchParams({
-                access_token: instagramToken,
-                media_type: "STORIES",
-                image_url: storyCardUrl,
-              }),
-            });
-            const storyData = await storyRes.json();
-            if (storyData?.id) {
-              const storyCreationId = storyData.id;
-              let storyFinished = false;
-              for (let s = 0; s < 15; s++) {
-                await new Promise((r) => setTimeout(r, 3000));
-                const sCheck = await fetch(`${instagramApi}/${storyCreationId}?fields=status_code,status&access_token=${instagramToken}`, { cache: "no-store" });
-                const sJson = await sCheck.json();
-                if (sJson.status_code === "FINISHED") { storyFinished = true; break; }
-                if (sJson.status_code === "ERROR") break;
+          if (!publicVideoUrl) {
+            throw new Error("Instagram Reels require a direct video file. Please configure Cloudinary in .env or provide a public video URL.");
+          }
+
+          // 1. Post Instagram Reel
+          const createRes = await fetch(`${instagramApi}/${igUserId}/media`, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              access_token: instagramToken,
+              media_type: "REELS",
+              video_url: publicVideoUrl,
+              caption: `${title}\n\n${description}\n\n${formattedHashtags.join(" ")}`,
+              share_to_feed: "true",
+            }),
+          });
+          const createData = await createRes.json();
+          if (!createRes.ok || createData.error) throw new Error(createData.error?.message || `HTTP ${createRes.status}`);
+
+          const creationId = createData.id;
+          let finished = false;
+          for (let i = 0; i < 16; i++) {
+            await new Promise((r) => setTimeout(r, 2500));
+            const statusUrl = new URL(`${instagramApi}/${creationId}`);
+            statusUrl.search = new URLSearchParams({
+              fields: "status_code,status",
+              access_token: instagramToken,
+            }).toString();
+            const statusRes = await fetch(statusUrl, { cache: "no-store" });
+            const statusData = await statusRes.json();
+            if (statusData.status_code === "FINISHED") { finished = true; break; }
+            if (statusData.status_code === "ERROR") throw new Error(statusData.status || "Instagram processing failed.");
+          }
+          if (!finished) throw new Error("Instagram processing timed out.");
+
+          const publishRes = await fetch(`${instagramApi}/${igUserId}/media_publish`, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ access_token: instagramToken, creation_id: creationId }),
+          });
+          const publishData = await publishRes.json();
+          instagramVideoId = publishData.id;
+          instagramUrl = `https://www.instagram.com/reel/${instagramVideoId}`;
+          try {
+            const permalinkRes = await fetch(`${instagramApi}/${instagramVideoId}?fields=permalink&access_token=${instagramToken}`);
+            const permalinkData = await permalinkRes.json();
+            if (permalinkData?.permalink) {
+              instagramUrl = permalinkData.permalink;
+            }
+          } catch {}
+          logs.push(`✅ Instagram: Reel published (${instagramUrl})`);
+
+          // 2. Post as Instagram Story (Designed Polaroid Story card)
+          try {
+            if (!storyCardUrl) {
+              const cardData = await getOrGenerateStoryCardUrl({
+                videoPath: absolutePath,
+                publicVideoUrl,
+                title,
+                partNumber,
+                instagramHandle: igHandle,
+              });
+              if (cardData.secureUrl) {
+                storyCardUrl = cardData.secureUrl;
+                uploadedStoryCardId = cardData.publicId;
               }
-              if (storyFinished) {
-                const pubStoryRes = await fetch(`${instagramApi}/${igUserId}/media_publish`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                  body: new URLSearchParams({ access_token: instagramToken, creation_id: storyCreationId }),
-                });
-                const pubStoryData = await pubStoryRes.json().catch(() => ({}));
-                if (pubStoryRes.ok) {
-                  instagramStoryId = String(pubStoryData?.id || storyCreationId);
-                  logs.push(`✅ Instagram: Story published (Polaroid Reel card)`);
+            }
+
+            if (storyCardUrl) {
+              const storyRes = await fetch(`${instagramApi}/${igUserId}/media`, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({
+                  access_token: instagramToken,
+                  media_type: "STORIES",
+                  image_url: storyCardUrl,
+                }),
+              });
+              const storyData = await storyRes.json();
+              if (storyData?.id) {
+                const storyCreationId = storyData.id;
+                let storyFinished = false;
+                for (let s = 0; s < 8; s++) {
+                  await new Promise((r) => setTimeout(r, 2000));
+                  const sCheck = await fetch(`${instagramApi}/${storyCreationId}?fields=status_code,status&access_token=${instagramToken}`, { cache: "no-store" });
+                  const sJson = await sCheck.json();
+                  if (sJson.status_code === "FINISHED") { storyFinished = true; break; }
+                  if (sJson.status_code === "ERROR") break;
+                }
+                if (storyFinished) {
+                  const pubStoryRes = await fetch(`${instagramApi}/${igUserId}/media_publish`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: new URLSearchParams({ access_token: instagramToken, creation_id: storyCreationId }),
+                  });
+                  const pubStoryData = await pubStoryRes.json().catch(() => ({}));
+                  if (pubStoryRes.ok) {
+                    instagramStoryId = String(pubStoryData?.id || storyCreationId);
+                    logs.push(`✅ Instagram: Story published (Polaroid Reel card)`);
+                  }
                 }
               }
             }
+          } catch (storyErr: any) {
+            console.warn("Instagram story notice:", storyErr.message);
           }
-        } catch (storyErr: any) {
-          console.warn("Instagram story notice:", storyErr.message);
+        } catch (e: any) {
+          logs.push(`❌ Instagram: ${e.message}`);
         }
-      } catch (e: any) {
-        logs.push(`❌ Instagram: ${e.message}`);
-      }
+      })());
     }
+
+    // Wait for all active platform publishing tasks to settle concurrently
+    await Promise.allSettled(publishTasks);
 
     // ─ Gmail notification (RFC 2047 MIME encoded subject to avoid garbled encoding) ─
     if (platforms.includes("Gmail") || (tokens.gmail?.access_token && (youtubeUrl || facebookUrl || instagramUrl))) {
@@ -1372,17 +1392,21 @@ const SAFE_CATEGORY_QUERIES: Record<string, string[]> = {
 // ─── Real Dynamic Viral Scrapers (Live Online Only — Zero Hardcoding & Zero AI) ─
 
 const TIKTOK_CATEGORY_KEYWORDS: Record<string, string[]> = {
-  "Motivational": ["motivation", "mindset", "success", "grind", "nevergiveup", "focus", "discipline", "life", "quote", "inspire", "hardwork", "hustle", "gymmotivation"],
+  "Trending": ["viral", "trending", "fyp", "foryou", "popular", "explore", "reels", "shorts", "mustwatch"],
+  "Comedy": ["funny", "laugh", "humor", "comedy", "lol", "prank", "joke", "meme", "fails", "standup", "sketch", "hilarious"],
   "Funny": ["funny", "laugh", "humor", "comedy", "lol", "prank", "joke", "meme", "fails", "trynottolaugh", "hilarious", "relatable"],
-  "Comedy": ["funny", "laugh", "humor", "comedy", "lol", "prank", "joke", "meme", "fails", "standup", "sketch"],
-  "Educational": ["facts", "didyouknow", "science", "learn", "history", "educational", "interesting", "knowledge", "discovery", "school"],
+  "Motivational": ["motivation", "mindset", "success", "grind", "nevergiveup", "focus", "discipline", "life", "quote", "inspire", "hardwork", "hustle", "gymmotivation"],
+  "Horror": ["horror", "scary", "spooky", "creepy", "paranormal", "ghost", "mystery", "thriller", "dark", "chilling", "haunted", "unexplained"],
+  "Educational": ["facts", "didyouknow", "science", "learn", "history", "educational", "interesting", "knowledge", "discovery", "school", "space", "biology"],
+  "Romance": ["love", "romance", "couple", "relationship", "crush", "heart", "cute", "sweet", "wholesome", "feelings", "marriage", "partner"],
+  "Adventure": ["adventure", "outdoor", "extreme", "hiking", "action", "travel", "climbing", "explore", "wild", "skate", "surf", "camping", "expedition"],
+  "Music": ["music", "song", "sing", "dance", "lyrics", "sound", "rap", "cover", "beat", "banger", "guitar", "piano", "vocals", "singer"],
+  "Food": ["food", "recipe", "cooking", "chef", "tasty", "delicious", "eat", "dinner", "cake", "kitchen", "bake", "lunch", "streetfood", "snack"],
   "Nature": ["nature", "wildlife", "animal", "earth", "ocean", "forest", "dog", "cat", "puppy", "pet", "birds", "landscape"],
   "Sports": ["sports", "football", "soccer", "gym", "workout", "athlete", "goals", "basketball", "training", "fitness", "run", "champion", "tennis", "fight", "ufc", "boxing"],
   "Gaming": ["gaming", "game", "gamer", "play", "gta", "fortnite", "roblox", "minecraft", "streamer", "twitch", "gameplay", "clip"],
   "Travel": ["travel", "explore", "vacation", "trip", "place", "city", "beautiful", "hotel", "flight", "beach", "view", "wanderlust", "destination"],
-  "Food": ["food", "recipe", "cooking", "chef", "tasty", "delicious", "eat", "dinner", "cake", "kitchen", "bake", "lunch", "streetfood", "snack"],
   "Fashion": ["fashion", "style", "ootd", "outfit", "clothes", "dress", "model", "drip", "fit", "beauty", "makeup", "look"],
-  "Music": ["music", "song", "sing", "dance", "lyrics", "sound", "rap", "cover", "beat", "banger"],
 };
 
 // 1. Live Trending TikTok Video Scraper (Real creators, millions of views, direct MP4 CDN stream)
@@ -1569,31 +1593,51 @@ async function searchWikimedia(category: string): Promise<{ title: string; url: 
   return null;
 }
 
-// ─── Scrape Live Online Viral Videos (100% Dynamic, Zero Hardcoding, Zero AI) ─
 export async function scrapeOnlineViralVideo(category: string): Promise<{ url: string; title: string; source: string }> {
   const cleanCat = category?.trim() || "Trending";
 
-  // 1. Live Trending TikTok Videos (Real creators, millions of views, direct unwatermarked CDN stream)
+  // 1. YouTube Shorts Category Search (100% relevant to category, real viral videos with views)
+  const queries = SAFE_CATEGORY_QUERIES[cleanCat] || SAFE_CATEGORY_QUERIES["Trending"] || [];
+  if (queries.length > 0) {
+    const randomQuery = queries[Math.floor(Math.random() * queries.length)];
+    try {
+      const ytResults = await searchYouTubeVideos(randomQuery);
+      if (ytResults && ytResults.length > 0) {
+        const picked = ytResults[Math.floor(Math.random() * Math.min(ytResults.length, 6))];
+        if (picked?.url) {
+          return {
+            title: picked.title,
+            url: picked.url,
+            source: `YouTube Shorts (${cleanCat})`,
+          };
+        }
+      }
+    } catch (ytErr: any) {
+      console.warn("YouTube category search notice:", ytErr.message);
+    }
+  }
+
+  // 2. Live Trending TikTok Videos (Real creators, millions of views, direct unwatermarked CDN stream)
   const fromTikTok = await scrapeTikTokTrendingVideos(cleanCat);
   if (fromTikTok) return fromTikTok;
 
-  // 2. Mixkit HD real human-filmed video scraper (action/sports/food/nature)
+  // 3. Mixkit HD real human-filmed video scraper (action/sports/food/nature)
   const fromMixkit = await searchMixkit(cleanCat);
   if (fromMixkit) return fromMixkit;
 
-  // 3. Internet Archive live search (classic comedy, slapstick, vintage cartoons)
+  // 4. Internet Archive live search (classic comedy, slapstick, vintage cartoons)
   const fromArchive = await searchArchiveOrg(cleanCat);
   if (fromArchive) return fromArchive;
 
-  // 4. Wikimedia Commons live search
+  // 5. Wikimedia Commons live search
   const fromWiki = await searchWikimedia(cleanCat);
   if (fromWiki) return fromWiki;
 
-  // 5. Fallback retry with general Trending on TikTok live feed
+  // 6. Fallback retry with general Trending on TikTok live feed
   const fallbackTikTok = await scrapeTikTokTrendingVideos("Trending");
   if (fallbackTikTok) return fallbackTikTok;
 
-  // 6. Fallback retry with Mixkit real footage
+  // 7. Fallback retry with Mixkit real footage
   const fallbackMixkit = (await searchMixkit("nature")) || (await searchMixkit("lifestyle"));
   if (fallbackMixkit) return fallbackMixkit;
 

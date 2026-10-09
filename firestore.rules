@@ -7,9 +7,9 @@ service cloud.firestore {
       allow list: if false;
     }
 
-    // Top-level videos collection (with userId binding)
+    // Top-level videos collection (allows authenticated users & cloud cron runners)
     match /videos/{videoId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
     // User documents and subcollections

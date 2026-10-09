@@ -641,6 +641,9 @@ export default function Home() {
       setDisplayName(user.displayName || user.email?.split("@")[0] || "Creator");
       setSignedIn(true);
       setScreen("studio");
+      if (database) {
+        setDoc(doc(database, "app_config", "auto_pilot"), { ownerUserId: user.uid }, { merge: true }).catch(() => {});
+      }
       // Synchronize in real-time with videos collection for this user
       try {
         const stored = localStorage.getItem("tvd-studio-session-videos");

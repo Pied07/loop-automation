@@ -20,6 +20,7 @@ const CATEGORIES = [
 
 async function handleCronPublish(req: NextRequest) {
   try {
+    let ownerUserId = "auto-pilot";
     // 1. Verify if auto-pilot is enabled in Firestore app settings
     if (database) {
       try {
@@ -31,6 +32,9 @@ async function handleCronPublish(req: NextRequest) {
               success: false,
               message: "Auto-Pilot is currently toggled OFF in workspace settings.",
             });
+          }
+          if (autoData.ownerUserId) {
+            ownerUserId = autoData.ownerUserId;
           }
         }
       } catch (err: any) {
@@ -79,7 +83,7 @@ async function handleCronPublish(req: NextRequest) {
             contentCategory: randomCategory,
             sourceTitle: cleanTitle,
             jobId,
-            userId: "auto-pilot",
+            userId: ownerUserId,
             cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
             cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || "",
             cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || "",

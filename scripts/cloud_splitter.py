@@ -129,11 +129,11 @@ def generate_clip_hashtags(title: str, category: str) -> list:
         and w not in UNIVERSAL_HASHTAGS
     ][:4]
     combined = []
-    for tag in clean_words + bank[:6] + ["shorts", "reels", "viral", "fyp"]:
+    for tag in clean_words + bank + ["shorts", "reels", "viral", "fyp", "trending", "explore", "foryou", "viralvideo", "watchthis"]:
         clean = tag.lower().replace("#", "").strip()
         if clean and clean not in combined:
             combined.append(clean)
-    return combined[:12] if len(combined) >= 12 else combined[:max(8, len(combined))]
+    return combined[:24]
 
 
 
@@ -705,6 +705,8 @@ def run():
                     "description": clip_item["description"],
                     "hashtags": clip_item["hashtags"],
                     "cloudinaryPublicId": clip_item.get("cloudinaryPublicId"),
+                    "category": CONTENT_CATEGORY,
+                    "userId": USER_ID,
                 }
                 pub_req = urllib.request.Request(
                     f"{APP_URL}/api/viral-clips/publish",
@@ -712,7 +714,7 @@ def run():
                     headers={"Content-Type": "application/json", "User-Agent": "ViralDesk-AutoPublisher"},
                     method="POST",
                 )
-                with urllib.request.urlopen(pub_req, timeout=90) as presp:
+                with urllib.request.urlopen(pub_req, timeout=240) as presp:
                     pdata = json.loads(presp.read().decode("utf-8"))
                     print(f"Auto-published part {clip_item['partNumber']}: {pdata.get('logs', [])}")
                     if pdata.get("youtubeVideoId"): clip_item["youtubeVideoId"] = pdata["youtubeVideoId"]

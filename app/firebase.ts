@@ -88,7 +88,8 @@ export function normalizeVideoRecord(video: any): VideoRecord {
 export async function getVideos(userId: string): Promise<VideoRecord[]> {
   if (!database) return [];
   try {
-    const q = query(collection(database, "videos"), where("userId", "==", userId));
+    const userIds = [userId, "auto-pilot", "creator"];
+    const q = query(collection(database, "videos"), where("userId", "in", userIds));
     const snapshot = await getDocs(q);
     if (!snapshot.empty) {
       return snapshot.docs.map((doc) => normalizeVideoRecord({ id: doc.id, ...doc.data() }));
@@ -109,7 +110,8 @@ export function listenToVideos(userId: string, callback: (videos: VideoRecord[])
   let unsubFallback: (() => void) | undefined;
   let topLoaded = false;
 
-  const qTop = query(collection(database, "videos"), where("userId", "==", userId));
+  const userIds = [userId, "auto-pilot", "creator"];
+  const qTop = query(collection(database, "videos"), where("userId", "in", userIds));
   const unsubTop = onSnapshot(
     qTop,
     (snapshot) => {
