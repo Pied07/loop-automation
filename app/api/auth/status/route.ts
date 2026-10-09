@@ -33,27 +33,41 @@ export async function GET() {
       }
     }
 
-    // Verify Meta (Facebook & Instagram) token validity
+    // Verify Facebook Page token validity
     if (tokens.facebook?.page_id && tokens.facebook?.page_access_token) {
       try {
-        const metaTest = await fetch(
+        const fbTest = await fetch(
           `https://graph.facebook.com/v26.0/${tokens.facebook.page_id}?fields=id&access_token=${tokens.facebook.page_access_token}`,
           { signal: AbortSignal.timeout(4000) }
         );
-        const metaData = await metaTest.json();
-        if (metaTest.ok && metaData.id) {
+        const fbData = await fbTest.json();
+        if (fbTest.ok && fbData.id) {
           connections.push("Facebook");
-          if (tokens.facebook?.instagram_user_id || tokens.instagram?.access_token) {
-            connections.push("Instagram");
-          }
         } else {
-          console.warn("Meta token expired or invalid:", metaData.error?.message);
+          console.warn("Facebook token expired or invalid:", fbData.error?.message);
         }
       } catch {
         connections.push("Facebook");
-        if (tokens.facebook?.instagram_user_id || tokens.instagram?.access_token) {
+      }
+    }
+
+    // Verify Instagram token validity independently
+    const igToken = tokens.instagram?.access_token || (tokens.facebook?.instagram_user_id ? tokens.facebook?.instagram_page_access_token : undefined);
+    const igUserId = tokens.instagram?.user_id || tokens.facebook?.instagram_user_id;
+    if (igToken && igUserId) {
+      try {
+        const igTest = await fetch(
+          `https://graph.facebook.com/v26.0/${igUserId}?fields=id&access_token=${igToken}`,
+          { signal: AbortSignal.timeout(4000) }
+        );
+        const igData = await igTest.json();
+        if (igTest.ok && igData.id) {
           connections.push("Instagram");
+        } else {
+          console.warn("Instagram token expired or invalid:", igData.error?.message);
         }
+      } catch {
+        connections.push("Instagram");
       }
     }
     if (tokens.gmail?.access_token || tokens.gmail?.refresh_token) {

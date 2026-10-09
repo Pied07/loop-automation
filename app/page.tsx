@@ -251,16 +251,13 @@ export default function Home() {
         setConnections(existingConns);
       }
 
-      // Always synchronize with server-side connected OAuth platforms
+      // Always synchronize with server-side connected OAuth platforms (keeps all devices in 100% sync)
       fetch("/api/auth/status")
         .then((res) => res.json())
         .then((data) => {
-          if (Array.isArray(data.connections) && data.connections.length > 0) {
-            setConnections((prev) => {
-              const combined = Array.from(new Set([...prev, ...data.connections]));
-              localStorage.setItem("app_connections", JSON.stringify(combined));
-              return combined;
-            });
+          if (Array.isArray(data.connections)) {
+            setConnections(data.connections);
+            localStorage.setItem("app_connections", JSON.stringify(data.connections));
           }
         })
         .catch(() => {});
@@ -657,15 +654,25 @@ export default function Home() {
     } else if (platform === 'Gmail') {
       const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
       url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent('openid email https://www.googleapis.com/auth/gmail.send')}&access_type=offline&prompt=consent`;
-    } else if (platform === 'Instagram' || platform === 'Facebook') {
+    } else if (platform === 'Facebook') {
       const clientId = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID;
-      const callbackPath = platform.toLowerCase();
-      const targetUri = typeof window !== 'undefined' ? `${window.location.origin}/api/auth/callback/${callbackPath}` : redirectUri;
+      const targetUri = typeof window !== 'undefined' ? `${window.location.origin}/api/auth/callback/facebook` : redirectUri;
       const params = new URLSearchParams({
         client_id: clientId || "",
         redirect_uri: targetUri,
         response_type: "code",
-        scope: "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish",
+        scope: "pages_show_list,pages_read_engagement,pages_manage_posts",
+        auth_type: "rerequest",
+      });
+      url = `https://www.facebook.com/v26.0/dialog/oauth?${params}`;
+    } else if (platform === 'Instagram') {
+      const clientId = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID;
+      const targetUri = typeof window !== 'undefined' ? `${window.location.origin}/api/auth/callback/instagram` : redirectUri;
+      const params = new URLSearchParams({
+        client_id: clientId || "",
+        redirect_uri: targetUri,
+        response_type: "code",
+        scope: "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement",
         auth_type: "rerequest",
       });
       url = `https://www.facebook.com/v26.0/dialog/oauth?${params}`;

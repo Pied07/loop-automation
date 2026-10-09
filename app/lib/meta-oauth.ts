@@ -95,26 +95,35 @@ export async function completeMetaOAuth(request: Request, provider: "facebook" |
     const igUsername = instagramPage ? getIgUsername(instagramPage) : undefined;
 
     if (!selectedPage?.access_token) return redirect(request, "error=meta_page_access_missing");
-    if (provider === "instagram" && !igUserId) return redirect(request, "error=meta_no_instagram");
+    if (provider === "facebook") {
+      tokens.facebook = {
+        ...(tokens.facebook || {}),
+        access_token: userToken,
+        page_id: selectedPage.id,
+        page_name: selectedPage.name,
+        page_access_token: selectedPage.access_token,
+      };
+      await writeTokens(JSON.parse(JSON.stringify(tokens)));
+      return redirect(request, "connected=facebook");
+    }
 
-    tokens.facebook = {
-      ...(tokens.facebook || {}),
-      access_token: userToken,
-      page_id: selectedPage.id,
-      page_name: selectedPage.name,
-      page_access_token: selectedPage.access_token,
-      instagram_page_id: instagramPage?.id || selectedPage.id,
-      instagram_page_access_token: instagramPage?.access_token || selectedPage.access_token,
-      instagram_user_id: igUserId,
-      instagram_username: igUsername,
-    };
-    // Firestore rejects 'undefined' values. JSON stringify/parse safely strips them.
-    await writeTokens(JSON.parse(JSON.stringify(tokens)));
-
-    const connected = ["facebook", ...(igUserId ? ["instagram"] : [])].join(",");
-    const query = new URLSearchParams({ connected });
-    if (!igUserId && provider === "facebook") query.set("warning", "meta_no_instagram");
-    return redirect(request, query.toString());
+    if (provider === "instagram") {
+      if (!igUserId) return redirect(request, "error=meta_no_instagram");
+      tokens.instagram = {
+        ...(tokens.instagram || {}),
+        access_token: instagramPage?.access_token || selectedPage.access_token || userToken,
+        user_id: igUserId,
+        username: igUsername,
+        page_id: instagramPage?.id || selectedPage.id,
+      };
+      if (tokens.facebook) {
+        tokens.facebook.instagram_user_id = igUserId;
+        tokens.facebook.instagram_username = igUsername;
+        tokens.facebook.instagram_page_access_token = instagramPage?.access_token || selectedPage.access_token;
+      }
+      await writeTokens(JSON.parse(JSON.stringify(tokens)));
+      return redirect(request, "connected=instagram");
+    }
   } catch (error: any) {
     console.error("Meta OAuth verification failed:", error?.message || "Unknown error");
     return redirect(request, `error=token_exchange_failed&details=${encodeURIComponent(error?.message || "Unknown error")}`);

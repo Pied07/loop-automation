@@ -14,7 +14,14 @@ export async function POST(req: NextRequest) {
     if (key === "youtube") {
       delete tokens.youtube;
     } else if (key === "facebook") {
-      delete tokens.facebook;
+      if (tokens.facebook) {
+        delete tokens.facebook.page_id;
+        delete tokens.facebook.page_name;
+        delete tokens.facebook.page_access_token;
+        if (!tokens.facebook.instagram_user_id) {
+          delete tokens.facebook;
+        }
+      }
     } else if (key === "instagram") {
       delete tokens.instagram;
       if (tokens.facebook) {
@@ -22,6 +29,9 @@ export async function POST(req: NextRequest) {
         delete tokens.facebook.instagram_page_id;
         delete tokens.facebook.instagram_page_access_token;
         delete tokens.facebook.instagram_username;
+        if (!tokens.facebook.page_id) {
+          delete tokens.facebook;
+        }
       }
     } else if (key === "gmail") {
       delete tokens.gmail;
