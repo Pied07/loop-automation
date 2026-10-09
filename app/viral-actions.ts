@@ -693,7 +693,6 @@ export async function publishClipAndCleanup(params: {
   let uploadedCloudinaryId: string | undefined;
   let storyCardUrl: string | undefined;
   let uploadedStoryCardId: string | undefined;
-  let publicVideoUrl = (isRemote && (clipPath.startsWith("http://") || clipPath.startsWith("https://"))) ? clipPath : "";
   const { readTokens } = await import("@/app/lib/tokens");
   const tokens: any = await readTokens();
 
@@ -703,7 +702,7 @@ export async function publishClipAndCleanup(params: {
   try {
     const cardData = await getOrGenerateStoryCardUrl({
       videoPath: absolutePath,
-      publicVideoUrl: publicVideoUrl || undefined,
+      publicVideoUrl: (isRemote && (clipPath.startsWith("http://") || clipPath.startsWith("https://"))) ? clipPath : undefined,
       title,
       partNumber,
       instagramHandle: igHandle,
@@ -898,9 +897,7 @@ export async function publishClipAndCleanup(params: {
         if (!instagramToken || !igUserId) throw new Error("Instagram not connected.");
 
         // Meta Instagram API requires a direct accessible MP4 video file URL
-        if (!publicVideoUrl && isRemote && (clipPath.startsWith("http://") || clipPath.startsWith("https://"))) {
-          publicVideoUrl = clipPath;
-        }
+        let publicVideoUrl = (isRemote && (clipPath.startsWith("http://") || clipPath.startsWith("https://"))) ? clipPath : "";
         if (!publicVideoUrl) {
           try {
             const { uploadVideoToCloudinary } = await import("@/app/cloudinary-upload");
@@ -1149,20 +1146,11 @@ export async function publishClipAndCleanup(params: {
       }
     }
 
-    // 4. Retain lightweight story card image in Cloudinary for social stories
+    // 4. Retain lightweight story card thumbnail image (~30 KB) in Cloudinary
+    // so library cards always display an aesthetic, high-res thumbnail preview!
   }
 
-  // Generate clean full-bleed video frame poster for website library cards
-  let cleanVideoPoster: string | undefined;
-  if (publicVideoUrl && publicVideoUrl.includes("res.cloudinary.com")) {
-    cleanVideoPoster = publicVideoUrl.replace(/\/video\/upload\/(?:v\d+\/)?/, "/video/upload/so_2,f_auto,q_auto/").replace(/\.[^.]+$/, ".jpg");
-  } else if (youtubeVideoId) {
-    cleanVideoPoster = `https://i.ytimg.com/vi/${youtubeVideoId}/hqdefault.jpg`;
-  } else if (facebookVideoId) {
-    cleanVideoPoster = `/api/viral-clips/thumbnail?facebookId=${facebookVideoId}`;
-  }
-
-  const resolvedThumb = cleanVideoPoster || (facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${facebookVideoId}` : undefined);
+  const resolvedThumb = storyCardUrl || (facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${facebookVideoId}` : undefined);
 
   const anySuccess = !!(youtubeVideoId || facebookVideoId || instagramVideoId);
   const failureReasons = logs.filter((l) => l.startsWith("❌") || l.startsWith("⚠️"));
