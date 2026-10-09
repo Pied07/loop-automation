@@ -85,6 +85,8 @@ type Screen = "home" | "studio" | "library" | "settings";
 
 function isGarbageRecord(video: VideoRecord): boolean {
   if (!video) return true;
+  // External channel videos not created/published from this web app
+  if (video.id?.startsWith("youtube-") || video.id?.startsWith("yt-")) return true;
   const title = (video.title || "").trim();
   const desc = (video.description || "").trim();
   // Filter click-to-watch / tap-to-watch teasers or feed post shares
@@ -533,38 +535,7 @@ export default function Home() {
   const [processMode, setProcessMode] = useState<"cloud" | "queue">("cloud");
   const [autoFindSource, setAutoFindSource] = useState<"scrape" | "direct" | "youtube">("scrape");
   const [autoPilotEnabled, setAutoPilotEnabled] = useState(false);
-  const [isSyncingSocials, setIsSyncingSocials] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  async function syncAllSocialVideos(manual = false, targetUserId?: string) {
-    if (isSyncingSocials) return;
-    setIsSyncingSocials(true);
-    if (manual) notify("Syncing published videos from YouTube, Facebook & Instagram...");
-    try {
-      const res = await fetch("/api/videos/sync", { method: "POST" });
-      const data = await res.json();
-      if (data.success && Array.isArray(data.videos) && data.videos.length > 0) {
-        const uid = targetUserId || auth?.currentUser?.uid;
-        if (uid && database) {
-          for (const v of data.videos) {
-            saveVideo(uid, v).catch(() => {});
-          }
-        }
-        setVideos((prev) => {
-          const combined = deduplicateVideos([...data.videos, ...prev], uid);
-          try { localStorage.setItem("tvd-studio-session-videos", JSON.stringify(combined)); } catch {}
-          return combined;
-        });
-        if (manual) notify(`Synced ${data.videos.length} published videos!`);
-      } else if (manual) {
-        notify("No published videos found on social accounts.");
-      }
-    } catch (e: any) {
-      if (manual) notify(`Sync notice: ${e.message}`);
-    } finally {
-      setIsSyncingSocials(false);
-    }
-  }
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -609,9 +580,6 @@ export default function Home() {
           gmail: "Gmail"
         };
         const newlyConnected = connectedParam.split(",").map((name) => platformMap[name.toLowerCase()] || name);
-        const newConns = [...new Set([...existingConns, ...newlyConnected])];
-        localStorage.setItem("app_connections", JSON.stringify(newConns));
-        setConnections(newConns);
         notify(`Connected: ${newlyConnected.join(" and ")}.`);
         if (searchParams.get("warning") === "meta_no_instagram") notify("Facebook Page connected. Link a Professional Instagram account to that Page to enable Instagram publishing.");
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -631,10 +599,6 @@ export default function Home() {
           instagram_token_exchange_failed: "Instagram could not exchange the sign-in code. Verify the Instagram App credentials and exact callback URL.",
           instagram_profile_unavailable: "Instagram login succeeded, but Meta did not return a professional account. Check the Instagram account type and app permissions."
         };
-        const failedPlatform = connectionError.startsWith("instagram_") ? "Instagram" : "Facebook";
-        const newConns = existingConns.filter((name) => name !== failedPlatform);
-        localStorage.setItem("app_connections", JSON.stringify(newConns));
-        setConnections(newConns);
         notify(errorMessages[connectionError] || `Meta connection failed (${connectionError}).`);
         window.history.replaceState({}, document.title, window.location.pathname);
         setTimeout(() => setScreen("settings"), 0);
@@ -666,12 +630,10 @@ export default function Home() {
       setDisplayName(user.displayName || user.email?.split("@")[0] || "Creator");
       setSignedIn(true);
       setScreen("studio");
-      // Auto-sync published social videos into the user's database
-      syncAllSocialVideos(false, user.uid);
       // Synchronize in real-time with videos saved under the user's Firestore account
       unsubVideos = listenToVideos(user.uid, (firestoreVideos) => {
         if (Array.isArray(firestoreVideos)) {
-          // Permanently delete any garbage records stored in Firestore
+          // Permanently delete any garbage records or foreign channel imports stored in Firestore
           for (const v of firestoreVideos) {
             if (isGarbageRecord(v)) {
               deleteVideo(user.uid, v.id).catch(() => {});
@@ -694,12 +656,6 @@ export default function Home() {
       if (unsubVideos) unsubVideos();
     };
   }, []);
-
-  useEffect(() => {
-    if (screen === "library") {
-      syncAllSocialVideos(false);
-    }
-  }, [screen]);
 
   
 
@@ -1282,7 +1238,7 @@ export default function Home() {
     return matchesFormat && matchesQuery && matchesTab;
   }).sort((a, b) => getRecordTimestamp(b) - getRecordTimestamp(a));
 
-  const PAGE_SIZE = 40;
+  const PAGE_SIZE = 20;
   const totalPages = Math.max(1, Math.ceil(filteredVideos.length / PAGE_SIZE));
   const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
   const paginatedVideos = filteredVideos.slice((safeCurrentPage - 1) * PAGE_SIZE, safeCurrentPage * PAGE_SIZE);
@@ -1570,7 +1526,7 @@ export default function Home() {
           </button>
         </div>
       </section>}
-      {screen === "library" && <section className="library-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR CLIPS LIBRARY</div><h1>Viral content, <em>in motion.</em></h1><p>Your published clips with links to YouTube, Facebook, and Instagram.</p></div><div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}><button className="secondary-button" onClick={() => syncAllSocialVideos(true)} disabled={isSyncingSocials} title="Fetch all published videos from YouTube, Facebook & Instagram">{isSyncingSocials ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />} {isSyncingSocials ? "Syncing..." : "Sync Socials"}</button><button className="secondary-button" onClick={exportCsv}><ArrowDownToLine size={16} /> Export spreadsheet</button></div></div>
+      {screen === "library" && <section className="library-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR CLIPS LIBRARY</div><h1>Viral content, <em>in motion.</em></h1><p>Your published clips with links to YouTube, Facebook, and Instagram.</p></div><button className="secondary-button" onClick={exportCsv}><ArrowDownToLine size={16} /> Export spreadsheet</button></div>
       
       <div className="library-tabber">
         {["All", "YouTube", "Facebook", "Instagram"].map(tab => (
@@ -1912,6 +1868,12 @@ export default function Home() {
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ platform: platformToDisconnect }),
                 });
+                const statusRes = await fetch("/api/auth/status");
+                const statusData = await statusRes.json();
+                if (Array.isArray(statusData.connections)) {
+                  setConnections(statusData.connections);
+                  localStorage.setItem("app_connections", JSON.stringify(statusData.connections));
+                }
               } catch {}
               notify(`${platformToDisconnect} disconnected.`);
             }}>Disconnect</button>

@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
         delete tokens.facebook.page_id;
         delete tokens.facebook.page_name;
         delete tokens.facebook.page_access_token;
+        delete tokens.facebook.access_token;
         if (!tokens.facebook.instagram_user_id) {
           delete tokens.facebook;
         }
@@ -38,6 +39,37 @@ export async function POST(req: NextRequest) {
     }
 
     await writeTokens(tokens);
+
+    // Also prune local tokens.json if present
+    try {
+      const fs = require("fs");
+      const path = require("path");
+      const tokensFile = path.join(process.cwd(), "tokens.json");
+      if (fs.existsSync(tokensFile)) {
+        const local = JSON.parse(fs.readFileSync(tokensFile, "utf8"));
+        if (key === "youtube") delete local.youtube;
+        else if (key === "facebook") {
+          if (local.facebook) {
+            delete local.facebook.page_id;
+            delete local.facebook.page_name;
+            delete local.facebook.page_access_token;
+            delete local.facebook.access_token;
+            if (!local.facebook.instagram_user_id) delete local.facebook;
+          }
+        } else if (key === "instagram") {
+          delete local.instagram;
+          if (local.facebook) {
+            delete local.facebook.instagram_user_id;
+            delete local.facebook.instagram_page_id;
+            delete local.facebook.instagram_page_access_token;
+            delete local.facebook.instagram_username;
+            if (!local.facebook.page_id) delete local.facebook;
+          }
+        } else if (key === "gmail") delete local.gmail;
+        fs.writeFileSync(tokensFile, JSON.stringify(local, null, 2));
+      }
+    } catch {}
+
     return NextResponse.json({ success: true, platform });
   } catch (err: any) {
     console.error("Disconnect error:", err);
