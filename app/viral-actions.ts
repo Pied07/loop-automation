@@ -1447,9 +1447,13 @@ export async function scrapeTikTokTrendingVideos(category: string): Promise<{ ti
       return catKws.some((k) => text.includes(k));
     });
 
-    // If no keyword match found in this batch or category is Trending, pool high-engagement videos
-    const pool = matched.length > 0 ? matched : valid.filter((v) => (v.play_count || 0) > 100000);
-    const candidateList = pool.length > 0 ? pool : valid;
+    const isTrending = category.toLowerCase() === "trending" || category.toLowerCase() === "viral";
+    if (!isTrending && matched.length === 0) {
+      // Never return unrelated random videos when a specific category is chosen!
+      return null;
+    }
+
+    const candidateList = isTrending ? valid : matched;
 
     // Sort by highest view count so the most viral videos appear first
     candidateList.sort((a, b) => (b.play_count || 0) - (a.play_count || 0));
@@ -1474,13 +1478,13 @@ export async function scrapeTikTokTrendingVideos(category: string): Promise<{ ti
   return null;
 }
 
-// 2. Mixkit Live HD Video Scraper (Real human-filmed action, food, sports, nature footage)
+// 2. Mixkit Live HD Video Scraper (Real human-filmed action, romance, food, sports, nature footage)
 async function searchMixkit(category: string): Promise<{ title: string; url: string; source: string } | null> {
   const catMap: Record<string, string> = {
     "Trending": "lifestyle",
     "Motivational": "lifestyle",
-    "Funny": "lifestyle",
-    "Comedy": "lifestyle",
+    "Funny": "comedy",
+    "Comedy": "comedy",
     "Educational": "technology",
     "Nature": "nature",
     "Sports": "sports",
@@ -1488,8 +1492,25 @@ async function searchMixkit(category: string): Promise<{ title: string; url: str
     "Travel": "travel",
     "Food": "food",
     "Fashion": "lifestyle",
+    "Romance": "romance",
+    "Adventure": "adventure",
+    "Horror": "horror",
+    "Music": "music",
   };
-  const targetCategory = catMap[category] || "nature";
+
+  const defaultTitles: Record<string, string[]> = {
+    "Romance": ["Sweet Romantic Couple Moment", "Heartfelt Love & Romance Story", "Cherished Romantic Connection"],
+    "Horror": ["Chilling Night Mystery", "Dark Haunting Atmosphere", "Spooky Paranormal Encounter"],
+    "Adventure": ["Extreme Action Expedition", "Epic Outdoor Wilderness Adventure", "Thrilling Mountain Exploration"],
+    "Food": ["Delicious Gourmet Culinary Creation", "Mouthwatering Kitchen Recipe", "Artisanal Chef Masterpiece"],
+    "Comedy": ["Hilarious Slapstick Comedy", "Unfiltered Laugh-Out-Loud Humor", "Relatable Comedy Moment"],
+    "Motivational": ["Unstoppable Mindset & Success Motivation", "Rise to Greatness Inspiration", "Relentless Focus & Grind"],
+    "Educational": ["Fascinating Scientific Discovery", "Mind-Expanding Insight", "Curious World Wonders"],
+    "Music": ["Rhythmic Acoustic Beats", "Soulful Harmonic Melody", "Energetic Musical Soundscape"],
+    "Trending": ["Viral Phenomenon Trending Clip", "Hypnotic Aesthetic Visuals", "Must-See Trending Moment"],
+  };
+
+  const targetCategory = catMap[category] || "lifestyle";
   try {
     const res = await fetch(`https://mixkit.co/free-stock-video/${targetCategory}/`, {
       headers: {
@@ -1502,10 +1523,12 @@ async function searchMixkit(category: string): Promise<{ title: string; url: str
     const mp4Matches = [...new Set([...html.matchAll(/https:\/\/assets\.mixkit\.co\/videos\/(\d+)\/\1\-(?:720|1080)\.mp4/g)].map((m) => m[0]))];
     if (mp4Matches.length > 0) {
       const picked = mp4Matches[Math.floor(Math.random() * mp4Matches.length)];
+      const titleOptions = defaultTitles[category] || [`Viral ${category} Moment`];
+      const pickedTitle = titleOptions[Math.floor(Math.random() * titleOptions.length)];
       return {
-        title: `Viral ${category} Moment`,
+        title: pickedTitle,
         url: picked,
-        source: "Mixkit HD Video (Direct Cloud MP4, Zero Bot Checks)",
+        source: `Mixkit HD (${category} • Direct Cloud MP4)`,
       };
     }
   } catch (e) {
@@ -1599,28 +1622,23 @@ async function searchWikimedia(category: string): Promise<{ title: string; url: 
 
 export async function scrapeOnlineViralVideo(category: string): Promise<{ url: string; title: string; source: string }> {
   const cleanCat = category?.trim() || "Trending";
+  const isTrending = cleanCat.toLowerCase() === "trending" || cleanCat.toLowerCase() === "viral";
 
-  // 1. Live Trending TikTok Videos (Real creators, millions of views, direct unwatermarked CDN MP4 stream)
-  const fromTikTok = await scrapeTikTokTrendingVideos(cleanCat);
-  if (fromTikTok) return fromTikTok;
+  // 1. If Trending: scrape live trending TikTok videos feed directly
+  if (isTrending) {
+    const fromTikTok = await scrapeTikTokTrendingVideos("Trending");
+    if (fromTikTok) return fromTikTok;
+  } else {
+    // 2. If specific category (Romance, Horror, Adventure, etc.): check for keyword-matched TikTok
+    const fromTikTok = await scrapeTikTokTrendingVideos(cleanCat);
+    if (fromTikTok) return fromTikTok;
+  }
 
-  // 2. Fallback retry with general Trending on TikTok live feed (guarantees any trending TikTok video)
-  const fallbackTikTok = await scrapeTikTokTrendingVideos("Trending");
-  if (fallbackTikTok) return fallbackTikTok;
-
-  // 3. Mixkit HD real human-filmed video scraper (action/sports/food/nature - direct cloud MP4)
+  // 3. Mixkit HD category scraper (100% genuine category video footage: Romance, Horror, Adventure, Food, etc.)
   const fromMixkit = await searchMixkit(cleanCat);
   if (fromMixkit) return fromMixkit;
 
-  // 4. Internet Archive live search (direct MP4)
-  const fromArchive = await searchArchiveOrg(cleanCat);
-  if (fromArchive) return fromArchive;
-
-  // 5. Wikimedia Commons live search (direct MP4)
-  const fromWiki = await searchWikimedia(cleanCat);
-  if (fromWiki) return fromWiki;
-
-  // 6. YouTube Shorts Category Search fallback
+  // 4. YouTube Shorts category search (100% relevant viral Shorts for that category)
   const queries = SAFE_CATEGORY_QUERIES[cleanCat] || SAFE_CATEGORY_QUERIES["Trending"] || [];
   if (queries.length > 0) {
     const randomQuery = queries[Math.floor(Math.random() * queries.length)];
@@ -1641,7 +1659,18 @@ export async function scrapeOnlineViralVideo(category: string): Promise<{ url: s
     }
   }
 
-  // 7. Fallback retry with Mixkit real footage
+  // 5. Internet Archive live search (direct MP4)
+  const fromArchive = await searchArchiveOrg(cleanCat);
+  if (fromArchive) return fromArchive;
+
+  // 6. Wikimedia Commons live search (direct MP4)
+  const fromWiki = await searchWikimedia(cleanCat);
+  if (fromWiki) return fromWiki;
+
+  // 7. Ultimate fallback only if all category-specific sources failed
+  const fallbackTikTok = await scrapeTikTokTrendingVideos("Trending");
+  if (fallbackTikTok) return fallbackTikTok;
+
   const fallbackMixkit = (await searchMixkit("nature")) || (await searchMixkit("lifestyle"));
   if (fallbackMixkit) return fallbackMixkit;
 
