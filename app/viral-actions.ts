@@ -898,15 +898,13 @@ export async function publishClipAndCleanup(params: {
     // ─ Instagram (Posts as Reel + Posts Story with Thumbnail Card) ─
     if (platforms.includes("Instagram")) {
       try {
-        const igUserId = tokens.instagram?.user_id || tokens.facebook?.instagram_user_id || "17841430707006338";
+        const igUserId = tokens.instagram?.user_id || tokens.facebook?.instagram_user_id || "17841424354654362";
         const instagramToken =
           tokens.instagram?.access_token ||
           tokens.facebook?.instagram_access_token ||
           tokens.facebook?.instagram_page_access_token ||
           tokens.facebook?.page_access_token;
-        const instagramApi = tokens.instagram?.access_token
-          ? "https://graph.instagram.com/v26.0"
-          : "https://graph.facebook.com/v26.0";
+        const instagramApi = "https://graph.facebook.com/v26.0";
         if (!instagramToken || !igUserId) throw new Error("Instagram not connected.");
 
         // Meta Instagram API requires a direct accessible MP4 video file URL

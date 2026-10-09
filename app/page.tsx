@@ -376,7 +376,19 @@ function deduplicateVideos(
 
   for (const records of groupMap.values()) {
     if (records.length === 1) {
-      result.push(records[0]);
+      const single = records[0];
+      const ytId = single.youtubeVideoId || extractYouTubeId(single.videoUrl);
+      const fbId = single.facebookVideoId || extractFacebookId(single.videoUrl);
+      const igId = single.instagramVideoId || extractInstagramId(single.videoUrl);
+      result.push({
+        ...single,
+        youtube: ytId ? 1 : 0,
+        facebook: fbId ? 1 : 0,
+        instagram: igId ? 1 : 0,
+        youtubeVideoId: ytId || "",
+        facebookVideoId: fbId || "",
+        instagramVideoId: igId || "",
+      });
       continue;
     }
 
@@ -401,19 +413,19 @@ function deduplicateVideos(
 
     const bestTitle = records.slice().sort((a, b) => getTitleQualityScore(b.title) - getTitleQualityScore(a.title))[0]?.title || winner.title;
     const bestDesc = records.slice().sort((a, b) => (b.description?.length || 0) - (a.description?.length || 0))[0]?.description || winner.description;
-    const bestYtId = records.find((r) => r.youtubeVideoId)?.youtubeVideoId || winner.youtubeVideoId;
-    const bestFbId = records.find((r) => r.facebookVideoId)?.facebookVideoId || winner.facebookVideoId;
-    const bestFbStoryId = records.find((r) => r.facebookStoryId)?.facebookStoryId || winner.facebookStoryId;
-    const bestFbPostId = records.find((r) => r.facebookPostId)?.facebookPostId || winner.facebookPostId;
-    const bestIgId = records.find((r) => r.instagramVideoId)?.instagramVideoId || winner.instagramVideoId;
-    const bestIgStoryId = records.find((r) => r.instagramStoryId)?.instagramStoryId || winner.instagramStoryId;
+    const bestYtId = records.map((r) => r.youtubeVideoId || extractYouTubeId(r.videoUrl)).find(Boolean) || "";
+    const bestFbId = records.map((r) => r.facebookVideoId || extractFacebookId(r.videoUrl)).find(Boolean) || "";
+    const bestFbStoryId = records.find((r) => r.facebookStoryId)?.facebookStoryId || winner.facebookStoryId || "";
+    const bestFbPostId = records.find((r) => r.facebookPostId)?.facebookPostId || winner.facebookPostId || "";
+    const bestIgId = records.map((r) => r.instagramVideoId || extractInstagramId(r.videoUrl)).find(Boolean) || "";
+    const bestIgStoryId = records.find((r) => r.instagramStoryId)?.instagramStoryId || winner.instagramStoryId || "";
     const bestVideoUrl = records.find((r) => r.videoUrl && r.videoUrl.includes("res.cloudinary.com"))?.videoUrl ||
       records.find((r) => r.videoUrl && r.videoUrl.startsWith("http"))?.videoUrl || winner.videoUrl;
     const bestThumb = records.find((r) => r.thumbnailUrl && !r.thumbnailUrl.includes("/api/viral-clips/thumbnail?"))?.thumbnailUrl || winner.thumbnailUrl;
 
-    const isYt = records.some((r) => r.youtube === 1 || Boolean(r.youtubeVideoId)) ? 1 : 0;
-    const isFb = records.some((r) => r.facebook === 1 || Boolean(r.facebookVideoId)) ? 1 : 0;
-    const isIg = records.some((r) => r.instagram === 1 || Boolean(r.instagramVideoId)) ? 1 : 0;
+    const isYt: 0 | 1 = bestYtId ? 1 : 0;
+    const isFb: 0 | 1 = bestFbId ? 1 : 0;
+    const isIg: 0 | 1 = bestIgId ? 1 : 0;
 
     let bestCreatedAt = winner.createdAt;
     let maxTs = getRecordTimestamp(winner);
@@ -433,9 +445,9 @@ function deduplicateVideos(
       hashtags: Array.from(allHashtags),
       videoUrl: bestVideoUrl,
       thumbnailUrl: bestThumb,
-      youtube: isYt as 0 | 1,
-      facebook: isFb as 0 | 1,
-      instagram: isIg as 0 | 1,
+      youtube: isYt,
+      facebook: isFb,
+      instagram: isIg,
       youtubeVideoId: bestYtId,
       facebookVideoId: bestFbId,
       facebookStoryId: bestFbStoryId,
@@ -809,7 +821,7 @@ export default function Home() {
           instagramStoryId: c.instagramStoryId || "",
           youtube: (c.youtubeVideoId || c.youtubeUrl) ? 1 : 0,
           facebook: (c.facebookVideoId || c.facebookUrl) ? 1 : 0,
-          instagram: (c.instagramVideoId || c.instagramUrl || c.facebookVideoId || c.facebookUrl) ? 1 : 0,
+          instagram: (c.instagramVideoId || c.instagramUrl) ? 1 : 0,
           thumbnailUrl:
             (c.youtubeVideoId ? `https://i.ytimg.com/vi/${c.youtubeVideoId}/hqdefault.jpg` : undefined) ||
             (c.facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${c.facebookVideoId}` : undefined),
@@ -1024,7 +1036,7 @@ export default function Home() {
       }));
       const youtubeVal: 0 | 1 = (data.youtubeUrl || data.youtubeVideoId) ? 1 : 0;
       const facebookVal: 0 | 1 = (data.facebookUrl || data.facebookVideoId) ? 1 : 0;
-      const instagramVal: 0 | 1 = (data.instagramUrl || data.instagramVideoId || facebookVal === 1) ? 1 : 0;
+      const instagramVal: 0 | 1 = (data.instagramUrl || data.instagramVideoId) ? 1 : 0;
 
       // Add or update in video library
       const existingRecord = videos.find((v) => {
@@ -1052,9 +1064,9 @@ export default function Home() {
         facebookPostId: data.facebookPostId || existingRecord?.facebookPostId || "",
         instagramVideoId: data.instagramVideoId || existingRecord?.instagramVideoId || "",
         instagramStoryId: data.instagramStoryId || existingRecord?.instagramStoryId || "",
-        youtube: (youtubeVal === 1 || existingRecord?.youtube === 1) ? 1 : 0,
-        facebook: (facebookVal === 1 || existingRecord?.facebook === 1) ? 1 : 0,
-        instagram: (instagramVal === 1 || existingRecord?.instagram === 1) ? 1 : 0,
+        youtube: (youtubeVal === 1 || Boolean(existingRecord?.youtubeVideoId)) ? 1 : 0,
+        facebook: (facebookVal === 1 || Boolean(existingRecord?.facebookVideoId)) ? 1 : 0,
+        instagram: (instagramVal === 1 || Boolean(existingRecord?.instagramVideoId)) ? 1 : 0,
         thumbnailUrl:
           (data.youtubeVideoId ? `https://i.ytimg.com/vi/${data.youtubeVideoId}/hqdefault.jpg` : undefined) ||
           (data.facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${data.facebookVideoId}` : undefined) ||
@@ -1232,11 +1244,11 @@ export default function Home() {
 
     let matchesTab = true;
     if (platformTab === "YouTube") {
-      matchesTab = video.youtube === 1 || Boolean(video.youtubeVideoId);
+      matchesTab = Boolean(video.youtubeVideoId) || (video.youtube === 1 && Boolean(extractYouTubeId(video.videoUrl)));
     } else if (platformTab === "Instagram") {
-      matchesTab = video.instagram === 1 || Boolean(video.instagramVideoId);
+      matchesTab = Boolean(video.instagramVideoId) || (video.instagram === 1 && Boolean(extractInstagramId(video.videoUrl)));
     } else if (platformTab === "Facebook") {
-      matchesTab = video.facebook === 1 || Boolean(video.facebookVideoId);
+      matchesTab = Boolean(video.facebookVideoId) || (video.facebook === 1 && Boolean(extractFacebookId(video.videoUrl)));
     }
 
     return matchesFormat && matchesQuery && matchesTab;
@@ -1453,14 +1465,18 @@ export default function Home() {
                             </div>
                             {result?.status === 'done' && (
                               <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                {result.youtubeUrl && <a href={result.youtubeUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#ff4444', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}><FaYoutube size={14} /> YouTube</a>}
-                                {(result.instagramUrl || result.facebookUrl) && (
-                                  <a
-                                    href={result.instagramUrl || "https://www.instagram.com/the_viral_desk/reels/"}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#f472b6', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}
-                                  >
+                                {result.youtubeUrl && (
+                                  <a href={result.youtubeUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#ff4444', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}>
+                                    <FaYoutube size={14} /> YouTube
+                                  </a>
+                                )}
+                                {result.facebookUrl && (
+                                  <a href={result.facebookUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#38bdf8', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}>
+                                    <FaFacebookF size={13} /> Facebook
+                                  </a>
+                                )}
+                                {result.instagramUrl && (
+                                  <a href={result.instagramUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#f472b6', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}>
                                     <FaInstagram size={13} /> Instagram
                                   </a>
                                 )}
@@ -1654,9 +1670,9 @@ export default function Home() {
       {video.status !== 'failed' && <div className="hashtag-row">{Array.from(new Set(video.hashtags || [])).map((tag, idx) => <span key={`${tag}-${idx}`}>#{tag.replace(/^#/, '')}</span>)}</div>}
       <div className="video-card-actions">
         <div className="card-platform-links">
-          {(video.youtube === 1 || Boolean(video.youtubeVideoId)) && (
+          {Boolean(video.youtubeVideoId || (video.youtube === 1 && extractYouTubeId(video.videoUrl))) && (
             <a
-              href={video.youtubeVideoId ? `https://www.youtube.com/shorts/${video.youtubeVideoId}` : (video.videoUrl || "#")}
+              href={`https://www.youtube.com/shorts/${video.youtubeVideoId || extractYouTubeId(video.videoUrl)}`}
               target="_blank"
               rel="noreferrer"
               className="platform-btn yt-btn"
@@ -1666,9 +1682,9 @@ export default function Home() {
               <span>Shorts</span>
             </a>
           )}
-          {(video.facebook === 1 || Boolean(video.facebookVideoId)) && (
+          {Boolean(video.facebookVideoId || (video.facebook === 1 && extractFacebookId(video.videoUrl))) && (
             <a
-              href={video.facebookVideoId ? `https://www.facebook.com/reel/${video.facebookVideoId}` : "https://www.facebook.com"}
+              href={`https://www.facebook.com/reel/${video.facebookVideoId || extractFacebookId(video.videoUrl)}`}
               target="_blank"
               rel="noreferrer"
               className="platform-btn fb-btn"
@@ -1678,12 +1694,12 @@ export default function Home() {
               <span>FB Reel</span>
             </a>
           )}
-          {(video.instagram === 1 || Boolean(video.instagramVideoId)) && (
+          {Boolean(video.instagramVideoId || (video.instagram === 1 && extractInstagramId(video.videoUrl))) && (
             <a
               href={
-                video.instagramVideoId
-                  ? (video.instagramVideoId.startsWith("http") ? video.instagramVideoId : `https://www.instagram.com/reel/${video.instagramVideoId}`)
-                  : "https://www.instagram.com/the_viral_desk/reels/"
+                (video.instagramVideoId || extractInstagramId(video.videoUrl) || "").startsWith("http")
+                  ? (video.instagramVideoId || extractInstagramId(video.videoUrl))
+                  : `https://www.instagram.com/reel/${video.instagramVideoId || extractInstagramId(video.videoUrl)}`
               }
               target="_blank"
               rel="noreferrer"

@@ -4,6 +4,8 @@ import path from "node:path";
 
 type StoredTokens = Record<string, unknown> & { facebook?: Record<string, unknown> };
 
+import { readTokens, writeTokens } from "@/app/lib/tokens";
+
 function redirect(request: Request, query: string) {
   const response = NextResponse.redirect(new URL(`/?${query}`, request.url));
   response.cookies.set("instagram_oauth_state", "", { path: "/api/auth/callback/instagram", maxAge: 0 });
@@ -57,9 +59,7 @@ export async function completeInstagramLogin(request: Request) {
     const instagramUserId = profile.user_id || profile.id || shortToken.user_id || longToken.user_id;
     if (!profileResponse.ok || !instagramUserId) return redirect(request, "error=instagram_profile_unavailable");
 
-    const tokenPath = path.join(process.cwd(), "tokens.json");
-    let tokens: StoredTokens = {};
-    try { tokens = JSON.parse(fs.readFileSync(tokenPath, "utf8")) as StoredTokens; } catch {}
+    const tokens = await readTokens();
     tokens.facebook = {
       ...(tokens.facebook || {}),
       instagram_login: true,
@@ -68,7 +68,13 @@ export async function completeInstagramLogin(request: Request) {
       instagram_username: profile.username,
       instagram_expires_at: Date.now() + Number(longToken.expires_in || 5184000) * 1000,
     };
-    fs.writeFileSync(tokenPath, JSON.stringify(tokens, null, 2));
+    tokens.instagram = {
+      ...(tokens.instagram || {}),
+      access_token: longToken.access_token,
+      user_id: String(instagramUserId),
+      username: profile.username,
+    };
+    await writeTokens(tokens);
     return redirect(request, "connected=instagram");
   } catch (error) {
     console.error("Instagram Login failed:", error instanceof Error ? error.message : "Unknown error");
