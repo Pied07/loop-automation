@@ -60,23 +60,29 @@ function normalizeVideoRecord(video: VideoRecord): VideoRecord {
 
 export async function getVideos(userId: string): Promise<VideoRecord[]> {
   if (!database) return [];
-  const videoQuery = query(collection(database, "users", userId, "videos"), orderBy("createdAt", "desc"));
+  const videoQuery = query(collection(database, "users", userId, "videos"));
   const snapshot = await getDocs(videoQuery);
   return snapshot.docs.map((video) => normalizeVideoRecord({ id: video.id, ...video.data() } as VideoRecord));
 }
 
 export function listenToVideos(userId: string, callback: (videos: VideoRecord[]) => void) {
   if (!database) return () => {};
-  const videoQuery = query(collection(database, "users", userId, "videos"), orderBy("createdAt", "desc"));
-  return onSnapshot(videoQuery, (snapshot) => {
-    callback(snapshot.docs.map((video) => normalizeVideoRecord({ id: video.id, ...video.data() } as VideoRecord)));
-  });
+  const videoQuery = query(collection(database, "users", userId, "videos"));
+  return onSnapshot(
+    videoQuery,
+    (snapshot) => {
+      callback(snapshot.docs.map((video) => normalizeVideoRecord({ id: video.id, ...video.data() } as VideoRecord)));
+    },
+    (error) => {
+      console.warn("Firestore listenToVideos error:", error);
+    }
+  );
 }
 
 export async function saveVideo(userId: string, video: VideoRecord): Promise<void> {
   if (!database) throw new Error("Firestore is not configured");
   const { id, sessionOnly: _sessionOnly, ...record } = video;
-  await setDoc(doc(database, "users", userId, "videos", id), record);
+  await setDoc(doc(database, "users", userId, "videos", id), record, { merge: true });
 }
 
 import { deleteDoc } from "firebase/firestore";

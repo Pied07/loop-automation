@@ -63,3 +63,5 @@ huggingface-worker/
 # Local scratch and model cache
 scratch/
 scripts/models/whisper-tiny/*.bin
+__pycache__/
+*.py[cod]

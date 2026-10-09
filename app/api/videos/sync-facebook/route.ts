@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
         instagram: 1, // Meta Page cross-posts reels to Instagram
         thumbnailUrl: thumb,
         format,
-        createdAt: item.created_time ? item.created_time.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        createdAt: item.created_time || new Date().toISOString(),
         status: "completed",
       };
 
