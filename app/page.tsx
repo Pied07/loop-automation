@@ -87,11 +87,17 @@ function mergeVideoRecords(...groups: VideoRecord[][]): VideoRecord[] {
   const merged = new Map<string, VideoRecord>();
   for (const video of groups.flat()) {
     if (!video || !video.id) continue;
+    // Exclude external API-scraped records
+    if (video.id.startsWith("youtube-") || video.id.startsWith("facebook-") || video.id.startsWith("instagram-")) {
+      continue;
+    }
     const cleanId = video.id.startsWith("session-") ? video.id.slice("session-".length) : video.id;
+    const normTitle = (video.title || "").trim().toLowerCase();
     const key =
       video.youtubeVideoId ? `yt-${video.youtubeVideoId}` :
       video.facebookVideoId ? `fb-${video.facebookVideoId}` :
       video.instagramVideoId ? `ig-${video.instagramVideoId}` :
+      normTitle.length > 5 ? `title-${normTitle}` :
       cleanId;
     const existing = merged.get(key);
     const score = (item: VideoRecord) =>
@@ -177,6 +183,7 @@ export default function Home() {
   const [videos, setVideos] = useState<VideoRecord[]>([]);
   const [filter, setFilter] = useState("All videos");
   const [query, setQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [toast, setToast] = useState("");
   const [loading, setLoading] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
@@ -216,7 +223,10 @@ export default function Home() {
         const cachedVideos = [...(Array.isArray(tvd) ? tvd : []), ...(Array.isArray(loop) ? loop : []), ...(Array.isArray(raw) ? raw : [])];
         if (cachedVideos.length > 0) {
           const sessionVideos = cachedVideos
-            .filter((video: VideoRecord) => Boolean(video?.id && (video.videoUrl || video.youtubeVideoId || video.facebookVideoId || video.instagramVideoId || video.title)))
+            .filter((video: VideoRecord) =>
+              Boolean(video?.id && (video.videoUrl || video.youtubeVideoId || video.facebookVideoId || video.instagramVideoId || video.title)) &&
+              !video.id.startsWith("youtube-") && !video.id.startsWith("facebook-") && !video.id.startsWith("instagram-")
+            )
             .map((video: VideoRecord) => {
               const cleanId = video.id.startsWith("session-") ? video.id.slice("session-".length) : video.id;
               const yt: 0 | 1 = (video.youtube !== undefined ? video.youtube : (video.youtubeVideoId ? 1 : 0)) as 0 | 1;
@@ -232,6 +242,8 @@ export default function Home() {
                 thumbnailUrl: cleanThumb,
               };
             });
+          // Resave only website-created videos to cache
+          localStorage.setItem("tvd-studio-session-videos", JSON.stringify(sessionVideos));
           window.setTimeout(() => setVideos((prev) => mergeVideoRecords(prev, sessionVideos)), 0);
         }
       } catch {}
@@ -283,36 +295,13 @@ export default function Home() {
         setConnections(existingConns);
       }
 
-      // 1. Always synchronize with server-side connected OAuth platforms (keeps all devices in 100% sync)
+      // Always synchronize with server-side connected OAuth platforms (keeps all devices in 100% sync)
       fetch("/api/auth/status")
         .then((res) => res.json())
         .then((data) => {
           if (Array.isArray(data.connections)) {
             setConnections(data.connections);
             localStorage.setItem("app_connections", JSON.stringify(data.connections));
-          }
-        })
-        .catch(() => {});
-
-      // 2. Automatically recover all published videos across YouTube, Facebook, and Instagram
-      fetch("/api/videos/published")
-        .then((res) => res.json())
-        .then((data) => {
-          if (data?.success && Array.isArray(data.videos) && data.videos.length > 0) {
-            let hiddenIds: string[] = [];
-            try {
-              hiddenIds = JSON.parse(localStorage.getItem("tvd-studio-hidden-youtube-videos") || "[]");
-            } catch {}
-            const visible = data.videos.filter((v: VideoRecord) => !v.youtubeVideoId || !hiddenIds.includes(v.youtubeVideoId));
-            setVideos((current) => {
-              const merged = mergeVideoRecords(current, visible);
-              try { localStorage.setItem("tvd-studio-session-videos", JSON.stringify(merged)); } catch {}
-              return merged;
-            });
-            const currentUser = auth?.currentUser;
-            if (currentUser) {
-              visible.forEach((v: VideoRecord) => saveVideo(currentUser.uid, v).catch(() => {}));
-            }
           }
         })
         .catch(() => {});
@@ -915,6 +904,11 @@ export default function Home() {
     return dateB - dateA;
   });
 
+  const PAGE_SIZE = 20;
+  const totalPages = Math.max(1, Math.ceil(filteredVideos.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const paginatedVideos = filteredVideos.slice((safeCurrentPage - 1) * PAGE_SIZE, safeCurrentPage * PAGE_SIZE);
+
   if (!signedIn) {
     return <>
       <Landing onStart={() => openAuth("signup")} onLogin={() => openAuth("login")} />
@@ -1204,7 +1198,7 @@ export default function Home() {
         {["All", "YouTube", "Facebook", "Instagram"].map(tab => (
           <button 
             key={tab} 
-            onClick={() => setPlatformTab(tab)}
+            onClick={() => { setPlatformTab(tab); setCurrentPage(1); }}
             className={`tab-pill ${platformTab === tab ? "active" : ""}`}
           >
             {tab}
@@ -1212,8 +1206,31 @@ export default function Home() {
         ))}
       </div>
       
-      <div className="library-toolbar"><div className="search-field"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your clips" /></div><label className="filter-select"><span className="sr-only">Filter by category</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option>All videos</option>{formats.map((item) => <option key={item.name}>{item.name}</option>)}</select><ChevronDown size={15} /></label><span className="result-count">{filteredVideos.length} clips</span></div>{filteredVideos.length ? <div className="video-grid">
-  {filteredVideos.map((video) => {
+      <div className="library-toolbar">
+        <div className="search-field">
+          <Search size={17} />
+          <input
+            value={query}
+            onChange={(event) => { setQuery(event.target.value); setCurrentPage(1); }}
+            placeholder="Search your clips"
+          />
+        </div>
+        <label className="filter-select">
+          <span className="sr-only">Filter by category</span>
+          <select value={filter} onChange={(event) => { setFilter(event.target.value); setCurrentPage(1); }}>
+            <option>All videos</option>
+            {formats.map((item) => <option key={item.name}>{item.name}</option>)}
+          </select>
+          <ChevronDown size={15} />
+        </label>
+        <span className="result-count">
+          {filteredVideos.length > PAGE_SIZE
+            ? `Showing ${(safeCurrentPage - 1) * PAGE_SIZE + 1}–${Math.min(safeCurrentPage * PAGE_SIZE, filteredVideos.length)} of ${filteredVideos.length} clips`
+            : `${filteredVideos.length} clips`}
+        </span>
+      </div>
+      {paginatedVideos.length ? <> <div className="video-grid">
+  {paginatedVideos.map((video) => {
     const ytId = video.youtubeVideoId || (() => {
       const m = video.videoUrl?.match(/(?:youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|shorts\/|live\/)([^#&?]*)/);
       return m && m[1]?.length === 11 ? m[1] : "";
@@ -1360,7 +1377,40 @@ export default function Home() {
       </div>
     </div></article>
     );
-  })}</div> : <div className="empty-library"><div className="empty-art"><span /><span /><span /><Clapperboard size={27} /></div><h2>{query || filter !== "All videos" ? "No matching clips" : "No clips published yet."}</h2><p>{query || filter !== "All videos" ? "Try another search or category." : "Published viral clips will appear here with YouTube, Facebook, and Instagram links."}</p>{!query && filter === "All videos" && <button className="primary-button" onClick={() => setScreen("studio")}><TrendingUp size={16} /> Create your first viral clip</button>}</div>}</section>}
+  })}</div>
+  {totalPages > 1 && (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '28px', paddingBottom: '16px', flexWrap: 'wrap' }}>
+      <button
+        className="secondary-button"
+        onClick={() => { setCurrentPage((p) => Math.max(1, p - 1)); }}
+        disabled={safeCurrentPage === 1}
+        style={{ padding: '6px 14px', fontSize: '13px', opacity: safeCurrentPage === 1 ? 0.4 : 1 }}
+      >
+        Previous
+      </button>
+      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
+        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+          <button
+            key={page}
+            onClick={() => { setCurrentPage(page); }}
+            className={`tab-pill ${safeCurrentPage === page ? "active" : ""}`}
+            style={{ minWidth: '34px', height: '34px', padding: '0 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: safeCurrentPage === page ? 700 : 500 }}
+          >
+            {page}
+          </button>
+        ))}
+      </div>
+      <button
+        className="secondary-button"
+        onClick={() => { setCurrentPage((p) => Math.min(totalPages, p + 1)); }}
+        disabled={safeCurrentPage === totalPages}
+        style={{ padding: '6px 14px', fontSize: '13px', opacity: safeCurrentPage === totalPages ? 0.4 : 1 }}
+      >
+        Next
+      </button>
+    </div>
+  )}
+  </> : <div className="empty-library"><div className="empty-art"><span /><span /><span /><Clapperboard size={27} /></div><h2>{query || filter !== "All videos" ? "No matching clips" : "No clips published yet."}</h2><p>{query || filter !== "All videos" ? "Try another search or category." : "Published viral clips will appear here with YouTube, Facebook, and Instagram links."}</p>{!query && filter === "All videos" && <button className="primary-button" onClick={() => setScreen("studio")}><TrendingUp size={16} /> Create your first viral clip</button>}</div>}</section>}
       {screen === "settings" && <section className="settings-content"><div className="eyebrow"><span className="eyebrow-dot" /> WORKSPACE SETTINGS</div><h1>Your studio, <em>your way.</em></h1><p className="settings-intro">Manage automated workflows and connected social networks.</p>
       
       {/* Auto-Pilot Daily Automation Toggler (Requirement 8) */}
