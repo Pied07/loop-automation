@@ -92,13 +92,19 @@ function mergeVideoRecords(...groups: VideoRecord[][]): VideoRecord[] {
       continue;
     }
     const cleanId = video.id.startsWith("session-") ? video.id.slice("session-".length) : video.id;
-    const normTitle = (video.title || "").trim().toLowerCase();
+    // Normalize title to alphanumeric slug so cross-posted FB & IG entries merge together
+    const titleSlug = (video.title || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "")
+      .slice(0, 32);
+
     const key =
-      video.youtubeVideoId ? `yt-${video.youtubeVideoId}` :
+      titleSlug.length >= 6 ? `title-${titleSlug}` :
       video.facebookVideoId ? `fb-${video.facebookVideoId}` :
+      video.youtubeVideoId ? `yt-${video.youtubeVideoId}` :
       video.instagramVideoId ? `ig-${video.instagramVideoId}` :
-      normTitle.length > 5 ? `title-${normTitle}` :
       cleanId;
+
     const existing = merged.get(key);
     const score = (item: VideoRecord) =>
       (item.captions?.length || 0) +
@@ -112,7 +118,7 @@ function mergeVideoRecords(...groups: VideoRecord[][]): VideoRecord[] {
       merged.set(key, {
         ...(existing || {}),
         ...video,
-        id: cleanId,
+        id: existing?.id || cleanId,
         youtube: (video.youtube === 1 || existing?.youtube === 1 || Boolean(video.youtubeVideoId || existing?.youtubeVideoId)) ? 1 : 0,
         facebook: (video.facebook === 1 || existing?.facebook === 1 || Boolean(video.facebookVideoId || existing?.facebookVideoId)) ? 1 : 0,
         instagram: (video.instagram === 1 || existing?.instagram === 1 || Boolean(video.instagramVideoId || existing?.instagramVideoId) || video.facebook === 1 || existing?.facebook === 1) ? 1 : 0,

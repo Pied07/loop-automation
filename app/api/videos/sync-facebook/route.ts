@@ -48,73 +48,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Also check video_reels endpoint for any reels published to the Page
-    try {
-      const reelsRes = await fetch(
-        `https://graph.facebook.com/v26.0/${pageId}/video_reels?fields=id,description,created_time,thumbnails,permalink_url&limit=50&access_token=${pageToken}`,
-        { cache: "no-store", signal: AbortSignal.timeout(8000) }
-      );
-      if (reelsRes.ok) {
-        const reelsData: any = await reelsRes.json();
-        for (const item of (reelsData.data || [])) {
-          if (item?.id && !allItemsMap.has(item.id)) allItemsMap.set(item.id, item);
-        }
-      }
-    } catch {}
 
-    // Fetch published_posts to capture all feed posts and cross-posts
-    try {
-      let nextPostsUrl: string | null = `https://graph.facebook.com/v26.0/${pageId}/published_posts?fields=id,message,created_time,permalink_url&limit=50&access_token=${pageToken}`;
-      let postPages = 0;
-      while (nextPostsUrl && postPages < 5) {
-        postPages++;
-        const pRes: Response = await fetch(nextPostsUrl, { cache: "no-store", signal: AbortSignal.timeout(8000) });
-        if (!pRes.ok) break;
-        const pData: any = await pRes.json();
-        for (const item of (pData.data || [])) {
-          if (item?.id && !allItemsMap.has(item.id)) {
-            allItemsMap.set(item.id, {
-              id: item.id,
-              title: item.message?.split("\n")[0]?.slice(0, 70),
-              description: item.message || "",
-              created_time: item.created_time,
-              permalink_url: item.permalink_url,
-            });
-          }
-        }
-        nextPostsUrl = pData?.paging?.next || null;
-      }
-    } catch {}
-
-    // Also fetch Instagram media associated with this Facebook Page
-    const igUserId = tokens?.instagram?.user_id || tokens?.facebook?.instagram_user_id;
-    const igToken = tokens?.instagram?.access_token || tokens?.facebook?.instagram_page_access_token || pageToken;
-    if (igUserId && igToken) {
-      try {
-        let nextIgUrl: string | null = `https://graph.facebook.com/v26.0/${igUserId}/media?fields=id,caption,permalink,timestamp,thumbnail_url,media_url&limit=50&access_token=${igToken}`;
-        let igPages = 0;
-        while (nextIgUrl && igPages < 5) {
-          igPages++;
-          const igRes: Response = await fetch(nextIgUrl, { cache: "no-store", signal: AbortSignal.timeout(8000) });
-          if (!igRes.ok) break;
-          const igData: any = await igRes.json();
-          for (const item of (igData.data || [])) {
-            if (item?.id && !allItemsMap.has(item.id)) {
-              allItemsMap.set(item.id, {
-                id: item.id,
-                title: item.caption?.split("\n")[0]?.slice(0, 70),
-                description: item.caption || "",
-                created_time: item.timestamp,
-                permalink_url: item.permalink,
-                thumbnail_url: item.thumbnail_url || item.media_url,
-                isInstagram: true,
-              });
-            }
-          }
-          nextIgUrl = igData?.paging?.next || null;
-        }
-      } catch {}
-    }
 
     const items = Array.from(allItemsMap.values());
     const syncedVideos: VideoRecord[] = [];
