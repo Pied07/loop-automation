@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { useEffect, useState, useRef, type FormEvent } from "react";
-import { auth, firebaseConfigured, database, listenToVideos, saveVideo, deleteVideo, clearAllUserVideos, type VideoRecord } from "./firebase";
+import { auth, firebaseConfigured, database, listenToVideos, saveVideo, deleteVideo, clearAllUserVideos, normalizeVideoRecord, type VideoRecord } from "./firebase";
 import { doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
 import { deleteFromYouTube, deleteFromFacebook, deleteFromInstagram } from "./actions";
 import { FaYoutube, FaInstagram, FaFacebookF } from "react-icons/fa6";
@@ -641,14 +641,23 @@ export default function Home() {
       setDisplayName(user.displayName || user.email?.split("@")[0] || "Creator");
       setSignedIn(true);
       setScreen("studio");
-      // Synchronize in real-time with top-level videos collection for this user
+      // Synchronize in real-time with videos collection for this user
       try {
-        localStorage.removeItem("tvd-studio-session-videos");
-        localStorage.removeItem("loop-studio-session-videos");
-        localStorage.removeItem("videos");
+        const stored = localStorage.getItem("tvd-studio-session-videos");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setVideos(parsed.map(normalizeVideoRecord));
+          }
+        }
       } catch {}
       unsubVideos = listenToVideos(user.uid, (firestoreVideos) => {
-        setVideos(firestoreVideos.sort((a, b) => getRecordTimestamp(b) - getRecordTimestamp(a)));
+        if (firestoreVideos && firestoreVideos.length > 0) {
+          setVideos(firestoreVideos.sort((a, b) => getRecordTimestamp(b) - getRecordTimestamp(a)));
+          try {
+            localStorage.setItem("tvd-studio-session-videos", JSON.stringify(firestoreVideos));
+          } catch {}
+        }
       });
     });
     return () => {
@@ -1067,8 +1076,17 @@ export default function Home() {
         sessionOnly: false,
       };
       const currentUser = auth?.currentUser;
+      // Immediately update local state and localStorage so the card appears in Library immediately
+      setVideos((prev) => [newRecord, ...prev.filter((v) => v.id !== newRecord.id)]);
+      try {
+        const stored = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]");
+        localStorage.setItem("tvd-studio-session-videos", JSON.stringify([newRecord, ...stored.filter((v: any) => v.id !== newRecord.id)]));
+      } catch {}
+
       if (currentUser) {
-        saveVideo(currentUser.uid, newRecord).catch(() => {});
+        saveVideo(currentUser.uid, newRecord).catch((err: any) => {
+          console.warn("Firestore saveVideo notice:", err.message);
+        });
       }
       notify(`${clip.title} published successfully!`);
     } catch (err: any) {

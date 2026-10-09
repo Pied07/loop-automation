@@ -49,7 +49,7 @@ export const auth = app ? getAuth(app) : null;
 export const database = app ? getFirestore(app) : null;
 export const storage = app ? getStorage(app) : null;
 
-function normalizeVideoRecord(video: any): VideoRecord {
+export function normalizeVideoRecord(video: any): VideoRecord {
   const yt: 0 | 1 = video.youtube === 1 ? 1 : (video.youtube === 0 ? 0 : (Boolean(video.youtubeVideoId || video.youtubeUrl) ? 1 : 0));
   const fb: 0 | 1 = video.facebook === 1 ? 1 : (video.facebook === 0 ? 0 : (Boolean(video.facebookVideoId || video.facebookUrl) ? 1 : 0));
   const ig: 0 | 1 = video.instagram === 1 ? 1 : (video.instagram === 0 ? 0 : (Boolean(video.instagramVideoId || video.instagramUrl) ? 1 : 0));
@@ -87,23 +87,58 @@ function normalizeVideoRecord(video: any): VideoRecord {
 
 export async function getVideos(userId: string): Promise<VideoRecord[]> {
   if (!database) return [];
-  const q = query(collection(database, "videos"), where("userId", "==", userId));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((doc) => normalizeVideoRecord({ id: doc.id, ...doc.data() }));
+  try {
+    const q = query(collection(database, "videos"), where("userId", "==", userId));
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      return snapshot.docs.map((doc) => normalizeVideoRecord({ id: doc.id, ...doc.data() }));
+    }
+  } catch (err) {
+    console.warn("Top-level getVideos notice:", err);
+  }
+  try {
+    const subSnap = await getDocs(collection(database, "users", userId, "videos"));
+    return subSnap.docs.map((doc) => normalizeVideoRecord({ id: doc.id, ...doc.data() }));
+  } catch {
+    return [];
+  }
 }
 
 export function listenToVideos(userId: string, callback: (videos: VideoRecord[]) => void) {
   if (!database) return () => {};
-  const q = query(collection(database, "videos"), where("userId", "==", userId));
-  return onSnapshot(
-    q,
+  let unsubFallback: (() => void) | undefined;
+  let topLoaded = false;
+
+  const qTop = query(collection(database, "videos"), where("userId", "==", userId));
+  const unsubTop = onSnapshot(
+    qTop,
     (snapshot) => {
+      topLoaded = true;
       callback(snapshot.docs.map((doc) => normalizeVideoRecord({ id: doc.id, ...doc.data() })));
     },
     (error) => {
-      console.warn("Firestore listenToVideos error:", error);
+      console.warn("Firestore top-level listen error (deploy firestore.rules for 'videos'):", error);
+      if (!topLoaded && !unsubFallback && database) {
+        try {
+          const qSub = collection(database, "users", userId, "videos");
+          unsubFallback = onSnapshot(
+            qSub,
+            (subSnap) => {
+              callback(subSnap.docs.map((doc) => normalizeVideoRecord({ id: doc.id, ...doc.data() })));
+            },
+            (subErr) => {
+              console.warn("Firestore fallback listen error:", subErr);
+            }
+          );
+        } catch {}
+      }
     }
   );
+
+  return () => {
+    unsubTop();
+    if (unsubFallback) unsubFallback();
+  };
 }
 
 export async function saveVideo(userId: string, video: Partial<VideoRecord> & { id: string }): Promise<void> {
@@ -123,21 +158,45 @@ export async function saveVideo(userId: string, video: Partial<VideoRecord> & { 
     facebookUrl: facebookVal === 1 ? (record.facebookUrl || (record.facebookVideoId ? `https://www.facebook.com/reel/${record.facebookVideoId}` : "")) : "",
     instagramUrl: instagramVal === 1 ? (record.instagramUrl || (record.instagramVideoId ? (record.instagramVideoId.startsWith("http") ? record.instagramVideoId : `https://www.instagram.com/reel/${record.instagramVideoId}`) : "")) : "",
   };
-  await setDoc(doc(database, "videos", id), cleanRecord, { merge: true });
+
+  try {
+    await setDoc(doc(database, "videos", id), cleanRecord, { merge: true });
+  } catch (err: any) {
+    console.warn("Failed to write to top-level 'videos' collection (rules not deployed yet):", err.message);
+    try {
+      await setDoc(doc(database, "users", userId, "videos", id), cleanRecord, { merge: true });
+    } catch (subErr) {
+      console.warn("Subcollection save also failed:", subErr);
+    }
+    throw err;
+  }
 }
 
 export async function deleteVideo(userId: string, videoId: string): Promise<void> {
   if (!database) throw new Error("Firebase not configured");
-  await deleteDoc(doc(database, "videos", videoId));
+  try {
+    await deleteDoc(doc(database, "videos", videoId));
+  } catch {}
+  try {
+    await deleteDoc(doc(database, "users", userId, "videos", videoId));
+  } catch {}
 }
 
 export async function clearAllUserVideos(userId: string): Promise<void> {
   if (!database) return;
-  const q = query(collection(database, "videos"), where("userId", "==", userId));
-  const snapshot = await getDocs(q);
-  const batch = writeBatch(database);
-  snapshot.docs.forEach((d) => batch.delete(d.ref));
-  await batch.commit();
+  try {
+    const q = query(collection(database, "videos"), where("userId", "==", userId));
+    const snapshot = await getDocs(q);
+    const batch = writeBatch(database);
+    snapshot.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  } catch {}
+  try {
+    const subSnap = await getDocs(collection(database, "users", userId, "videos"));
+    const batch2 = writeBatch(database);
+    subSnap.docs.forEach((d) => batch2.delete(d.ref));
+    await batch2.commit();
+  } catch {}
 }
 
 export async function deleteVideosByYouTubeId(userId: string, youtubeVideoId: string): Promise<void> {
