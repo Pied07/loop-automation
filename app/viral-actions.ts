@@ -336,9 +336,9 @@ async function splitVideo(
         "-vf", "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30",
         "-c:v", "libx264",
         "-preset", "veryfast",
-        "-crf", "28",
+        "-crf", "22",
         "-c:a", "aac",
-        "-b:a", "96k",
+        "-b:a", "128k",
         "-movflags", "+faststart",
         targetSlicePath,
       ];
@@ -477,34 +477,34 @@ const HASHTAG_BANK: Record<string, string[]> = {
 const UNIVERSAL_HASHTAGS = ["viral","trending","foryou","fyp","reels","shorts","explore","share","mustwatch","viralvideo","watchthis","followformore","content","socialmedia","entertainment","trendingreels","explorepage"];
 
 // Part-based hooks (rotate based on part number)
+// Part-based hooks (High-retention open loops that prevent scrolling)
 const HOOKS: Record<string, string[]> = {
-  "Trending":     ["This clip is taking over the internet 🔥","You have to see this to believe it 👀","The whole internet is talking about this ⚡","Wait until you see what happens next 😱","One of the most viral moments this week 🎯"],
-  "Comedy":       ["Try not to laugh challenge 😂","Warning: do not watch this in public 🤣","This had me in tears 💀","Funniest clip you'll see all day 😭","Bro I can't stop rewatching this 😂🔥"],
-  "Motivational": ["This one will change how you think 🔥","If you're going through a tough time, watch this 💪","This clip hits different when you needed it most ⚡","One of the most powerful moments in the entire series 🎯","Stop scrolling — this is exactly what you need to hear today 🙌"],
-  "Funny":        ["You will NOT be able to stop laughing 😂","Warning: do not watch this in public 🤣","This one got me in tears 💀","This is the funniest thing I've seen all week 😭","Bro I can't stop rewatching this 😂🔥"],
-  "Horror":       ["Do not watch this alone in the dark 🌑","This spine-chilling moment gave me chills 👻","Unexplained real mystery caught on tape 👀","Spooky encounter you won't be able to forget 😱","Watch closely — something isn't right here 🚪"],
-  "Educational":  ["Most people don't know this 🤯","This fact will blow your mind 🧠","They don't teach this in school 📚","One of the most eye-opening clips I've come across 👀","After seeing this, you'll never look at it the same way 💡"],
+  "Trending":     ["Wait until the last 3 seconds... 💀","Nobody saw this coming 😳","The moment everything changed ⚡","Watch closely — something isn't right here 👀","This clip broke the internet for a reason 🔥"],
+  "Comedy":       ["Bro did NOT hesitate 💀","Try not to laugh challenge (impossible) 😂","Warning: do not watch this in public 🤣","This had me in actual tears 😭","I cannot stop rewatching this 😂🔥"],
+  "Motivational": ["Stop scrolling — this is exactly what you need to hear today 🙌","The mindset shift that changes everything 🔥","This clip hits different when you needed it most ⚡","Most people realize this too late in life 💡","One of the most powerful life lessons you'll ever hear 🎯"],
+  "Funny":        ["Bro had no idea what was about to happen 💀","You will NOT be able to stop laughing 😂","Warning: do not watch this in public 🤣","Funniest thing on the internet today 😭","Can't stop rewatching this part 😂🔥"],
+  "Horror":       ["Do not watch this alone in the dark 🌑","The ending gave me literal chills 👻","Unexplained real mystery caught on tape 👀","Watch the background very closely... 🚪","I still can't explain what happened here 😱"],
+  "Educational":  ["99% of people have no idea about this 🤯","This single fact will blow your mind 🧠","They never taught us this in school 📚","One of the most eye-opening things you'll see today 👀","Once you see this, you can never unsee it 💡"],
   "Romance":      ["A love story that touches your heart ❤️","Unspoken feelings that hit deep in the heart ✨","When someone truly means the world to you 💍","Late night thoughts of someone you love 💕","Tag someone who gives you butterflies 🦋"],
   "Adventure":    ["The adrenaline rush is unreal 🏔️","This outdoor moment will leave you speechless 🌊","Action-packed adventure you have to witness 🔥","Pushing human limits to the absolute edge 🧗","Earth's wild side captured on camera 🏕️"],
   "Music":        ["This live performance gave me absolute chills 🎵","The vocals and rhythm are pure magic 🔥","You need this track on your playlist NOW 🎶","Can't stop listening to this on repeat 🎤","Pure musical talent right here ✨"],
   "Food":         ["The way this came together is mouth-watering 🍽️","One bite and you'll understand why this went viral 😋","Street food master at work 👨‍🍳","Warning: this will make you extremely hungry 🤤","Absolutely incredible cooking skills 🔥"],
   "Nature":       ["Nature never ceases to amaze me 🌿","Our planet is absolutely breathtaking 🌍","This is why I love the natural world 🦋","Moments like these remind us how beautiful life is 🌅","Pure magic captured on camera 📷"],
-  "Sports":       ["This moment gave me chills 🏆","Absolute SCENES! 🔥","This is why sports are beautiful 💯","Nobody expected this to happen 😤","Legendary performance right here 🐐"],
-  "Gaming":       ["Nobody saw this coming 🎮","This clip broke the internet 💥","The reaction says everything 👀","Insane skill level right here 🔥","This is why we love gaming 🎯"],
-  "Travel":       ["I can't believe places like this exist 😍","This destination is absolutely stunning 🌏","Adding this to the bucket list immediately ✈️","The views here are unreal 🏔️","This is why travel changes you forever 🌅"],
+  "Sports":       ["This moment gave me absolute chills 🏆","Nobody expected this comeback 😤","This is why sports are legendary 💯","Coldest athlete moment in history 🐐","Absolute SCENES! 🔥"],
+  "Gaming":       ["Nobody saw this play coming 🎮","The reaction says everything 👀","Insane skill level right here 🔥","This clutch broke the internet 💥","Legendary gaming moment 🎯"],
+  "Travel":       ["I can't believe places like this exist 😍","Adding this destination to the bucket list immediately ✈️","This view is absolutely breathtaking 🌏","The world is way too beautiful 🏔️","Travel changes you forever 🌅"],
   "Fashion":      ["The fit is immaculate 🔥","This look is absolutely everything 💅","Style goals right here ✨","The drip is unreal 👑","This is how you do it 💯"],
 };
 
-// CTA (Call to action) endings
+// High-converting CTAs (Designed to trigger Comments, Saves & Profile visits)
 const CTAS = [
-  "Follow for more daily viral clips!",
-  "Save this and share it with someone who needs to see it!",
-  "Drop a 🔥 if you loved this!",
-  "Tag someone who needs to watch this!",
-  "Turn on notifications so you never miss a part!",
-  "What are your thoughts? Drop a comment below!",
-  "Like and follow for the full series!",
-  "Share this with your friends — they'll thank you later!",
+  "Who was in the wrong here? Drop your thoughts below 👇",
+  "What would you have done in this situation? Comment below 👇",
+  "Rate this moment from 1 to 10 🔥",
+  "Save this video so you don't lose it 📌",
+  "Share this with someone who needs to see this 💀",
+  "Follow @the_viral_desk for the full series and daily clips! 🎬",
+  "Part 2 is already posted on our profile! 🔥",
 ];
 
 function pickRandom<T>(arr: T[], seed: number): T {
@@ -512,24 +512,31 @@ function pickRandom<T>(arr: T[], seed: number): T {
 }
 
 export async function cleanViralTitle(rawTitle: string, category = "Trending"): Promise<string> {
-  let title = (rawTitle || "").replace(/https?:\/\/\S+/gi, "").replace(/#[a-zA-Z0-9_]+/g, "").trim();
+  let title = (rawTitle || "")
+    .replace(/https?:\/\/\S+/gi, "")
+    .replace(/#[a-zA-Z0-9_]+/g, "")
+    .replace(/\.(mp4|mov|webm|mkv|avi)$/i, "")
+    .replace(/\b(1080p|720p|4k|hd|uhd|full hd|official video|official audio|full episode|free download)\b/gi, "")
+    .replace(/[_\-]+/g, " ")
+    .trim();
+
   const isHash = /^[a-zA-Z0-9_-]{18,}$/.test(title) || /^[0-9\s_-]+$/.test(title) || !/[a-zA-Z]/.test(title);
   if (!title || isHash || title.length < 4) {
     const fallbacks: Record<string, string[]> = {
-      Trending: ["Trending Viral Internet Moment", "Must Watch Viral Video", "This Clip Is Taking Over Social Media"],
-      Comedy: ["Stand Up Comedy Masterpiece", "Funniest Clip You Will See Today", "Comedy Gold Moments"],
-      Motivational: ["The Mindset Shift That Changes Everything", "Powerful Motivation You Need Today", "Never Give Up On Your Dreams"],
-      Funny: ["Try Not To Laugh Challenge", "Pure Comedy Gold Moment", "Funniest Video You Will See Today"],
-      Horror: ["Spine Chilling Real Mystery", "Unexplained Paranormal Encounter", "Do Not Watch This Alone In The Dark"],
-      Educational: ["Mind Blowing Fact You Never Knew", "Science Facts That Will Shock You", "History Secret That Changes Everything"],
-      Romance: ["A Love Story That Touches Your Heart", "Unspoken Feelings That Hit Deep", "When Someone Truly Means Everything"],
-      Adventure: ["Extreme Outdoor Adventure Highlight", "Breathtaking Adrenaline Moment", "Pushing Limits In The Wild"],
-      Music: ["Amazing Live Music Performance", "Incredible Rhythm And Melody", "Viral Sound That Hits Different"],
-      Food: ["Incredible Street Food Chef Skills", "Delicious Cooking Recipe Master", "Mouth Watering Food Everyone Is Craving"],
-      Sports: ["Legendary Athlete Moment Chills", "Incredible Sports Highlight", "Unstoppable Athletic Performance"],
-      Travel: ["Breathtaking Place You Must Visit", "Hidden Paradise On Earth", "Stunning Travel View Before You Die"],
-      Nature: ["Incredible Wildlife Encounter Caught On Camera", "Nature Never Ceases To Amaze", "Wild Animals Beautiful Moment"],
-      Gaming: ["Insane Gaming Clutch Moment", "Epic Gameplay Highlight", "Unbelievable Gaming Reaction"],
+      Trending: ["Wait for the ending... 😱", "The moment everything changed ⚡", "Nobody saw this coming 😳"],
+      Comedy: ["Funniest clip you'll see all day 😂", "Bro did NOT hesitate 💀", "Try not to laugh challenge 🤣"],
+      Motivational: ["The mindset shift that changes everything 🔥", "Powerful words you need to hear today 💪", "Never give up on your vision 🎯"],
+      Funny: ["Funniest video on the internet today 😂", "Bro had zero chill 💀", "Try not to laugh challenge 😭"],
+      Horror: ["Do not watch this alone in the dark 🌑", "Unexplained mystery caught on tape 👀", "The ending gave me chills 👻"],
+      Educational: ["Mind-blowing fact you never knew 🤯", "They never taught us this in school 🧠", "The secret history changes everything 💡"],
+      Romance: ["A love story that touches your heart ❤️", "Unspoken feelings that hit deep ✨", "When someone truly means everything 💕"],
+      Adventure: ["Pushing human limits to the edge 🏔️", "Extreme adventure caught on camera 🔥", "Breathtaking adrenaline moment 🧗"],
+      Music: ["This live performance gave me chills 🎵", "Viral sound that hits different 🎶", "Incredible performance right here ✨"],
+      Food: ["Mouth-watering street food chef skills 🤤", "Delicious recipe everyone is craving 🍽️", "Incredible cooking masterpiece 👨‍🍳"],
+      Sports: ["Legendary athlete moment gives chills 🏆", "Nobody saw this comeback coming 😤", "Incredible sports highlight 🐐"],
+      Travel: ["Breathtaking place you must visit before you die ✈️", "Hidden paradise on Earth 🌏", "Stunning travel destination 😍"],
+      Nature: ["Incredible wildlife encounter caught on camera 🌿", "Nature never ceases to amaze 🌍", "Beautiful animal moment 🦋"],
+      Gaming: ["Insane gaming clutch broke the internet 🎮", "Epic gameplay reaction 👀", "Unbelievable play right here 💥"],
     };
     const list = fallbacks[category] || fallbacks.Trending;
     return list[Math.floor(Math.random() * list.length)];
@@ -545,42 +552,38 @@ export async function generateClipMetadata(params: {
   contentCategory: string;
   clipDuration: number;
 }): Promise<{ description: string; hashtags: string[] }> {
-  const { partNumber, totalParts, sourceTitle, contentCategory, clipDuration } = params;
+  const { partNumber, totalParts, sourceTitle, contentCategory } = params;
 
   const cleanTitle = await cleanViralTitle(sourceTitle, contentCategory);
   const categoryHooks = HOOKS[contentCategory] || HOOKS["Trending"];
   const hook = pickRandom(categoryHooks, partNumber - 1);
   const cta = pickRandom(CTAS, partNumber + 1);
 
-  // Strictly omit PART label if video is a single clip
   const isMultiPart = totalParts > 1;
-  const partLabel = isMultiPart ? `📌 PART ${partNumber} of ${totalParts}` : "";
-  const clipLen = clipDuration < 120 ? `${Math.round(clipDuration)}s` : `${Math.round(clipDuration / 60)}min`;
+  const partLabel = isMultiPart ? `📌 PART ${partNumber} OF ${totalParts}` : "";
 
-  // Clean, structured description
-  const description = [
+  // High-retention, clean social caption without spammy disclaimers
+  const descriptionLines = [
     ...(partLabel ? [partLabel, ""] : []),
     `✨ ${hook}`,
-    `🎬 ${cleanTitle}`,
-    `⏱ Duration: ${clipLen}`,
+    `🎬 "${cleanTitle}"`,
     "",
     `💬 ${cta}`,
-    "🔔 Like, comment & subscribe for daily viral moments!",
-    "",
-    "────────────────",
-    `Fair Use Disclaimer: This clip from "${cleanTitle}" is curated under Fair Use for educational, inspirational, and commentary purposes. All rights belong to their respective owners.`,
-  ].join("\n");
+    isMultiPart && partNumber < totalParts ? "🔥 Watch Part 2 on our profile!" : "",
+  ].filter(Boolean);
 
-  // Post-respective hashtags: clean words from title + niche tags + platform tags
-  const bankTags = (HASHTAG_BANK[contentCategory] || HASHTAG_BANK["Trending"] || []).slice(0, 16);
-  const rawWords = cleanTitle.match(/[a-zA-Z]{3,12}/g) || [];
+  const description = descriptionLines.join("\n");
+
+  // Post-respective hashtags: targeted, high-performing tags (8-12 tags max for optimal ranking)
+  const bankTags = (HASHTAG_BANK[contentCategory] || HASHTAG_BANK["Trending"] || []).slice(0, 8);
+  const rawWords = cleanTitle.match(/[a-zA-Z]{4,12}/g) || [];
   const cleanTitleTags = rawWords
     .map((w) => w.toLowerCase())
     .filter((w) => !/[bcdfghjklmnpqrstvwxyz]{5,}/i.test(w) && !bankTags.includes(w) && !UNIVERSAL_HASHTAGS.includes(w))
-    .slice(0, 5);
+    .slice(0, 3);
 
-  const combined = [...new Set([...cleanTitleTags, ...bankTags, "shorts", "reels", "viral", "fyp", "trending", "explore", "foryou", "viralvideo", "watchthis"])];
-  const hashtags = combined.slice(0, 24);
+  const combined = [...new Set([...cleanTitleTags, ...bankTags, "shorts", "reels", "viral", "fyp", "trending"])];
+  const hashtags = combined.slice(0, 10);
 
   return { description, hashtags };
 }
@@ -774,9 +777,49 @@ export async function publishClipAndCleanup(params: {
     }
   }
 
-  const fullTitle = `${title} — ${description.slice(0, 40)}`;
+  const { readTokens } = await import("@/app/lib/tokens");
+  const tokens: any = await readTokens();
+  const igHandle = tokens.facebook?.instagram_username || "the_viral_desk";
+
+  // 1. Clean, punchy viral title (no broken description slices, fits smartphone viewports)
+  const cleanTitleCore = title.replace(/\s*—\s*.*$/, "").replace(/\s+/g, " ").trim();
+  const viralTitle = cleanTitleCore.length > 80 ? `${cleanTitleCore.slice(0, 77)}...` : cleanTitleCore;
+
+  // 2. Platform-optimized tags & captions
   const formattedHashtags = hashtags.map((h) => `#${h.replace(/^#/, "")}`);
-  const fullDescription = `${title}\n\n${description}\n\n${formattedHashtags.join(" ")}`;
+
+  const isShort = !params.totalDuration || params.totalDuration <= 180;
+  const youtubeTitle = isShort
+    ? (viralTitle.toLowerCase().includes("#shorts") ? viralTitle.slice(0, 100) : `${viralTitle.slice(0, 85)} #Shorts`)
+    : viralTitle.slice(0, 100);
+
+  const youtubeDescription = [
+    `🎬 ${viralTitle}`,
+    "",
+    description,
+    "",
+    formattedHashtags.slice(0, 15).join(" "),
+  ].join("\n");
+
+  const instagramCaption = [
+    viralTitle,
+    "",
+    description,
+    "",
+    `👉 Follow @${igHandle} for daily cinema & drama scenes! 🍿`,
+    "",
+    formattedHashtags.slice(0, 8).join(" "),
+  ].join("\n");
+
+  const facebookReelCaption = [
+    viralTitle,
+    "",
+    description,
+    "",
+    "Who was in the wrong here? Drop your thoughts below 👇",
+    "",
+    formattedHashtags.slice(0, 10).join(" "),
+  ].join("\n");
 
   let youtubeVideoId: string | undefined;
   let facebookVideoId: string | undefined;
@@ -794,10 +837,6 @@ export async function publishClipAndCleanup(params: {
   let isStoryVideo = false;
   let storyVideoLocalPath: string | undefined;
   let storyOverlayLocalPath: string | undefined;
-  const { readTokens } = await import("@/app/lib/tokens");
-  const tokens: any = await readTokens();
-
-  const igHandle = tokens.facebook?.instagram_username || "aishortvideos";
 
   // Pre-generate Story Teaser Video (or aesthetic Polaroid card fallback)
   try {
@@ -847,19 +886,14 @@ export async function publishClipAndCleanup(params: {
 
           const youtube = google.youtube({ version: "v3", auth: oauth2Client });
 
-          const isShort = !params.totalDuration || params.totalDuration <= 180;
-          const cleanTitleWithShorts = isShort && !fullTitle.toLowerCase().includes("#shorts")
-            ? `${fullTitle.slice(0, 90)} #Shorts`
-            : fullTitle.slice(0, 100);
-
           const res = await youtube.videos.insert({
             part: ["snippet", "status"],
             requestBody: {
               snippet: {
-                title: cleanTitleWithShorts,
-                description: fullDescription,
-                tags: [...hashtags.slice(0, 18), "Shorts", "shorts", "viral"],
-                categoryId: "22",
+                title: youtubeTitle,
+                description: youtubeDescription,
+                tags: [...hashtags.slice(0, 15), "Shorts", "shorts", "viral"],
+                categoryId: "24", // Entertainment (highest discovery for viral clips)
               },
               status: { privacyStatus: "public", selfDeclaredMadeForKids: false },
             },
@@ -902,8 +936,8 @@ export async function publishClipAndCleanup(params: {
           const fileBuffer = fs.readFileSync(/*turbopackIgnore: true*/ absolutePath);
           const formData = new FormData();
           formData.append("access_token", pageToken);
-          formData.append("title", fullTitle.slice(0, 100));
-          formData.append("description", fullDescription);
+          formData.append("title", viralTitle.slice(0, 100));
+          formData.append("description", facebookReelCaption);
           formData.append("published", "true");
           formData.append(
             "source",
@@ -1032,7 +1066,7 @@ export async function publishClipAndCleanup(params: {
               headers: { "Content-Type": "application/x-www-form-urlencoded" },
               body: new URLSearchParams({
                 access_token: pageToken,
-                message: `✨ Tap to watch full Reel: ${facebookUrl}\n\n${title}`,
+                message: `🎬 ${viralTitle}\n\n👉 Watch the full Reel: ${facebookUrl}\n\nWho was in the wrong here? Drop your thoughts below 👇`,
                 link: facebookUrl,
               }),
             });
@@ -1088,7 +1122,7 @@ export async function publishClipAndCleanup(params: {
               access_token: instagramToken,
               media_type: "REELS",
               video_url: publicVideoUrl,
-              caption: `${title}\n\n${description}\n\n${formattedHashtags.join(" ")}`,
+              caption: instagramCaption,
               share_to_feed: "true",
             }),
           });

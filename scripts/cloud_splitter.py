@@ -84,23 +84,26 @@ UNIVERSAL_HASHTAGS = ["shorts", "viral", "trending", "foryou", "fyp", "explore",
 
 def clean_human_title(raw_title: str, category: str = "Trending") -> str:
     cleaned = re.sub(r"https?://\S+", "", raw_title or "")
-    cleaned = re.sub(r"#[a-zA-Z0-9_]+", "", cleaned).strip()
+    cleaned = re.sub(r"#[a-zA-Z0-9_]+", "", cleaned)
+    cleaned = re.sub(r"\.(mp4|mov|webm|mkv|avi)$", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\b(1080p|720p|4k|hd|uhd|full hd|official video|official audio|full episode|free download)\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"[_\-]+", " ", cleaned).strip()
     is_hash = bool(re.match(r"^[a-zA-Z0-9_-]{18,}$", cleaned)) or bool(re.match(r"^[0-9\s_-]+$", cleaned)) or not re.search(r"[a-zA-Z]", cleaned)
     if not cleaned or is_hash or len(cleaned) < 4:
         fallbacks = {
-            "Trending": ["Trending Viral Internet Moment", "Must Watch Viral Video", "This Clip Is Taking Over Social Media"],
-            "Motivational": ["The Mindset Shift That Changes Everything", "Powerful Motivation You Need Today", "Never Give Up On Your Dreams"],
-            "Funny": ["Try Not To Laugh Challenge", "Pure Comedy Gold Moment", "Funniest Video You Will See Today"],
-            "Comedy": ["Stand Up Comedy Masterpiece", "Funniest Clip You Will See Today", "Comedy Gold Moments"],
-            "Romance": ["A Love Story That Touches Your Heart", "Unspoken Feelings That Hit Deep In The Heart", "When Someone Truly Means The World To You", "Late Night Thoughts Of Someone You Love"],
-            "Horror": ["Unexplained Mystery Caught At Night", "Spine Chilling Real Paranormal Moment", "Do Not Watch This Alone In The Dark"],
-            "Educational": ["Mind Blowing Fact You Never Knew", "Science Facts That Will Shock You", "History Secret That Changes Everything"],
-            "Food": ["Incredible Street Food Chef Skills", "Delicious Cooking Recipe Master", "Mouth Watering Food Everyone Is Craving"],
-            "Sports": ["Legendary Athlete Moment Chills", "Incredible Sports Highlight", "Unstoppable Athletic Performance"],
-            "Travel": ["Breathtaking Place You Must Visit", "Hidden Paradise On Earth", "Stunning Travel View Before You Die"],
-            "Nature": ["Incredible Wildlife Encounter Caught On Camera", "Nature Never Ceases To Amaze", "Wild Animals Beautiful Moment"],
-            "Gaming": ["Insane Gaming Clutch Moment", "Epic Gameplay Highlight", "Unbelievable Gaming Reaction"],
-            "Music": ["Amazing Live Music Performance", "Incredible Rhythm And Melody", "Viral Sound That Hits Different"],
+            "Trending": ["Wait for the ending... 😱", "The moment everything changed ⚡", "Nobody saw this coming 😳"],
+            "Motivational": ["The mindset shift that changes everything 🔥", "Powerful words you need to hear today 💪", "Never give up on your vision 🎯"],
+            "Funny": ["Funniest video on the internet today 😂", "Bro had zero chill 💀", "Try not to laugh challenge 😭"],
+            "Comedy": ["Funniest clip you will see all day 😂", "Bro did NOT hesitate 💀", "Try not to laugh challenge 🤣"],
+            "Romance": ["A love story that touches your heart ❤️", "Unspoken feelings that hit deep ✨", "When someone truly means everything 💕"],
+            "Horror": ["Do not watch this alone in the dark 🌑", "Unexplained mystery caught on tape 👀", "The ending gave me chills 👻"],
+            "Educational": ["Mind-blowing fact you never knew 🤯", "They never taught us this in school 🧠", "The secret history changes everything 💡"],
+            "Food": ["Mouth-watering street food chef skills 🤤", "Delicious recipe everyone is craving 🍽️", "Incredible cooking masterpiece 👨‍🍳"],
+            "Sports": ["Legendary athlete moment gives chills 🏆", "Nobody saw this comeback coming 😤", "Incredible sports highlight 🐐"],
+            "Travel": ["Breathtaking place you must visit before you die ✈️", "Hidden paradise on Earth 🌏", "Stunning travel destination 😍"],
+            "Nature": ["Incredible wildlife encounter caught on camera 🌿", "Nature never ceases to amaze 🌍", "Beautiful animal moment 🦋"],
+            "Gaming": ["Insane gaming clutch broke the internet 🎮", "Epic gameplay reaction 👀", "Unbelievable play right here 💥"],
+            "Music": ["This live performance gave me chills 🎵", "Viral sound that hits different 🎶", "Incredible performance right here ✨"],
         }
         cat_key = category.strip().title() if category else "Trending"
         picks = fallbacks.get(cat_key, fallbacks["Trending"])
