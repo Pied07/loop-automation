@@ -11,6 +11,7 @@ import {
   CircleHelp,
   Clapperboard,
   Download,
+  ExternalLink,
   Film,
   Flame,
   Flower2,
@@ -546,10 +547,26 @@ export default function Home() {
   const [processMode, setProcessMode] = useState<"cloud" | "queue">("cloud");
   const [autoFindSource, setAutoFindSource] = useState<"scrape" | "youtube">("scrape");
   const [autoPilotEnabled, setAutoPilotEnabled] = useState(false);
+  const [outroUrl, setOutroUrl] = useState<string>("/assets/video-outro.mp4");
+  const [isCustomOutro, setIsCustomOutro] = useState<boolean>(false);
+  const [outroUpdatedAt, setOutroUpdatedAt] = useState<string | null>(null);
+  const [isUploadingOutro, setIsUploadingOutro] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const outroFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
+      fetch("/api/outro")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.url) {
+            setOutroUrl(data.url);
+            setIsCustomOutro(Boolean(data.isCustom));
+            setOutroUpdatedAt(data.updatedAt || null);
+          }
+        })
+        .catch(() => {});
+
       try {
         const storedAuto = localStorage.getItem("tvd-auto-pilot") === "true";
         setAutoPilotEnabled(storedAuto);
@@ -793,6 +810,52 @@ export default function Home() {
       setIsUploading(false);
       setUploadProgress(0);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleOutroUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.includes("video") && !file.name.endsWith(".mp4") && !file.name.endsWith(".mov")) {
+      notify("Please choose an MP4 or MOV video file.");
+      return;
+    }
+    setIsUploadingOutro(true);
+    notify("Uploading new outro video & replacing old outro...");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/outro", {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || "Failed to upload outro");
+      setOutroUrl(data.url);
+      setIsCustomOutro(true);
+      setOutroUpdatedAt(data.updatedAt || new Date().toISOString());
+      notify("🎬 New outro video active! Previous outro was deleted.");
+    } catch (err: any) {
+      notify("Outro upload failed: " + err.message);
+    } finally {
+      setIsUploadingOutro(false);
+      if (outroFileInputRef.current) outroFileInputRef.current.value = "";
+    }
+  }
+
+  async function handleResetOutro() {
+    setIsUploadingOutro(true);
+    try {
+      const res = await fetch("/api/outro", { method: "DELETE" });
+      if (!res.ok) throw new Error("Could not reset outro");
+      setOutroUrl("/assets/video-outro.mp4");
+      setIsCustomOutro(false);
+      setOutroUpdatedAt(null);
+      notify("Default outro restored.");
+    } catch (err: any) {
+      notify("Reset failed: " + err.message);
+    } finally {
+      setIsUploadingOutro(false);
     }
   }
 
@@ -1888,6 +1951,107 @@ export default function Home() {
             </p>
           </div>
         )}
+      </div>
+
+      {/* Custom Outro Video Setting & Live Preview (Requirement) */}
+      <div style={{ background: '#111218', border: '1.5px solid #232635', borderRadius: '12px', padding: '22px', marginBottom: '24px', boxShadow: '0 8px 30px rgba(0,0,0,0.45)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', maxWidth: '640px' }}>
+            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', display: 'grid', placeItems: 'center', color: '#fff', boxShadow: '0 0 16px rgba(59,130,246,0.4)', flexShrink: 0 }}>
+              <Film size={22} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#ffffff' }}>Active Outro Video (CTA Card)</h2>
+                <span style={{ fontSize: '10px', fontWeight: 800, padding: '2px 8px', borderRadius: '12px', background: isCustomOutro ? 'rgba(59,130,246,0.2)' : 'rgba(148,163,184,0.15)', color: isCustomOutro ? '#60a5fa' : '#94a3b8' }}>
+                  {isCustomOutro ? 'CUSTOM OUTRO' : 'DEFAULT OUTRO'}
+                </span>
+                {outroUpdatedAt && (
+                  <span style={{ fontSize: '10px', color: '#64748b' }}>
+                    Updated {new Date(outroUpdatedAt).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+              <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
+                This video is automatically appended to the end of every viral clip. When you upload a new outro video, the old outro is deleted immediately and your new video will be used every time.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              type="file"
+              ref={outroFileInputRef}
+              accept="video/mp4,video/quicktime,video/webm"
+              style={{ display: 'none' }}
+              onChange={handleOutroUpload}
+            />
+            <button
+              type="button"
+              disabled={isUploadingOutro}
+              onClick={() => outroFileInputRef.current?.click()}
+              className="primary-button"
+              style={{ padding: '8px 16px', fontSize: '12px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Upload size={14} />
+              {isUploadingOutro ? "Replacing Outro..." : "Upload New Outro Video"}
+            </button>
+            {isCustomOutro && (
+              <button
+                type="button"
+                disabled={isUploadingOutro}
+                onClick={handleResetOutro}
+                className="secondary-button"
+                style={{ padding: '8px 12px', fontSize: '12px', color: '#ef4444' }}
+                title="Delete custom outro and restore default"
+              >
+                <Trash2 size={13} /> Reset
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Live Video Preview Player */}
+        <div style={{ marginTop: '18px', paddingTop: '16px', borderTop: '1px solid #1f2230', display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {outroUrl ? (
+            <div style={{ position: 'relative', width: '140px', height: '248px', borderRadius: '10px', overflow: 'hidden', border: '1.5px solid #2d3142', background: '#000', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', flexShrink: 0 }}>
+              <video
+                key={outroUrl}
+                src={outroUrl}
+                controls
+                playsInline
+                preload="metadata"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+              <div style={{ position: 'absolute', top: '6px', left: '6px', background: 'rgba(0,0,0,0.7)', borderRadius: '4px', padding: '2px 6px', fontSize: '9px', fontWeight: 700, color: '#fff', pointerEvents: 'none' }}>
+                LIVE PREVIEW
+              </div>
+            </div>
+          ) : (
+            <div style={{ width: '140px', height: '248px', borderRadius: '10px', border: '1.5px dashed #2d3142', display: 'grid', placeItems: 'center', color: '#64748b', fontSize: '11px', textAlign: 'center', padding: '10px' }}>
+              No outro video configured
+            </div>
+          )}
+
+          <div style={{ flex: '1 1 240px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', marginBottom: '4px' }}>
+              Current Outro Preview &amp; Verification
+            </div>
+            <p style={{ margin: '0 0 10px', fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
+              Press play to preview your active call-to-action video. Every cut clip will append this exact outro card across YouTube, Facebook, and Instagram.
+            </p>
+            {outroUrl && (
+              <a
+                href={outroUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#38bdf8', textDecoration: 'underline' }}
+              >
+                <ExternalLink size={12} /> Direct Video Link
+              </a>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="settings-row"><div className="settings-icon youtube-icon"><FaYoutube size={22} /></div><div className="settings-copy"><h2>YouTube publishing</h2><p>Connect YouTube to publish viral clips directly to your channel.</p></div><button className={`secondary-button ${connections.includes("YouTube") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("YouTube")}>{connections.includes("YouTube") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon instagram-icon"><FaInstagram size={21} /></div><div className="settings-copy"><h2>Instagram publishing</h2><p>Connect Instagram to automatically post viral clips as Reels.</p></div><button className={`secondary-button ${connections.includes("Instagram") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Instagram")}>{connections.includes("Instagram") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon facebook-icon"><FaFacebookF size={19} /></div><div className="settings-copy"><h2>Facebook publishing</h2><p>Connect Facebook to cross-post your viral clips as Facebook Reels.</p></div><button className={`secondary-button ${connections.includes("Facebook") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Facebook")}>{connections.includes("Facebook") ? "Disconnect" : "Connect"}</button></div><div className="settings-row"><div className="settings-icon gmail-icon"><SiGmail size={19} /></div><div className="settings-copy"><h2>Gmail notifications</h2><p>Connect Gmail to receive post links (YouTube, Facebook, Instagram) after each clip is published.</p></div><button className={`secondary-button ${connections.includes("Gmail") ? 'disconnect' : ''}`} onClick={() => handleConnectionClick("Gmail")}>{connections.includes("Gmail") ? "Disconnect" : "Connect"}</button></div><div className="settings-note"><CircleHelp size={17} /><p>100% free workflow: local yt-dlp + ffmpeg for splitting, smart rule-based descriptions &amp; hashtags, direct posting to your connected platforms. No paid services or API keys needed.</p></div></section>}

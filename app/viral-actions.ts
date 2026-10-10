@@ -300,8 +300,32 @@ async function splitVideo(
   // Keep each output short enough for short-form platforms and Cloudinary's default upload cap.
   const clipLength = SHORT_CLIP_LENGTH_SECONDS;
   const clips: { clipPath: string; duration: number; startTime: number }[] = [];
-  const outroPath = path.join(process.cwd(), "public", "assets", "video-outro.mp4");
-  const hasOutro = fs.existsSync(outroPath);
+
+  // Check for active custom outro video or local fallback
+  let outroPath = path.join(process.cwd(), "public", "assets", "video-outro.mp4");
+  try {
+    const { database } = await import("@/app/firebase");
+    if (database) {
+      const { doc, getDoc } = await import("firebase/firestore");
+      const snap = await getDoc(doc(database, "app_config", "outro_settings"));
+      if (snap.exists() && snap.data().url && snap.data().url.startsWith("http")) {
+        const customUrl = snap.data().url;
+        const os = require("os");
+        const cachedPath = path.join(os.tmpdir(), "active_custom_outro.mp4");
+        const res = await fetch(customUrl);
+        if (res.ok) {
+          const buffer = Buffer.from(await res.arrayBuffer());
+          fs.writeFileSync(cachedPath, buffer);
+          if (fs.existsSync(cachedPath) && fs.statSync(cachedPath).size > 1000) {
+            outroPath = cachedPath;
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn("Notice: Error loading dynamic outro in splitVideoLocally:", err?.message);
+  }
+  const hasOutro = Boolean(outroPath && fs.existsSync(outroPath));
 
   let startTime = 0;
   let partIndex = 1;

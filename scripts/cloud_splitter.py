@@ -518,11 +518,25 @@ def run():
 
     # 2. Split with FFmpeg & merge outro
     outro_path = ROOT_DIR / "public" / "assets" / "video-outro.mp4"
+    if APP_URL:
+        try:
+            req = urllib.request.Request(f"{APP_URL}/api/outro", headers={"User-Agent": "ViralDesk-Splitter"})
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if data.get("url") and str(data["url"]).startswith("http"):
+                    print(f"🎬 Downloading active custom outro video: {data['url']}")
+                    temp_outro = Path("/tmp/active_custom_outro.mp4") if Path("/tmp").exists() else ROOT_DIR / "active_custom_outro.mp4"
+                    urllib.request.urlretrieve(data["url"], str(temp_outro))
+                    if temp_outro.exists() and temp_outro.stat().st_size > 1000:
+                        outro_path = temp_outro
+        except Exception as e:
+            print(f"Notice: Could not load dynamic outro from API ({e}), using default if present.")
+
     has_outro = outro_path.exists()
     if has_outro:
         print(f"🎬 Outro video detected: {outro_path} (Will append to the end of every clip)")
     else:
-        print("Notice: No outro video found at public/assets/video-outro.mp4")
+        print("Notice: No outro video found.")
 
     clip_length = SHORT_CLIP_LENGTH_SECONDS
     max_clips = int(os.environ.get("MAX_CLIPS", "5"))

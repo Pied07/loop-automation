@@ -350,8 +350,27 @@ async function processJob(job) {
     // Default duration if probe failed
     if (duration <= 0) duration = 180.0;
 
-    // Check if outro video is present
-    const outroPath = path.join(ROOT_DIR, "public", "assets", "video-outro.mp4");
+    // Check if outro video is present (dynamic from API or local fallback)
+    let outroPath = path.join(ROOT_DIR, "public", "assets", "video-outro.mp4");
+    if (APP_URL) {
+      try {
+        const oRes = await fetch(`${APP_URL}/api/outro`, { headers: { "User-Agent": "ViralDesk-Worker" } });
+        if (oRes.ok) {
+          const oData = await oRes.json();
+          if (oData.url && oData.url.startsWith("http")) {
+            console.log(`[WORKER] 🎬 Downloading active custom outro video: ${oData.url}...`);
+            const tempOutro = path.join(TEMP_DIR, "active_custom_outro.mp4");
+            const buf = Buffer.from(await (await fetch(oData.url)).arrayBuffer());
+            fs.writeFileSync(tempOutro, buf);
+            if (fs.existsSync(tempOutro) && fs.statSync(tempOutro).size > 1000) {
+              outroPath = tempOutro;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`[WORKER] Notice checking dynamic outro: ${err.message}`);
+      }
+    }
     const hasOutro = fs.existsSync(outroPath);
     if (hasOutro) {
       console.log(`[WORKER] 🎬 Outro video detected: ${outroPath} (Will append to the end of every clip)`);
