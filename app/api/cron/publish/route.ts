@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { database } from "@/app/firebase";
 import { collection, doc, getDoc, getDocs, limit, query, setDoc } from "firebase/firestore";
-import { scrapeOnlineViralVideo, cleanViralTitle, extractUrlSignatures, isUrlDuplicate } from "@/app/viral-actions";
+import { scrapeOnlineViralVideo, cleanViralTitle } from "@/app/viral-actions";
+import { extractUrlSignatures, isUrlDuplicate } from "@/app/lib/url-utils";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";

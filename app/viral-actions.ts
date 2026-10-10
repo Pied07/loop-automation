@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import { exec, spawn } from "child_process";
 import { promisify } from "util";
+import { extractUrlSignatures, isUrlDuplicate } from "@/app/lib/url-utils";
 
 const execAsync = promisify(exec);
 const SHORT_CLIP_LENGTH_SECONDS = 90;
@@ -688,7 +689,7 @@ async function getOrGenerateStoryMedia(params: {
         `"${ffmpegBin}" -y -i "${videoPath}" -i "${tmpOverlay}" -filter_complex "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black[bg];[bg][1:v]overlay=0:0[outv]" -map "[outv]" -map 0:a? -t ${storyDur} -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac -b:a 128k "${tmpStoryVideo}"`
       );
 
-      if (fs.existsSync(tmpStoryVideo) && fs.statSync(tmpStoryVideo).size > 1000) {
+      if (fs.existsSync(/*turbopackIgnore: true*/ tmpStoryVideo) && fs.statSync(/*turbopackIgnore: true*/ tmpStoryVideo).size > 1000) {
         const { uploadVideoToCloudinary } = await import("@/app/cloudinary-upload");
         const cRes = await uploadVideoToCloudinary(tmpStoryVideo, `story_vid_${Date.now()}_part${partNumber}`);
         return {
@@ -1695,40 +1696,7 @@ const TIKTOK_CATEGORY_KEYWORDS: Record<string, string[]> = {
   "Fashion": ["fashion style", "ootd fashion", "outfit transition", "streetwear style", "runway fashion", "model runway"],
 };
 
-export function extractUrlSignatures(url: string): string[] {
-  if (!url) return [];
-  const trimmed = url.trim().toLowerCase();
-  const sigs = new Set<string>([trimmed]);
 
-  try {
-    const parsed = new URL(trimmed);
-    // Base path without query params or hash
-    const basePath = parsed.origin + parsed.pathname.replace(/\/+$/, "");
-    sigs.add(basePath);
-
-    // Path segments: the last non-empty segment is the video unique hash or filename
-    const segments = parsed.pathname.split("/").filter(Boolean);
-    if (segments.length > 0) {
-      const lastSegment = segments[segments.length - 1];
-      if (lastSegment.length >= 8 && !["video", "mp4", "feed", "play"].includes(lastSegment)) {
-        sigs.add(lastSegment);
-      }
-    }
-    // Also check for numeric ID in query or path (e.g. video_id or /video/123456789)
-    const numId = trimmed.match(/\/(\d{15,22})(?:\/|$|\?)/);
-    if (numId) sigs.add(numId[1]);
-  } catch {
-    sigs.add(trimmed.split("?")[0]);
-  }
-
-  return Array.from(sigs);
-}
-
-export function isUrlDuplicate(url: string, excludedSignatures?: Set<string>): boolean {
-  if (!url || !excludedSignatures || excludedSignatures.size === 0) return false;
-  const sigs = extractUrlSignatures(url);
-  return sigs.some((s) => excludedSignatures.has(s));
-}
 
 // 1. Live Trending TikTok Video Scraper (Real creators, millions of views, direct MP4 CDN stream)
 export async function scrapeTikTokTrendingVideos(category: string, excludedSignatures?: Set<string>): Promise<{ title: string; url: string; source: string } | null> {
