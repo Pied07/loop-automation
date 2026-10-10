@@ -626,6 +626,7 @@ def run():
                 category=CONTENT_CATEGORY,
                 part_num=part_num,
                 total_parts=total_parts,
+                source_title=clean_title,
             )
             clip_title = meta.get("title") or (clean_title if total_parts <= 1 else f"PART {part_num} | {clean_title[:45]}")
             clip_desc = meta.get("description") or f"✨ {clean_title}"

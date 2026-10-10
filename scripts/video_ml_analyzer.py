@@ -140,14 +140,49 @@ def get_clip_duration(clip_path: str) -> float:
     return 10.0
 
 
+OUTRO_PATTERNS = [
+    re.compile(r"\b(?:like,?\s*)?(?:comment,?\s*)?(?:and\s*)?(?:follow|subscribe)\b.*", re.IGNORECASE),
+    re.compile(r"\b(?:subscribe|follow)\s+(?:to\s+)?(?:the\s+)?viral\s*desk\b.*", re.IGNORECASE),
+    re.compile(r"\b(?:for\s+more\s+viral\s+(?:content|videos?|moments?))\b.*", re.IGNORECASE),
+    re.compile(r"\b(?:turn\s+on\s+notifications?|hit\s+the\s+bell)\b.*", re.IGNORECASE),
+    re.compile(r"\b(?:drop\s+(?:your\s+)?reactions?|leave\s+a\s+comment)\b.*", re.IGNORECASE),
+    re.compile(r"\b(?:thanks?\s+for\s+watching)\b.*", re.IGNORECASE),
+    re.compile(r"\b(?:link\s+in\s+bio)\b.*", re.IGNORECASE),
+]
+
+
+def is_outro_text(text: str) -> bool:
+    """Checks if text contains social media outro/cta boilerplate."""
+    if not text:
+        return False
+    t_lower = text.lower()
+    if "viral desk" in t_lower or "viraldesk" in t_lower:
+        return True
+    return any(p.search(text) for p in OUTRO_PATTERNS)
+
+
+def scrub_outro_text(text: str) -> str:
+    """Removes outro sentences/clauses from speech transcripts."""
+    if not text:
+        return ""
+    # Split text into sentences
+    pieces = [p.strip() for p in re.split(r"[.!?\n]+", text) if p.strip()]
+    kept = [p for p in pieces if not is_outro_text(p)]
+    if not kept:
+        return ""
+    return ". ".join(kept) + "."
+
+
 def extract_clip_frames(clip_path: str, num_frames: int = 3) -> List[str]:
-    """Extracts keyframes from the clip at evenly spaced timestamps."""
+    """Extracts keyframes from the clip content, safely excluding appended outro cards."""
     frame_paths = []
     tmp_dir = Path(clip_path).parent / "ml_frames"
     tmp_dir.mkdir(parents=True, exist_ok=True)
 
     duration = get_clip_duration(clip_path)
-    timestamps = [duration * (i + 1) / (num_frames + 1) for i in range(num_frames)]
+    # Exclude trailing 10.5 seconds if video has an appended outro card
+    content_duration = max(3.0, duration - 10.5) if duration > 14.0 else duration
+    timestamps = [content_duration * (i + 1) / (num_frames + 1) for i in range(num_frames)]
     for idx, t in enumerate(timestamps):
         out_frame = tmp_dir / f"frame_{Path(clip_path).stem}_{idx}.jpg"
         cmd = [
@@ -165,10 +200,14 @@ def extract_clip_frames(clip_path: str, num_frames: int = 3) -> List[str]:
 
 
 def extract_clip_audio(clip_path: str) -> Optional[str]:
-    """Extracts 16kHz mono WAV audio from the clip for Whisper."""
+    """Extracts 16kHz mono WAV audio from clip content, safely excluding appended outro cards."""
     out_wav = Path(clip_path).parent / f"audio_{Path(clip_path).stem}.wav"
+    duration = get_clip_duration(clip_path)
+    # Exclude trailing 10.5 seconds if video has an appended outro card
+    content_duration = max(3.0, duration - 10.5) if duration > 14.0 else duration
     cmd = [
         FFMPEG_BIN, "-y", "-i", clip_path,
+        "-t", f"{content_duration:.2f}",
         "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
         str(out_wav)
     ]
@@ -247,6 +286,8 @@ def extract_keywords_from_text(text: str) -> List[str]:
         "first", "being", "most", "ones", "each", "where", "much", "very", "every",
         "he", "she", "his", "her", "hers", "him", "you", "your", "yours", "our",
         "ours", "their", "theirs", "its", "who", "whom", "whose", "it's", "was",
+        "subscribe", "follow", "comment", "share", "notification", "notifications",
+        "desk", "viraldesk", "bell", "watching",
     }
     clean_words = []
 
@@ -271,21 +312,25 @@ def generate_metadata_from_video_ml(
     category: str = "Trending",
     part_num: int = 1,
     total_parts: int = 1,
+    source_title: str = "",
 ) -> Dict[str, Any]:
     """
     Main entry point: Analyzes the actual video file with Vision & Speech ML models.
-    Produces dynamic, video-specific title, description, and hashtags.
+    Produces dynamic, video-specific title, description, and hashtags with 0 duplicates.
     """
     cat_clean = (category or "Trending").strip().title()
 
-    # 1. Extract audio & transcribe speech with Whisper (ultra-fast ~1.5s)
+    # 1. Extract audio & transcribe speech with Whisper (excluding outro)
     audio_wav = extract_clip_audio(clip_path)
-    transcript = transcribe_audio(audio_wav) if audio_wav else ""
+    raw_transcript = transcribe_audio(audio_wav) if audio_wav else ""
+    transcript = scrub_outro_text(raw_transcript).strip()
 
-    # 2. Extract frames & run Vision ML
+    # 2. Extract frames & run Vision ML (excluding outro)
     frames = extract_clip_frames(clip_path, num_frames=3)
     captions = caption_frames(frames)
     primary_scene = captions[0] if captions else ""
+    if is_outro_text(primary_scene):
+        primary_scene = ""
 
     # Cleanup temporary frame and audio files to keep disk usage at 0 MB
     for f in frames:
@@ -295,65 +340,83 @@ def generate_metadata_from_video_ml(
         try: os.unlink(audio_wav)
         except: pass
 
-    # 4. Generate Dynamic Title from Video ML output
-    clip_title = ""
-    if transcript and len(transcript) > 15:
-        # Extract punchy quote/hook sentence from the actual speech
-        sentences = [s.strip() for s in re.split(r"[.!?]", transcript) if len(s.strip()) >= 15]
+    # 3. Determine Dynamic Title from Video ML output or source title
+    candidate_title = ""
+    clean_src = (source_title or "").strip()
+    if clean_src and not is_outro_text(clean_src):
+        candidate_title = clean_src
+    elif transcript and len(transcript) >= 15:
+        # Extract punchy quote/hook sentence from the actual speech (excluding outros)
+        sentences = [s.strip() for s in re.split(r"[.!?]", transcript) if len(s.strip()) >= 15 and not is_outro_text(s)]
         punchy = next(
             (s for s in sentences if any(w in s.lower() for w in ["succeed", "fail", "love", "never", "remember", "life", "why", "how", "secret", "hard", "win", "dream"])),
-            sentences[0] if sentences else transcript[:50]
+            sentences[0] if sentences else ""
         )
-        clip_title = punchy.strip("\"' ")[:55]
-        if not clip_title.endswith((".", "!", "?")):
-            clip_title = clip_title.strip()
-    elif primary_scene:
+        if punchy:
+            candidate_title = punchy.strip("\"' ")[:55]
+
+    if not candidate_title and primary_scene and not is_outro_text(primary_scene):
         words = primary_scene.split()
         if words and words[0].lower() in ["a", "an", "the"]:
             clean_scene = " ".join(words[1:])
         else:
             clean_scene = primary_scene
-        clip_title = clean_scene.capitalize()[:55]
-    else:
-        clip_title = f"Unbelievable {cat_clean} Moment"
+        candidate_title = clean_scene.capitalize()[:55]
 
+    if not candidate_title or is_outro_text(candidate_title):
+        candidate_title = f"Unbelievable {cat_clean} Moment"
+
+    clip_title = candidate_title.strip()
     if total_parts > 1:
         clip_title = f"PART {part_num} | {clip_title[:42]}"
 
-    # 5. Generate Dynamic Description from Video ML output
-    part_badge = "" if total_parts <= 1 else f"📌 PART {part_num} of {total_parts}\n\n"
+    # 4. Generate Dynamic Description WITHOUT repetition
+    desc_lines = []
+    seen_texts = set()
 
-    desc_lines = [f"{part_badge}✨ {clip_title}\n"]
+    def norm_text(t: str) -> str:
+        return re.sub(r"[^\w]+", "", t.lower())
+
+    seen_texts.add(norm_text(clip_title))
+    if candidate_title:
+        seen_texts.add(norm_text(candidate_title))
+
+    # Part badge if multi-part
+    if total_parts > 1:
+        desc_lines.append(f"📌 PART {part_num} of {total_parts}\n")
+
+    # Speech quote if meaningful and not repeating the title
     if transcript:
-        # Include the most impactful 1-2 sentences of the speech
-        sentences = [s.strip() for s in re.split(r"[.!?]", transcript) if len(s.strip()) > 10]
-        quote_snippet = ". ".join(sentences[:3]) + "." if sentences else transcript[:200]
-        desc_lines.append(f"\"{quote_snippet}\"\n")
-    if primary_scene:
-        desc_lines.append(f"👁️ Visual Scene: {primary_scene.capitalize()}.\n")
+        sentences = [s.strip() for s in re.split(r"[.!?]", transcript) if len(s.strip()) > 10 and not is_outro_text(s)]
+        quote_snippet = ". ".join(sentences[:2]) if sentences else ""
+        if quote_snippet:
+            norm_q = norm_text(quote_snippet)
+            if norm_q and norm_q not in seen_texts and norm_text(candidate_title) not in norm_q:
+                desc_lines.append(f"\"{quote_snippet}.\"\n")
+                seen_texts.add(norm_q)
 
+    # Clean engagement callout
     desc_lines.append("💬 What does this mean to you? Drop your reaction below! 👇")
-    desc_lines.append(f"🔔 Follow & Subscribe for daily inspiration & moments!\n")
-    desc_lines.append("────────────────────────────")
-    desc_lines.append("Fair Use Disclaimer: Curated and analyzed for commentary, education, and entertainment.")
 
-    description = "\n".join(desc_lines)
+    description = "\n".join(desc_lines).strip()
 
-    # 6. Generate Video-Specific ML Hashtags
+    # 5. Generate Video-Specific ML Hashtags
     hashtags = []
 
     # Priority 1: High-value tags from speech transcript
     if transcript:
         for tag in extract_keywords_from_text(transcript):
-            if tag not in hashtags:
+            if tag not in hashtags and not is_outro_text(tag):
                 hashtags.append(tag)
             if len(hashtags) >= 8:
                 break
 
     # Priority 2: High-value tags from visual scene
     for cap in captions:
+        if is_outro_text(cap):
+            continue
         for tag in extract_keywords_from_text(cap):
-            if tag not in hashtags:
+            if tag not in hashtags and not is_outro_text(tag):
                 hashtags.append(tag)
             if len(hashtags) >= 10:
                 break
@@ -373,7 +436,7 @@ def generate_metadata_from_video_ml(
         from onnx_viral_engine import engine as onnx_eng
         onnx_tags = onnx_eng.predict_hashtags(clip_title, cat_clean, max_tags=30)
         for ot in onnx_tags:
-            if ot not in hashtags and len(hashtags) < 30:
+            if ot not in hashtags and not is_outro_text(ot) and len(hashtags) < 30:
                 hashtags.append(ot)
     except Exception:
         pass

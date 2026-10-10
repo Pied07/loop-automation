@@ -794,33 +794,104 @@ export async function publishClipAndCleanup(params: {
     ? (viralTitle.toLowerCase().includes("#shorts") ? viralTitle.slice(0, 100) : `${viralTitle.slice(0, 85)} #Shorts`)
     : viralTitle.slice(0, 100);
 
-  const youtubeDescription = [
-    `🎬 ${viralTitle}`,
-    "",
-    description,
-    "",
-    formattedHashtags.slice(0, 30).join(" "),
-  ].join("\n");
+  // Helper: Assembles social captions with ZERO duplicate titles, lines, or redundant CTAs
+  const assembleDeduplicatedCaption = ({
+    captionTitle,
+    captionDesc,
+    callToAction,
+    captionHashtags,
+    titlePrefix,
+  }: {
+    captionTitle: string;
+    captionDesc: string;
+    callToAction?: string;
+    captionHashtags: string[];
+    titlePrefix?: string;
+  }): string => {
+    const normTitle = captionTitle.trim().toLowerCase().replace(/^[^\w]+|[^\w]+$/g, "");
+    const lines: string[] = [];
+    const seenNormLines = new Set<string>();
 
-  const instagramCaption = [
-    viralTitle,
-    "",
-    description,
-    "",
-    `👉 Follow @${igHandle} for daily cinema & drama scenes! 🍿`,
-    "",
-    formattedHashtags.slice(0, 30).join(" "),
-  ].join("\n");
+    const descLower = (captionDesc || "").toLowerCase();
+    const descHasTitle = normTitle.length > 5 && descLower.includes(normTitle);
 
-  const facebookReelCaption = [
-    viralTitle,
-    "",
-    description,
-    "",
-    "Who was in the wrong here? Drop your thoughts below 👇",
-    "",
-    formattedHashtags.slice(0, 30).join(" "),
-  ].join("\n");
+    // If description does NOT already contain/feature the title, prepend it cleanly
+    if (!descHasTitle && captionTitle.trim()) {
+      const formattedTitle = titlePrefix ? `${titlePrefix} ${captionTitle.trim()}` : captionTitle.trim();
+      lines.push(formattedTitle);
+      seenNormLines.add(normTitle);
+    }
+
+    const rawLines = (captionDesc || "").split("\n");
+    for (const raw of rawLines) {
+      const trimmed = raw.trim();
+      if (!trimmed) {
+        if (lines.length > 0 && lines[lines.length - 1] !== "") {
+          lines.push("");
+        }
+        continue;
+      }
+      const norm = trimmed.toLowerCase().replace(/^[^\w]+|[^\w]+$/g, "");
+      // Skip duplicate lines or repeats of the title
+      if (norm && seenNormLines.has(norm)) {
+        continue;
+      }
+      if (norm && normTitle.length > 5 && (norm === normTitle || norm === `"${normTitle}"`)) {
+        continue;
+      }
+      if (norm) {
+        seenNormLines.add(norm);
+      }
+      lines.push(trimmed);
+    }
+
+    if (callToAction && callToAction.trim()) {
+      const ctaTrimmed = callToAction.trim();
+      const ctaNorm = ctaTrimmed.toLowerCase().replace(/^[^\w]+|[^\w]+$/g, "");
+      const alreadyHasCTA =
+        seenNormLines.has(ctaNorm) ||
+        descLower.includes("follow @") ||
+        descLower.includes("subscribe for") ||
+        descLower.includes("drop your thoughts");
+      if (!alreadyHasCTA) {
+        if (lines.length > 0 && lines[lines.length - 1] !== "") {
+          lines.push("");
+        }
+        lines.push(ctaTrimmed);
+        seenNormLines.add(ctaNorm);
+      }
+    }
+
+    if (captionHashtags && captionHashtags.length > 0) {
+      if (lines.length > 0 && lines[lines.length - 1] !== "") {
+        lines.push("");
+      }
+      lines.push(captionHashtags.slice(0, 30).join(" "));
+    }
+
+    return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  };
+
+  const youtubeDescription = assembleDeduplicatedCaption({
+    captionTitle: viralTitle,
+    titlePrefix: "🎬",
+    captionDesc: description,
+    captionHashtags: formattedHashtags,
+  });
+
+  const instagramCaption = assembleDeduplicatedCaption({
+    captionTitle: viralTitle,
+    captionDesc: description,
+    callToAction: `👉 Follow @${igHandle} for daily cinema & drama scenes! 🍿`,
+    captionHashtags: formattedHashtags,
+  });
+
+  const facebookReelCaption = assembleDeduplicatedCaption({
+    captionTitle: viralTitle,
+    captionDesc: description,
+    callToAction: "Who was in the wrong here? Drop your thoughts below 👇",
+    captionHashtags: formattedHashtags,
+  });
 
   let youtubeVideoId: string | undefined;
   let facebookVideoId: string | undefined;

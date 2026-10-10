@@ -251,12 +251,8 @@ class OnnxViralEngine:
 
         description = (
             f"{part_badge}"
-            f"✨ {title}\n\n"
-            f"{hook}\n\n"
-            f"💬 Drop a comment below with your thoughts!\n"
-            f"🔔 Follow & Subscribe for daily {cat_clean.lower()} moments!\n\n"
-            f"────────────────────────────\n"
-            f"Fair Use Disclaimer: Curated for commentary, education, and entertainment purposes."
+            f"✨ {hook}\n\n"
+            f"💬 Drop a comment below with your thoughts!"
         )
 
         return {
