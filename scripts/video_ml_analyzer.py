@@ -368,17 +368,27 @@ def generate_metadata_from_video_ml(
         if u not in hashtags:
             hashtags.append(u)
 
+    # Fill remaining slots up to 30 using ONNX viral model predictions
+    try:
+        from onnx_viral_engine import engine as onnx_eng
+        onnx_tags = onnx_eng.predict_hashtags(clip_title, cat_clean, max_tags=30)
+        for ot in onnx_tags:
+            if ot not in hashtags and len(hashtags) < 30:
+                hashtags.append(ot)
+    except Exception:
+        pass
+
     print(f"[ML] Video ML Analysis complete for Part {part_num}:")
     if transcript:
         print(f"   [Audio] Speech: {transcript[:60]}...")
     if primary_scene:
         print(f"   [Vision] Scene: {primary_scene}")
-    print(f"   [Hashtags] Generated: {['#' + h for h in hashtags[:8]]}")
+    print(f"   [Hashtags] Generated {len(hashtags[:30])} tags: {['#' + h for h in hashtags[:8]]}")
 
     return {
         "title": clip_title,
         "description": description,
-        "hashtags": hashtags[:12],
+        "hashtags": hashtags[:30],
         "vision_scene": primary_scene,
         "audio_transcript": transcript,
         "engine": "multimodal-vision-audio-ml",

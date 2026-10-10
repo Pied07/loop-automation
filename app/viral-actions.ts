@@ -574,16 +574,17 @@ export async function generateClipMetadata(params: {
 
   const description = descriptionLines.join("\n");
 
-  // Post-respective hashtags: targeted, high-performing tags (8-12 tags max for optimal ranking)
-  const bankTags = (HASHTAG_BANK[contentCategory] || HASHTAG_BANK["Trending"] || []).slice(0, 8);
+  // Post-respective hashtags: targeted, high-performing tags (25-30 tags for maximum reach)
+  const bankTags = HASHTAG_BANK[contentCategory] || HASHTAG_BANK["Trending"] || [];
   const rawWords = cleanTitle.match(/[a-zA-Z]{4,12}/g) || [];
   const cleanTitleTags = rawWords
     .map((w) => w.toLowerCase())
     .filter((w) => !/[bcdfghjklmnpqrstvwxyz]{5,}/i.test(w) && !bankTags.includes(w) && !UNIVERSAL_HASHTAGS.includes(w))
-    .slice(0, 3);
+    .slice(0, 5);
 
-  const combined = [...new Set([...cleanTitleTags, ...bankTags, "shorts", "reels", "viral", "fyp", "trending"])];
-  const hashtags = combined.slice(0, 10);
+  const extraViralTags = ["viralreels", "trendingnow", "instareels", "explorepage", "viralpost", "foryoupage", "contentcreator", "entertainment", "reelsvideo", "instaviral"];
+  const combined = [...new Set([...cleanTitleTags, ...bankTags, ...UNIVERSAL_HASHTAGS, ...extraViralTags])];
+  const hashtags = combined.slice(0, 30);
 
   return { description, hashtags };
 }
@@ -798,7 +799,7 @@ export async function publishClipAndCleanup(params: {
     "",
     description,
     "",
-    formattedHashtags.slice(0, 15).join(" "),
+    formattedHashtags.slice(0, 30).join(" "),
   ].join("\n");
 
   const instagramCaption = [
@@ -808,7 +809,7 @@ export async function publishClipAndCleanup(params: {
     "",
     `👉 Follow @${igHandle} for daily cinema & drama scenes! 🍿`,
     "",
-    formattedHashtags.slice(0, 8).join(" "),
+    formattedHashtags.slice(0, 30).join(" "),
   ].join("\n");
 
   const facebookReelCaption = [
@@ -818,7 +819,7 @@ export async function publishClipAndCleanup(params: {
     "",
     "Who was in the wrong here? Drop your thoughts below 👇",
     "",
-    formattedHashtags.slice(0, 10).join(" "),
+    formattedHashtags.slice(0, 30).join(" "),
   ].join("\n");
 
   let youtubeVideoId: string | undefined;

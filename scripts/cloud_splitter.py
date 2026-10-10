@@ -132,12 +132,13 @@ def generate_clip_hashtags(title: str, category: str) -> list:
         and w not in bank 
         and w not in UNIVERSAL_HASHTAGS
     ][:4]
+    extra_viral_tags = ["viralreels", "trendingnow", "instareels", "explorepage", "viralpost", "foryoupage", "contentcreator", "entertainment", "reelsvideo", "instaviral"]
     combined = []
-    for tag in clean_words + bank + ["shorts", "reels", "viral", "fyp", "trending", "explore", "foryou", "viralvideo", "watchthis"]:
+    for tag in clean_words + bank + UNIVERSAL_HASHTAGS + extra_viral_tags:
         clean = tag.lower().replace("#", "").strip()
         if clean and clean not in combined:
             combined.append(clean)
-    return combined[:24]
+    return combined[:30]
 
 
 

@@ -155,7 +155,7 @@ class OnnxViralEngine:
             vec /= norm
         return vec
 
-    def predict_hashtags(self, title: str, category: str, max_tags: int = 12) -> List[str]:
+    def predict_hashtags(self, title: str, category: str, max_tags: int = 30) -> List[str]:
         cat_clean = (category or "Trending").strip().title()
         if cat_clean not in CATEGORY_VIRAL_BANK:
             cat_clean = "Trending"
@@ -163,9 +163,11 @@ class OnnxViralEngine:
         exclusions = CATEGORY_EXCLUSIONS.get(cat_clean, set())
         predicted_set: List[str] = []
 
+        is_hash = bool(re.match(r"^[a-zA-Z0-9_\-]{16,}$", title.strip())) or (" " not in title.strip() and len(title.strip()) > 14)
+
         # 1. PRIORITY ONE: Category-specific high-traffic tags (Guarantees zero irrelevant tags!)
         cat_bank = CATEGORY_VIRAL_BANK.get(cat_clean, CATEGORY_VIRAL_BANK["Trending"])
-        target_cat_count = 8 if is_hash else 6
+        target_cat_count = 10 if is_hash else 8
         for t in cat_bank:
             if t not in predicted_set and t not in exclusions:
                 predicted_set.append(t)
@@ -173,7 +175,6 @@ class OnnxViralEngine:
                 break
 
         # 2. PRIORITY TWO: Extract relevant topic words from real human title
-        is_hash = bool(re.match(r"^[a-zA-Z0-9_\-]{16,}$", title.strip())) or (" " not in title.strip() and len(title.strip()) > 14)
         stopwords = {
             "this", "that", "clip", "video", "taking", "over", "part", "with", "from",
             "your", "what", "how", "when", "why", "who", "all", "are", "get", "got",
@@ -190,10 +191,10 @@ class OnnxViralEngine:
                 and not re.search(r"[bcdfghjklmnpqrstvwxyz]{5,}", w)
             ):
                 predicted_set.append(w)
-                if len(predicted_set) >= 8:
+                if len(predicted_set) >= 12:
                     break
 
-        # 3. PRIORITY THREE: Compatible ONNX Predictions
+        # 3. PRIORITY THREE: Compatible ONNX Predictions (Trained on 400 viral tags)
         if self.session and self.tags:
             try:
                 query_text = f"{cat_clean} {title}" if not is_hash else cat_clean
@@ -202,7 +203,7 @@ class OnnxViralEngine:
                 if outputs and len(outputs) > 0 and len(outputs[0]) > 0:
                     prob_map = outputs[0][0]
                     sorted_indices = sorted(prob_map.keys(), key=lambda k: prob_map[k], reverse=True)
-                    for idx in sorted_indices[:40]:
+                    for idx in sorted_indices[:80]:
                         if idx < len(self.tags):
                             tag = self.tags[idx].lower().strip()
                             if (
@@ -213,14 +214,15 @@ class OnnxViralEngine:
                                 and len(tag) >= 3
                             ):
                                 predicted_set.append(tag)
-                                if len(predicted_set) >= max_tags - 2:
+                                if len(predicted_set) >= max_tags - 3:
                                     break
             except Exception as e:
                 print(f"Notice: ONNX inference fallback: {e}")
 
-        # 4. Universal Viral Tags
-        for u in ["shorts", "fyp", "viral"]:
-            if u not in predicted_set:
+        # 4. Universal Viral Tags to reach target of 25-30
+        extra_viral = ["shorts", "fyp", "viral", "explorepage", "trendingnow", "viralvideo", "foryou", "viralreels"]
+        for u in extra_viral:
+            if u not in predicted_set and len(predicted_set) < max_tags:
                 predicted_set.append(u)
 
         return [t.lower().replace("#", "") for t in predicted_set[:max_tags]]
@@ -236,7 +238,7 @@ class OnnxViralEngine:
         if cat_clean not in CATEGORY_HOOKS:
             cat_clean = "Trending"
 
-        hashtags = self.predict_hashtags(title, cat_clean, max_tags=12)
+        hashtags = self.predict_hashtags(title, cat_clean, max_tags=30)
 
         # Select category-appropriate viral hook
         hooks = CATEGORY_HOOKS.get(cat_clean, CATEGORY_HOOKS["Trending"])
