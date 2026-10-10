@@ -1954,102 +1954,233 @@ export default function Home() {
       </div>
 
       {/* Custom Outro Video Setting & Live Preview (Requirement) */}
-      <div style={{ background: '#111218', border: '1.5px solid #232635', borderRadius: '12px', padding: '22px', marginBottom: '24px', boxShadow: '0 8px 30px rgba(0,0,0,0.45)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', maxWidth: '640px' }}>
-            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', display: 'grid', placeItems: 'center', color: '#fff', boxShadow: '0 0 16px rgba(59,130,246,0.4)', flexShrink: 0 }}>
-              <Film size={22} />
+      <div className="outro-setting-card">
+        {/* Header Section */}
+        <div className="outro-header">
+          <div className="outro-header-info">
+            <div className="outro-icon-badge">
+              <Clapperboard size={22} />
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#ffffff' }}>Active Outro Video (CTA Card)</h2>
-                <span style={{ fontSize: '10px', fontWeight: 800, padding: '2px 8px', borderRadius: '12px', background: isCustomOutro ? 'rgba(59,130,246,0.2)' : 'rgba(148,163,184,0.15)', color: isCustomOutro ? '#60a5fa' : '#94a3b8' }}>
-                  {isCustomOutro ? 'CUSTOM OUTRO' : 'DEFAULT OUTRO'}
+                <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#ffffff' }}>Call-to-Action Outro Video</h2>
+                <span style={{
+                  fontSize: '10px',
+                  fontWeight: 800,
+                  padding: '2px 9px',
+                  borderRadius: '12px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  background: isCustomOutro ? 'rgba(56,189,248,0.15)' : 'rgba(148,163,184,0.12)',
+                  color: isCustomOutro ? '#38bdf8' : '#94a3b8',
+                  border: isCustomOutro ? '1px solid rgba(56,189,248,0.3)' : '1px solid rgba(148,163,184,0.2)',
+                }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isCustomOutro ? '#38bdf8' : '#94a3b8' }} />
+                  {isCustomOutro ? 'CUSTOM OUTRO ACTIVE' : 'DEFAULT OUTRO'}
                 </span>
                 {outroUpdatedAt && (
-                  <span style={{ fontSize: '10px', color: '#64748b' }}>
-                    Updated {new Date(outroUpdatedAt).toLocaleDateString()}
+                  <span style={{ fontSize: '11px', color: '#64748b' }}>
+                    • Updated {new Date(outroUpdatedAt).toLocaleDateString()}
                   </span>
                 )}
               </div>
-              <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
-                This video is automatically appended to the end of every viral clip. When you upload a new outro video, the old outro is deleted immediately and your new video will be used every time.
+              <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#94a3b8', lineHeight: 1.55 }}>
+                Automatically stitched at the end of every viral clip across YouTube Shorts, Instagram Reels, and Facebook Reels. Uploading a new outro replaces the active file and deletes previous assets from Cloud storage.
               </p>
             </div>
           </div>
-
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <input
-              type="file"
-              ref={outroFileInputRef}
-              accept="video/mp4,video/quicktime,video/webm"
-              style={{ display: 'none' }}
-              onChange={handleOutroUpload}
-            />
-            <button
-              type="button"
-              disabled={isUploadingOutro}
-              onClick={() => outroFileInputRef.current?.click()}
-              className="primary-button"
-              style={{ padding: '8px 16px', fontSize: '12px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-            >
-              <Upload size={14} />
-              {isUploadingOutro ? "Replacing Outro..." : "Upload New Outro Video"}
-            </button>
-            {isCustomOutro && (
-              <button
-                type="button"
-                disabled={isUploadingOutro}
-                onClick={handleResetOutro}
-                className="secondary-button"
-                style={{ padding: '8px 12px', fontSize: '12px', color: '#ef4444' }}
-                title="Delete custom outro and restore default"
-              >
-                <Trash2 size={13} /> Reset
-              </button>
-            )}
-          </div>
         </div>
 
-        {/* Live Video Preview Player */}
-        <div style={{ marginTop: '18px', paddingTop: '16px', borderTop: '1px solid #1f2230', display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
-          {outroUrl ? (
-            <div style={{ position: 'relative', width: '140px', height: '248px', borderRadius: '10px', overflow: 'hidden', border: '1.5px solid #2d3142', background: '#000', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', flexShrink: 0 }}>
-              <video
-                key={outroUrl}
-                src={outroUrl}
-                controls
-                playsInline
-                preload="metadata"
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-              <div style={{ position: 'absolute', top: '6px', left: '6px', background: 'rgba(0,0,0,0.7)', borderRadius: '4px', padding: '2px 6px', fontSize: '9px', fontWeight: 700, color: '#fff', pointerEvents: 'none' }}>
-                LIVE PREVIEW
+        {/* Layout Grid: 9:16 Preview Player + Management Hub */}
+        <div className="outro-layout-grid">
+          {/* Column 1: Video Preview Frame */}
+          <div>
+            {outroUrl ? (
+              <div className="outro-preview-frame">
+                <video
+                  key={outroUrl}
+                  src={outroUrl}
+                  controls
+                  playsInline
+                  preload="metadata"
+                />
+                <div style={{
+                  position: 'absolute',
+                  top: '8px',
+                  left: '8px',
+                  background: 'rgba(0,0,0,0.75)',
+                  backdropFilter: 'blur(6px)',
+                  borderRadius: '20px',
+                  padding: '2px 8px',
+                  fontSize: '9px',
+                  fontWeight: 800,
+                  color: '#f8fafc',
+                  letterSpacing: '0.5px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  pointerEvents: 'none',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                }}>
+                  <Play size={8} fill="currentColor" /> LIVE PREVIEW
+                </div>
+                <div style={{
+                  position: 'absolute',
+                  top: '8px',
+                  right: '8px',
+                  background: 'rgba(0,0,0,0.75)',
+                  backdropFilter: 'blur(6px)',
+                  borderRadius: '6px',
+                  padding: '2px 6px',
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  color: '#94a3b8',
+                  pointerEvents: 'none',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                }}>
+                  9:16
+                </div>
+              </div>
+            ) : (
+              <div className="outro-preview-frame" style={{ border: '1.5px dashed #2d3142', color: '#64748b', fontSize: '11px', textAlign: 'center', padding: '12px' }}>
+                No outro video configured
+              </div>
+            )}
+          </div>
+
+          {/* Column 2: Specs & Upload Controls */}
+          <div className="outro-details-panel">
+            {/* Specs row */}
+            <div className="outro-specs-row">
+              <div className="outro-spec-item">
+                <div className="outro-spec-item-icon" style={{ background: 'rgba(56,189,248,0.15)', color: '#38bdf8' }}>
+                  <Scissors size={14} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 700, letterSpacing: '0.4px', textTransform: 'uppercase' }}>Workflow Rule</div>
+                  <div style={{ fontSize: '12px', color: '#f1f5f9', fontWeight: 600 }}>Appends to Part 1, Part 2...</div>
+                </div>
+              </div>
+
+              <div className="outro-spec-item">
+                <div className="outro-spec-item-icon" style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24' }}>
+                  <Sparkles size={14} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 700, letterSpacing: '0.4px', textTransform: 'uppercase' }}>Recommended Specs</div>
+                  <div style={{ fontSize: '12px', color: '#f1f5f9', fontWeight: 600 }}>1080×1920 • MP4 / MOV</div>
+                </div>
+              </div>
+
+              <div className="outro-spec-item">
+                <div className="outro-spec-item-icon" style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80' }}>
+                  <ShieldCheck size={14} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 700, letterSpacing: '0.4px', textTransform: 'uppercase' }}>Cloud Storage</div>
+                  <div style={{ fontSize: '12px', color: '#f1f5f9', fontWeight: 600 }}>Auto-deletes old videos</div>
+                </div>
               </div>
             </div>
-          ) : (
-            <div style={{ width: '140px', height: '248px', borderRadius: '10px', border: '1.5px dashed #2d3142', display: 'grid', placeItems: 'center', color: '#64748b', fontSize: '11px', textAlign: 'center', padding: '10px' }}>
-              No outro video configured
-            </div>
-          )}
 
-          <div style={{ flex: '1 1 240px' }}>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', marginBottom: '4px' }}>
-              Current Outro Preview &amp; Verification
+            {/* Upload Zone */}
+            <div className="outro-upload-zone">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(229,9,20,0.15)', color: '#ff3b45', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    <Upload size={16} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#ffffff' }}>
+                      {isCustomOutro ? "Replace Outro Video" : "Upload Custom Outro Video"}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                      MP4, MOV, or WEBM (up to 50MB). Automatically deployed across cloud &amp; worker runners.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="outro-actions-bar">
+                <input
+                  type="file"
+                  ref={outroFileInputRef}
+                  accept="video/mp4,video/quicktime,video/webm"
+                  style={{ display: 'none' }}
+                  onChange={handleOutroUpload}
+                />
+                <button
+                  type="button"
+                  disabled={isUploadingOutro}
+                  onClick={() => outroFileInputRef.current?.click()}
+                  className="secondary-button"
+                  style={{
+                    padding: '8px 18px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '7px',
+                    background: '#1a1d2c',
+                    borderColor: '#2e3347',
+                    color: '#ffffff',
+                  }}
+                >
+                  {isUploadingOutro ? <LoaderCircle className="spin" size={14} /> : <Upload size={14} />}
+                  {isUploadingOutro ? "Uploading & Storing..." : "Choose Outro Video"}
+                </button>
+
+                {isCustomOutro && (
+                  <button
+                    type="button"
+                    disabled={isUploadingOutro}
+                    onClick={handleResetOutro}
+                    className="secondary-button"
+                    style={{
+                      padding: '8px 14px',
+                      fontSize: '12px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      color: '#ef4444',
+                      borderColor: 'rgba(239, 68, 68, 0.3)',
+                      background: 'rgba(239, 68, 68, 0.08)',
+                    }}
+                    title="Delete custom outro and restore default"
+                  >
+                    <Trash2 size={13} /> Reset to Default
+                  </button>
+                )}
+
+                {outroUrl && (
+                  <a
+                    href={outroUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="secondary-button"
+                    style={{
+                      padding: '8px 14px',
+                      fontSize: '12px',
+                      color: '#94a3b8',
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      marginLeft: 'auto',
+                    }}
+                  >
+                    <ExternalLink size={13} /> Fullscreen
+                  </a>
+                )}
+              </div>
             </div>
-            <p style={{ margin: '0 0 10px', fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
-              Press play to preview your active call-to-action video. Every cut clip will append this exact outro card across YouTube, Facebook, and Instagram.
-            </p>
-            {outroUrl && (
-              <a
-                href={outroUrl}
-                target="_blank"
-                rel="noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#38bdf8', textDecoration: 'underline' }}
-              >
-                <ExternalLink size={12} /> Direct Video Link
-              </a>
-            )}
+
+            {/* Status note */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '11px', color: '#64748b' }}>
+              <Check size={13} style={{ color: '#22c55e', flexShrink: 0 }} />
+              <span>Verified with Cloudinary CDN. Next clips will stitch this exact active outro.</span>
+            </div>
           </div>
         </div>
       </div>
