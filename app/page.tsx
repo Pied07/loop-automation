@@ -824,6 +824,9 @@ export default function Home() {
           thumbnailUrl:
             (c.youtubeVideoId ? `https://i.ytimg.com/vi/${c.youtubeVideoId}/hqdefault.jpg` : undefined) ||
             (c.facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${c.facebookVideoId}` : undefined),
+          sourceUrl: c.sourceUrl || c.sourceLink || videoUrl || "",
+          sourceLink: c.sourceLink || c.sourceUrl || videoUrl || "",
+          isCron: Boolean(c.isCron || (c.id && String(c.id).includes("cron"))),
           format: selectedCategory,
           createdAt: new Date().toISOString(),
           status: "completed",
@@ -1077,6 +1080,9 @@ export default function Home() {
           (data.thumbnailUrl && !data.thumbnailUrl.includes("story") ? data.thumbnailUrl : undefined) ||
           existingRecord?.thumbnailUrl,
         format: selectedCategory,
+        sourceUrl: videoUrl || existingRecord?.sourceUrl || existingRecord?.sourceLink || "",
+        sourceLink: videoUrl || existingRecord?.sourceLink || existingRecord?.sourceUrl || "",
+        isCron: Boolean(existingRecord?.isCron || (existingRecord?.id && String(existingRecord.id).includes("cron"))),
         createdAt: existingRecord?.createdAt || new Date().toISOString(),
         status: "completed",
         sessionOnly: false,
@@ -1131,8 +1137,17 @@ export default function Home() {
       notify("Your library is empty. Generated videos will appear here.");
       return;
     }
-    const headers = ["Title", "Description", "Captions", "Hashtags", "Video URL", "Format", "Created"];
-    const rows = videos.map((video) => [video.title, video.description, video.captions, video.hashtags.join(" "), video.videoUrl, video.format, video.createdAt]);
+    const headers = ["Title", "Description", "Captions", "Hashtags", "Video URL", "Source Link", "Format", "Created"];
+    const rows = videos.map((video) => [
+      video.title,
+      video.description,
+      video.captions,
+      video.hashtags.join(" "),
+      video.videoUrl,
+      video.sourceUrl || video.sourceLink || "",
+      video.format,
+      video.createdAt,
+    ]);
     const csv = [headers, ...rows].map((row) => row.map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`).join(",")).join("\r\n");
     const link = document.createElement("a");
     link.href = URL.createObjectURL(new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" }));
@@ -1674,6 +1689,9 @@ export default function Home() {
               <span className="thumb-unavailable">Preview unavailable</span>
             )}
             <span className="thumb-tag">{video.format}</span>
+            {video.isCron && (
+              <span className="thumb-tag" style={{ background: '#7c3aed', color: '#fff', marginLeft: '6px' }}>Auto-Pilot</span>
+            )}
           </div>
         )}
     <div className="video-details">
@@ -1683,6 +1701,19 @@ export default function Home() {
       {video.status !== 'failed' && <div className="hashtag-row">{Array.from(new Set(video.hashtags || [])).map((tag, idx) => <span key={`${tag}-${idx}`}>#{tag.replace(/^#/, '')}</span>)}</div>}
       <div className="video-card-actions">
         <div className="card-platform-links">
+          {(video.sourceUrl || video.sourceLink) && (
+            <a
+              href={video.sourceUrl || video.sourceLink}
+              target="_blank"
+              rel="noreferrer"
+              className="platform-btn"
+              style={{ background: 'rgba(255, 255, 255, 0.08)', color: '#d1d5db', textDecoration: 'none' }}
+              title={`Original Source Video: ${video.sourceUrl || video.sourceLink}`}
+            >
+              <Link size={11} />
+              <span>Source</span>
+            </a>
+          )}
           {video.youtube === 1 && Boolean(video.youtubeUrl) && (
             <a
               href={video.youtubeUrl}

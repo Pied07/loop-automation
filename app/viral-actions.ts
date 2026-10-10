@@ -1695,8 +1695,43 @@ const TIKTOK_CATEGORY_KEYWORDS: Record<string, string[]> = {
   "Fashion": ["fashion style", "ootd fashion", "outfit transition", "streetwear style", "runway fashion", "model runway"],
 };
 
+export function extractUrlSignatures(url: string): string[] {
+  if (!url) return [];
+  const trimmed = url.trim().toLowerCase();
+  const sigs = new Set<string>([trimmed]);
+
+  try {
+    const parsed = new URL(trimmed);
+    // Base path without query params or hash
+    const basePath = parsed.origin + parsed.pathname.replace(/\/+$/, "");
+    sigs.add(basePath);
+
+    // Path segments: the last non-empty segment is the video unique hash or filename
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    if (segments.length > 0) {
+      const lastSegment = segments[segments.length - 1];
+      if (lastSegment.length >= 8 && !["video", "mp4", "feed", "play"].includes(lastSegment)) {
+        sigs.add(lastSegment);
+      }
+    }
+    // Also check for numeric ID in query or path (e.g. video_id or /video/123456789)
+    const numId = trimmed.match(/\/(\d{15,22})(?:\/|$|\?)/);
+    if (numId) sigs.add(numId[1]);
+  } catch {
+    sigs.add(trimmed.split("?")[0]);
+  }
+
+  return Array.from(sigs);
+}
+
+export function isUrlDuplicate(url: string, excludedSignatures?: Set<string>): boolean {
+  if (!url || !excludedSignatures || excludedSignatures.size === 0) return false;
+  const sigs = extractUrlSignatures(url);
+  return sigs.some((s) => excludedSignatures.has(s));
+}
+
 // 1. Live Trending TikTok Video Scraper (Real creators, millions of views, direct MP4 CDN stream)
-export async function scrapeTikTokTrendingVideos(category: string): Promise<{ title: string; url: string; source: string } | null> {
+export async function scrapeTikTokTrendingVideos(category: string, excludedSignatures?: Set<string>): Promise<{ title: string; url: string; source: string } | null> {
   const regions = ["GB", "US", "CA", "AU"];
   // Randomly rotate region so every call gets fresh, varied live content
   const region = regions[Math.floor(Math.random() * regions.length)];
@@ -1712,12 +1747,17 @@ export async function scrapeTikTokTrendingVideos(category: string): Promise<{ ti
     const rawVideos: any[] = data.data || [];
     if (!Array.isArray(rawVideos) || rawVideos.length === 0) return null;
 
-    // Filter valid videos: direct MP4, real title, exclude synthetic AI generations
+    // Filter valid videos: direct MP4, real title, exclude synthetic AI generations & past duplicates
     const valid = rawVideos.filter((v) => {
       if (!v.play || !v.title) return false;
       const t = String(v.title).toLowerCase();
       const u = String(v.play).toLowerCase();
       if (t.includes("ai generated") || t.includes("ai-generation") || u.includes("user-ai-generation")) return false;
+      if (excludedSignatures && excludedSignatures.size > 0) {
+        if (isUrlDuplicate(v.play, excludedSignatures)) return false;
+        if (v.video_id && excludedSignatures.has(String(v.video_id).toLowerCase())) return false;
+        if (v.id && excludedSignatures.has(String(v.id).toLowerCase())) return false;
+      }
       return true;
     });
 
@@ -1881,7 +1921,8 @@ const CATEGORY_VERIFIED_BANK: Record<string, string[]> = {
   ],
 };
 
-async function fetchTikTokVideoById(videoId: string): Promise<{ title: string; url: string; source: string } | null> {
+async function fetchTikTokVideoById(videoId: string, excludedSignatures?: Set<string>): Promise<{ title: string; url: string; source: string } | null> {
+  if (excludedSignatures && excludedSignatures.has(videoId.toLowerCase())) return null;
   try {
     const res = await fetch(`https://www.tikwm.com/api/?url=https://www.tiktok.com/@a/video/${videoId}`, {
       headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
@@ -1890,6 +1931,7 @@ async function fetchTikTokVideoById(videoId: string): Promise<{ title: string; u
     if (!res.ok) return null;
     const data = await res.json();
     if (data.code === 0 && data.data?.play) {
+      if (excludedSignatures && isUrlDuplicate(data.data.play, excludedSignatures)) return null;
       const cleanTitle = (data.data.title || "Viral Clip").replace(/#[a-zA-Z0-9_]+/g, "").replace(/\s+/g, " ").trim();
       const author = data.data.author?.nickname || data.data.author?.unique_id || "Creator";
       const views = data.data.play_count ? Number(data.data.play_count).toLocaleString() : "";
@@ -1905,30 +1947,31 @@ async function fetchTikTokVideoById(videoId: string): Promise<{ title: string; u
   return null;
 }
 
-export async function scrapeOnlineViralVideo(category: string): Promise<{ url: string; title: string; source: string }> {
+export async function scrapeOnlineViralVideo(category: string, excludedSignatures?: Set<string>): Promise<{ url: string; title: string; source: string }> {
   const cleanCat = category?.trim() || "Trending";
   const isTrending = cleanCat.toLowerCase() === "trending" || cleanCat.toLowerCase() === "viral";
 
   // 1. If Trending: scrape live trending TikTok videos (real creators, speech, sound, ban-safe)
   if (isTrending) {
-    const fromTikTok = await scrapeTikTokTrendingVideos("Trending");
+    const fromTikTok = await scrapeTikTokTrendingVideos("Trending", excludedSignatures);
     if (fromTikTok) return fromTikTok;
   } else {
     // 2. Specific Category: Check if live TikTok feed contains keyword-matched clips with audio
-    const fromTikTok = await scrapeTikTokTrendingVideos(cleanCat);
+    const fromTikTok = await scrapeTikTokTrendingVideos(cleanCat, excludedSignatures);
     if (fromTikTok) return fromTikTok;
 
     // 3. Category Verified Bank: Get verified viral TikTok video with original creator sound (100% ban-safe)
-    const ids = CATEGORY_VERIFIED_BANK[cleanCat] || [];
-    if (ids.length > 0) {
-      const pickedId = ids[Math.floor(Math.random() * ids.length)];
-      const fromVerified = await fetchTikTokVideoById(pickedId);
+    const rawIds = CATEGORY_VERIFIED_BANK[cleanCat] || [];
+    const availableIds = rawIds.filter((id) => !excludedSignatures?.has(id.toLowerCase()));
+    if (availableIds.length > 0) {
+      const pickedId = availableIds[Math.floor(Math.random() * availableIds.length)];
+      const fromVerified = await fetchTikTokVideoById(pickedId, excludedSignatures);
       if (fromVerified) return fromVerified;
     }
   }
 
   // 4. Fallback: High engagement TikTok video with real audio
-  const fallbackTikTok = await scrapeTikTokTrendingVideos("Trending");
+  const fallbackTikTok = await scrapeTikTokTrendingVideos("Trending", excludedSignatures);
   if (fallbackTikTok) return fallbackTikTok;
 
   throw new Error(`Could not find a viral video with audio for "${cleanCat}". Please paste a video URL directly.`);

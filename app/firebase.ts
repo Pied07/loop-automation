@@ -12,6 +12,9 @@ export type VideoRecord = {
   hashtags: string[];
   thumbnailUrl?: string;
   videoUrl?: string;
+  sourceUrl?: string;
+  sourceLink?: string;
+  isCron?: boolean;
   cloudinaryUrl?: string;
   cloudinaryPublicId?: string;
   youtube?: 0 | 1;
@@ -57,6 +60,7 @@ export function normalizeVideoRecord(video: any): VideoRecord {
   const ytUrl = yt === 1 ? (video.youtubeUrl || (video.youtubeVideoId ? `https://www.youtube.com/shorts/${video.youtubeVideoId}` : "")) : "";
   const fbUrl = fb === 1 ? (video.facebookUrl || (video.facebookVideoId ? `https://www.facebook.com/reel/${video.facebookVideoId}` : "")) : "";
   const igUrl = ig === 1 ? (video.instagramUrl || (video.instagramVideoId ? (video.instagramVideoId.startsWith("http") ? video.instagramVideoId : `https://www.instagram.com/reel/${video.instagramVideoId}`) : "")) : "";
+  const src = video.sourceUrl || video.sourceLink || video.originalUrl || "";
 
   return {
     ...video,
@@ -68,6 +72,9 @@ export function normalizeVideoRecord(video: any): VideoRecord {
     hashtags: Array.isArray(video.hashtags) ? video.hashtags : [],
     thumbnailUrl: video.thumbnailUrl || "",
     videoUrl: video.videoUrl || "",
+    sourceUrl: src,
+    sourceLink: src,
+    isCron: Boolean(video.isCron || video.userId === "auto-pilot" || String(video.id || "").startsWith("cron-") || String(video.jobId || "").startsWith("cron-")),
     cloudinaryUrl: video.cloudinaryUrl || "",
     cloudinaryPublicId: video.cloudinaryPublicId || "",
     youtube: yt,

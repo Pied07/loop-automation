@@ -89,6 +89,9 @@ export async function POST(req: NextRequest) {
                   ? `ig-${result.instagramVideoId}`
                   : `clip-${partNumber}-${Date.now()}`));
 
+        const srcUrl = body.sourceUrl || body.sourceLink || "";
+        const isCronJob = Boolean(body.isCron || targetUserId === "auto-pilot" || String(body.jobId || "").startsWith("cron-") || cleanDocId.includes("cron"));
+
         const record = {
           id: cleanDocId,
           userId: targetUserId,
@@ -98,6 +101,9 @@ export async function POST(req: NextRequest) {
           format: body.category || body.contentCategory || "Trending",
           createdAt: new Date().toISOString(),
           status: "completed",
+          sourceUrl: srcUrl,
+          sourceLink: srcUrl,
+          isCron: isCronJob,
           youtube: ytVal,
           youtubeVideoId: result.youtubeVideoId || "",
           youtubeUrl: result.youtubeUrl || (result.youtubeVideoId ? `https://www.youtube.com/shorts/${result.youtubeVideoId}` : ""),

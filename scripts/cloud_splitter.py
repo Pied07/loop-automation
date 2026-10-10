@@ -705,6 +705,9 @@ def run():
             try:
                 pub_payload = {
                     "clipPath": clip_item["publicUrl"] or clip_item["url"],
+                    "sourceUrl": VIDEO_URL,
+                    "sourceLink": VIDEO_URL,
+                    "isCron": JOB_ID.startswith("cron-") or USER_ID == "auto-pilot",
                     "partNumber": clip_item["partNumber"],
                     "totalParts": len(clips),
                     "title": clip_item["title"],
