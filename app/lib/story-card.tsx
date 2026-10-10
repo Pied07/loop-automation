@@ -206,3 +206,134 @@ export async function generatePolaroidStoryCard(params: {
   const arrBuf = await res.arrayBuffer();
   return Buffer.from(arrBuf);
 }
+
+export async function generateStoryVideoOverlay(params: {
+  title: string;
+  partNumber?: number;
+  instagramHandle?: string;
+}): Promise<Buffer> {
+  const { title, partNumber, instagramHandle } = params;
+  const cleanTitle = (title || "VIRAL REEL").replace(/[^\x20-\x7E]/g, "").slice(0, 48);
+  const cleanHandle = (instagramHandle || "the_viral_desk").replace(/[@\s]/g, "");
+
+  const element = (
+    <div
+      style={{
+        width: 1080,
+        height: 1920,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "100px 50px 140px 50px",
+        backgroundColor: "transparent",
+        position: "relative",
+      }}
+    >
+      {/* 1. Top Teaser Badge */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 10,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "16px 36px",
+            borderRadius: 50,
+            backgroundColor: "rgba(10, 12, 20, 0.85)",
+            border: "2px solid rgba(255, 255, 255, 0.35)",
+            color: "#ffffff",
+            fontSize: 28,
+            fontWeight: 800,
+            letterSpacing: 2.5,
+            textTransform: "uppercase",
+            boxShadow: "0 10px 30px rgba(0, 0, 0, 0.6)",
+          }}
+        >
+          <span
+            style={{
+              width: 14,
+              height: 14,
+              borderRadius: 7,
+              backgroundColor: "#ff3b45",
+              marginRight: 10,
+            }}
+          />
+          {partNumber && partNumber > 1 ? `NEW REEL • PART ${partNumber}` : "NEW REEL TEASER"}
+        </div>
+        {cleanTitle ? (
+          <div
+            style={{
+              padding: "8px 24px",
+              borderRadius: 30,
+              backgroundColor: "rgba(0, 0, 0, 0.65)",
+              color: "#e2e8f0",
+              fontSize: 22,
+              fontWeight: 600,
+              maxWidth: 720,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {cleanTitle}
+          </div>
+        ) : null}
+      </div>
+
+      {/* 2. Middle Spacer (Transparent for Video Playback) */}
+      <div style={{ flex: 1 }} />
+
+      {/* 3. Bottom CTA Card (Directs Viewer to Profile for Full Reel) */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 14,
+          padding: "26px 54px",
+          borderRadius: 36,
+          backgroundColor: "rgba(10, 12, 20, 0.9)",
+          border: "2.5px solid rgba(255, 255, 255, 0.9)",
+          boxShadow: "0 25px 60px rgba(0, 0, 0, 0.85), 0 0 30px rgba(255, 255, 255, 0.2)",
+          textAlign: "center",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            color: "#ffffff",
+            fontSize: 34,
+            fontWeight: 900,
+            letterSpacing: 0.5,
+          }}
+        >
+          👀 WATCH FULL REEL ON @{cleanHandle}
+        </div>
+        <div
+          style={{
+            color: "#f87171",
+            fontSize: 24,
+            fontWeight: 800,
+            letterSpacing: 1.5,
+            textTransform: "uppercase",
+          }}
+        >
+          👉 TO SEE THE FULL REEL, VISIT OUR PROFILE
+        </div>
+      </div>
+    </div>
+  );
+
+  const res = new ImageResponse(element, { width: 1080, height: 1920 });
+  const arrBuf = await res.arrayBuffer();
+  return Buffer.from(arrBuf);
+}

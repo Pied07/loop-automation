@@ -639,6 +639,83 @@ async function getOrGenerateStoryCardUrl(params: {
   }
 }
 
+// ─── Story Media Generator (Up to 58s video teaser or Polaroid card fallback) ──
+async function getOrGenerateStoryMedia(params: {
+  videoPath?: string;
+  publicVideoUrl?: string;
+  title: string;
+  partNumber: number;
+  totalParts?: number;
+  instagramHandle?: string;
+}): Promise<{
+  secureUrl?: string;
+  publicId?: string;
+  isVideo?: boolean;
+  localVideoPath?: string;
+  localOverlayPath?: string;
+}> {
+  const { videoPath, publicVideoUrl, title, partNumber, instagramHandle } = params;
+  let tmpOverlay: string | undefined;
+  let tmpStoryVideo: string | undefined;
+
+  // 1. Attempt creating video teaser with FFmpeg (up to 58s, plays video + sound + CTA overlay)
+  if (videoPath && fs.existsSync(/*turbopackIgnore: true*/ videoPath)) {
+    try {
+      const ffmpegBin = await checkFfmpeg();
+      const rawDur = await getVideoDuration(ffmpegBin, videoPath);
+      // Story max duration: up to 58 seconds
+      const storyDur = Math.min(Math.max(rawDur || 58, 4), 58);
+
+      const { generateStoryVideoOverlay } = await import("@/app/lib/story-card");
+      const overlayBuffer = await generateStoryVideoOverlay({
+        title,
+        partNumber,
+        instagramHandle,
+      });
+
+      const os = require("os");
+      tmpOverlay = path.join(os.tmpdir(), `story_ovl_${Date.now()}_part${partNumber}.png`);
+      fs.writeFileSync(tmpOverlay, overlayBuffer);
+
+      tmpStoryVideo = path.join(os.tmpdir(), `story_vid_${Date.now()}_part${partNumber}.mp4`);
+
+      // Scale to 1080x1920 with aspect preservation, overlay transparent CTA banner, trim to story length
+      await execAsync(
+        `"${ffmpegBin}" -y -i "${videoPath}" -i "${tmpOverlay}" -filter_complex "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black[bg];[bg][1:v]overlay=0:0[outv]" -map "[outv]" -map 0:a? -t ${storyDur} -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac -b:a 128k "${tmpStoryVideo}"`
+      );
+
+      if (fs.existsSync(tmpStoryVideo) && fs.statSync(tmpStoryVideo).size > 1000) {
+        const { uploadVideoToCloudinary } = await import("@/app/cloudinary-upload");
+        const cRes = await uploadVideoToCloudinary(tmpStoryVideo, `story_vid_${Date.now()}_part${partNumber}`);
+        return {
+          secureUrl: cRes.secureUrl,
+          publicId: cRes.publicId,
+          isVideo: true,
+          localVideoPath: tmpStoryVideo,
+          localOverlayPath: tmpOverlay,
+        };
+      }
+    } catch (vidErr: any) {
+      console.warn("Story video teaser generation notice (falling back to card):", vidErr?.message);
+    }
+  }
+
+  // 2. Fallback: Generate Polaroid Story Card Image if video teaser cannot be produced
+  const cardData = await getOrGenerateStoryCardUrl({
+    videoPath,
+    publicVideoUrl,
+    title,
+    partNumber,
+    instagramHandle,
+  });
+  return {
+    secureUrl: cardData.secureUrl,
+    publicId: cardData.publicId,
+    isVideo: false,
+    localOverlayPath: tmpOverlay,
+  };
+}
+
 export async function publishClipAndCleanup(params: {
   clipPath: string;
   partNumber: number;
@@ -714,26 +791,33 @@ export async function publishClipAndCleanup(params: {
   let uploadedCloudinaryId: string | undefined;
   let storyCardUrl: string | undefined;
   let uploadedStoryCardId: string | undefined;
+  let isStoryVideo = false;
+  let storyVideoLocalPath: string | undefined;
+  let storyOverlayLocalPath: string | undefined;
   const { readTokens } = await import("@/app/lib/tokens");
   const tokens: any = await readTokens();
 
   const igHandle = tokens.facebook?.instagram_username || "aishortvideos";
 
-  // Pre-generate aesthetic Polaroid Story card thumbnail
+  // Pre-generate Story Teaser Video (or aesthetic Polaroid card fallback)
   try {
-    const cardData = await getOrGenerateStoryCardUrl({
+    const sMedia = await getOrGenerateStoryMedia({
       videoPath: absolutePath,
       publicVideoUrl: (isRemote && (clipPath.startsWith("http://") || clipPath.startsWith("https://"))) ? clipPath : undefined,
       title,
       partNumber,
+      totalParts: params.totalParts,
       instagramHandle: igHandle,
     });
-    if (cardData.secureUrl) {
-      storyCardUrl = cardData.secureUrl;
-      uploadedStoryCardId = cardData.publicId;
+    if (sMedia.secureUrl) {
+      storyCardUrl = sMedia.secureUrl;
+      uploadedStoryCardId = sMedia.publicId;
+      isStoryVideo = !!sMedia.isVideo;
+      storyVideoLocalPath = sMedia.localVideoPath;
+      storyOverlayLocalPath = sMedia.localOverlayPath;
     }
   } catch (cardErr: any) {
-    console.warn("Story card pre-generation notice:", cardErr?.message);
+    console.warn("Story media pre-generation notice:", cardErr?.message);
   }
 
   try {
@@ -839,29 +923,84 @@ export async function publishClipAndCleanup(params: {
           facebookUrl = `https://www.facebook.com/reel/${facebookVideoId}`;
           logs.push(`✅ Facebook: ${facebookUrl}`);
 
-          // Also post Facebook Page Story (using designed Polaroid Story card)
+          // Also post Facebook Page Story (Video teaser or photo card)
           try {
             if (!storyCardUrl) {
-              const cardData = await getOrGenerateStoryCardUrl({
+              const sMedia = await getOrGenerateStoryMedia({
                 videoPath: absolutePath,
                 publicVideoUrl: (isRemote && (clipPath.startsWith("http://") || clipPath.startsWith("https://"))) ? clipPath : undefined,
                 title,
                 partNumber,
+                totalParts: params.totalParts,
                 instagramHandle: igHandle,
               });
-              if (cardData.secureUrl) {
-                storyCardUrl = cardData.secureUrl;
-                uploadedStoryCardId = cardData.publicId;
+              if (sMedia.secureUrl) {
+                storyCardUrl = sMedia.secureUrl;
+                uploadedStoryCardId = sMedia.publicId;
+                isStoryVideo = !!sMedia.isVideo;
+                storyVideoLocalPath = sMedia.localVideoPath;
+                storyOverlayLocalPath = sMedia.localOverlayPath;
               }
             }
 
-            if (storyCardUrl) {
+            let fbStoryPublished = false;
+            // Attempt Facebook Video Story if video file exists
+            if (isStoryVideo && storyVideoLocalPath && fs.existsSync(storyVideoLocalPath)) {
+              try {
+                const startRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/video_stories`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                  body: new URLSearchParams({
+                    access_token: pageToken,
+                    upload_phase: "start",
+                  }),
+                });
+                const startData = await startRes.json();
+                if (startData?.video_id && startData?.upload_url) {
+                  const fileStats = fs.statSync(storyVideoLocalPath);
+                  const fileBuffer = fs.readFileSync(storyVideoLocalPath);
+                  const upVideoRes = await fetch(startData.upload_url, {
+                    method: "POST",
+                    headers: {
+                      Authorization: `OAuth ${pageToken}`,
+                      offset: "0",
+                      file_size: String(fileStats.size),
+                      "Content-Type": "application/octet-stream",
+                    },
+                    body: fileBuffer,
+                  });
+                  if (upVideoRes.ok) {
+                    const finishRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/video_stories`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                      body: new URLSearchParams({
+                        access_token: pageToken,
+                        upload_phase: "finish",
+                        video_id: startData.video_id,
+                      }),
+                    });
+                    const finishData = await finishRes.json();
+                    if (finishData?.id || finishData?.success || finishData?.post_id) {
+                      facebookStoryId = String(finishData.post_id || finishData.id || startData.video_id);
+                      logs.push(`✅ Facebook: Story published (Video preview)`);
+                      fbStoryPublished = true;
+                    }
+                  }
+                }
+              } catch (fbVidErr: any) {
+                console.warn("Facebook video story notice (falling back to photo):", fbVidErr.message);
+              }
+            }
+
+            // Fallback to Photo Story if video story didn't complete
+            if (!fbStoryPublished && storyCardUrl) {
+              const photoUrl = storyCardUrl.endsWith(".mp4") ? storyCardUrl.replace(/\.mp4$/, ".jpg") : storyCardUrl;
               const upRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/photos`, {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: new URLSearchParams({
                   access_token: pageToken,
-                  url: storyCardUrl,
+                  url: photoUrl,
                   published: "false",
                 }),
               });
@@ -878,7 +1017,7 @@ export async function publishClipAndCleanup(params: {
                 const storyData = await storyRes.json();
                 if (storyData?.id || storyData?.success || storyData?.post_id) {
                   facebookStoryId = String(storyData.id || storyData.post_id || upData.id);
-                  logs.push(`✅ Facebook: Story published (Polaroid Reel card)`);
+                  logs.push(`✅ Facebook: Story published (Teaser card)`);
                 }
               }
             }
@@ -989,38 +1128,48 @@ export async function publishClipAndCleanup(params: {
           } catch {}
           logs.push(`✅ Instagram: Reel published (${instagramUrl})`);
 
-          // 2. Post as Instagram Story (Designed Polaroid Story card)
+          // 2. Post as Instagram Story (Video preview or designed card)
           try {
             if (!storyCardUrl) {
-              const cardData = await getOrGenerateStoryCardUrl({
+              const sMedia = await getOrGenerateStoryMedia({
                 videoPath: absolutePath,
                 publicVideoUrl,
                 title,
                 partNumber,
+                totalParts: params.totalParts,
                 instagramHandle: igHandle,
               });
-              if (cardData.secureUrl) {
-                storyCardUrl = cardData.secureUrl;
-                uploadedStoryCardId = cardData.publicId;
+              if (sMedia.secureUrl) {
+                storyCardUrl = sMedia.secureUrl;
+                uploadedStoryCardId = sMedia.publicId;
+                isStoryVideo = !!sMedia.isVideo;
+                storyVideoLocalPath = sMedia.localVideoPath;
+                storyOverlayLocalPath = sMedia.localOverlayPath;
               }
             }
 
             if (storyCardUrl) {
+              const storyParams: Record<string, string> = {
+                access_token: instagramToken,
+                media_type: "STORIES",
+              };
+              if (isStoryVideo) {
+                storyParams.video_url = storyCardUrl;
+              } else {
+                storyParams.image_url = storyCardUrl;
+              }
+
               const storyRes = await fetch(`${instagramApi}/${igUserId}/media`, {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: new URLSearchParams({
-                  access_token: instagramToken,
-                  media_type: "STORIES",
-                  image_url: storyCardUrl,
-                }),
+                body: new URLSearchParams(storyParams),
               });
               const storyData = await storyRes.json();
               if (storyData?.id) {
                 const storyCreationId = storyData.id;
                 let storyFinished = false;
-                for (let s = 0; s < 8; s++) {
-                  await new Promise((r) => setTimeout(r, 2000));
+                for (let s = 0; s < 16; s++) {
+                  await new Promise((r) => setTimeout(r, 2500));
                   const sCheck = await fetch(`${instagramApi}/${storyCreationId}?fields=status_code,status&access_token=${instagramToken}`, { cache: "no-store" });
                   const sJson = await sCheck.json();
                   if (sJson.status_code === "FINISHED") { storyFinished = true; break; }
@@ -1035,7 +1184,7 @@ export async function publishClipAndCleanup(params: {
                   const pubStoryData = await pubStoryRes.json().catch(() => ({}));
                   if (pubStoryRes.ok) {
                     instagramStoryId = String(pubStoryData?.id || storyCreationId);
-                    logs.push(`✅ Instagram: Story published (Polaroid Reel card)`);
+                    logs.push(`✅ Instagram: Story published (${isStoryVideo ? "Video teaser preview" : "Teaser card"})`);
                   }
                 }
               }
@@ -1188,8 +1337,35 @@ export async function publishClipAndCleanup(params: {
       }
     }
 
-    // 4. Retain lightweight story card thumbnail image (~30 KB) in Cloudinary
-    // so library cards always display an aesthetic, high-res thumbnail preview!
+    // 4. Delete story thumbnail / video from Cloudinary (Auto-cleanup to keep storage at 0 MB)
+    let storyTargetId = uploadedStoryCardId;
+    if (!storyTargetId && storyCardUrl && storyCardUrl.includes("res.cloudinary.com")) {
+      const match = storyCardUrl.match(/\/(?:image|video)\/upload\/(?:v\d+\/)?([^.]+)/);
+      if (match) storyTargetId = match[1];
+    }
+
+    if (storyTargetId && cloudName && apiKey && apiSecret && process.env.CLOUDINARY_DELETE_AFTER_PUBLISH === "true") {
+      try {
+        const { deleteCloudinaryAsset } = await import("@/app/cloudinary-upload");
+        await Promise.allSettled([
+          deleteCloudinaryAsset(storyTargetId, "video"),
+          deleteCloudinaryAsset(storyTargetId, "image"),
+        ]);
+        logs.push(`🗑️ Cloudinary story asset cleaned up (${storyTargetId}).`);
+      } catch (cErr: any) {
+        console.warn("Could not delete story asset from Cloudinary:", cErr.message);
+      }
+    }
+
+    // 5. Clean up temporary local files for the story video & overlay
+    try {
+      if (storyVideoLocalPath && fs.existsSync(/*turbopackIgnore: true*/ storyVideoLocalPath)) {
+        fs.unlinkSync(storyVideoLocalPath);
+      }
+      if (storyOverlayLocalPath && fs.existsSync(/*turbopackIgnore: true*/ storyOverlayLocalPath)) {
+        fs.unlinkSync(storyOverlayLocalPath);
+      }
+    } catch {}
   }
 
   // Return standard video thumbnail (YouTube hqdefault or Facebook thumbnail), never the story card
