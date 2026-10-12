@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { publishClipAndCleanup } from "@/app/viral-actions";
 import { readTokens } from "@/app/lib/tokens";
 import { database } from "@/app/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -22,14 +22,17 @@ export async function POST(req: NextRequest) {
     if (tokens.facebook?.page_id && tokens.facebook?.page_access_token) serverPlatforms.push("Facebook");
     if (tokens.facebook?.instagram_user_id || tokens.instagram?.access_token) serverPlatforms.push("Instagram");
 
-    const requestedPlatforms = Array.isArray(body.platforms) ? body.platforms : [];
-    const detectedPlatforms = Array.from(new Set([...requestedPlatforms, ...serverPlatforms]));
+    const requestedPlatforms = Array.isArray(body.platforms) && body.platforms.length > 0 ? body.platforms : [];
+    const detectedPlatforms = requestedPlatforms.length > 0
+      ? requestedPlatforms.filter((p: string) => serverPlatforms.includes(p))
+      : serverPlatforms;
 
-    const serverConnections = [...detectedPlatforms, ...(tokens.gmail?.access_token || tokens.gmail?.refresh_token ? ["Gmail"] : [])];
+    const serverConnections = [...serverPlatforms, ...(tokens.gmail?.access_token || tokens.gmail?.refresh_token ? ["Gmail"] : [])];
     const detectedConnections = Array.from(new Set([...(Array.isArray(body.connections) ? body.connections : []), ...serverConnections]));
 
     if (!detectedPlatforms.length) {
-      return NextResponse.json({ error: "No connected social platforms found to publish to." }, { status: 400 });
+      const missingName = requestedPlatforms.length > 0 ? requestedPlatforms.join(", ") : "social platform";
+      return NextResponse.json({ error: `Selected platform (${missingName}) is not connected in Settings.` }, { status: 400 });
     }
 
     let effectiveEmail = userEmail || tokens.gmail?.email || "";
@@ -76,11 +79,11 @@ export async function POST(req: NextRequest) {
         }
         if (!targetUserId) targetUserId = "auto-pilot";
 
-        const ytVal: 0 | 1 = (result.youtubeUrl || result.youtubeVideoId) ? 1 : 0;
-        const fbVal: 0 | 1 = (result.facebookUrl || result.facebookVideoId) ? 1 : 0;
-        const igVal: 0 | 1 = (result.instagramUrl || result.instagramVideoId) ? 1 : 0;
+        const ytVal: 0 | 1 = (result.youtubeUrl || result.youtubeVideoId) ? 1 : (body.youtube === 1 ? 1 : 0);
+        const fbVal: 0 | 1 = (result.facebookUrl || result.facebookVideoId) ? 1 : (body.facebook === 1 ? 1 : 0);
+        const igVal: 0 | 1 = (result.instagramUrl || result.instagramVideoId) ? 1 : (body.instagram === 1 ? 1 : 0);
 
-        // Clean document ID without any slashes (Firestore paths split on '/')
+        // Use existing document ID if provided (prevents duplicate records), or generate platform ID
         const cleanDocId = result.youtubeVideoId
           ? `yt-${result.youtubeVideoId}`
           : (result.facebookVideoId
@@ -89,48 +92,63 @@ export async function POST(req: NextRequest) {
                   ? `ig-${result.instagramVideoId}`
                   : `clip-${partNumber}-${Date.now()}`));
 
+        const finalDocId = body.clipId || body.id || cleanDocId;
+
         const srcUrl = body.sourceUrl || body.sourceLink || "";
         const isCronJob = Boolean(body.isCron || targetUserId === "auto-pilot" || String(body.jobId || "").startsWith("cron-") || cleanDocId.includes("cron"));
+        const isAi = Boolean(body.isAiVideo);
+        const resolvedFormat = body.format || body.category || body.contentCategory || (isAi ? "AI Video" : "Viral");
 
-        const record = {
-          id: cleanDocId,
+        const record: any = {
+          id: finalDocId,
           userId: targetUserId,
           title: title || "Viral Clip",
           description: description || "",
           hashtags: Array.isArray(hashtags) ? hashtags.map((h: string) => h.startsWith("#") ? h : `#${h}`) : [],
-          format: body.category || body.contentCategory || "Trending",
-          createdAt: new Date().toISOString(),
+          format: resolvedFormat,
+          isAiVideo: isAi,
+          createdAt: body.createdAt || new Date().toISOString(),
           status: "completed",
           sourceUrl: srcUrl,
           sourceLink: srcUrl,
+          videoUrl: body.videoUrl || body.clipPath || "",
+          cloudinaryUrl: body.cloudinaryUrl || (body.clipPath?.includes("cloudinary") ? body.clipPath : ""),
           isCron: isCronJob,
           youtube: ytVal,
-          youtubeVideoId: result.youtubeVideoId || "",
-          youtubeUrl: result.youtubeUrl || (result.youtubeVideoId ? `https://www.youtube.com/shorts/${result.youtubeVideoId}` : ""),
+          youtubeVideoId: result.youtubeVideoId || body.youtubeVideoId || "",
+          youtubeUrl: result.youtubeUrl || (result.youtubeVideoId ? `https://www.youtube.com/shorts/${result.youtubeVideoId}` : (body.youtubeUrl || "")),
           facebook: fbVal,
-          facebookVideoId: result.facebookVideoId || "",
-          facebookUrl: result.facebookUrl || (result.facebookVideoId ? `https://www.facebook.com/reel/${result.facebookVideoId}` : ""),
-          facebookStoryId: result.facebookStoryId || "",
-          facebookPostId: result.facebookPostId || "",
+          facebookVideoId: result.facebookVideoId || body.facebookVideoId || "",
+          facebookUrl: result.facebookUrl || (result.facebookVideoId ? `https://www.facebook.com/reel/${result.facebookVideoId}` : (body.facebookUrl || "")),
+          facebookStoryId: result.facebookStoryId || body.facebookStoryId || "",
+          facebookPostId: result.facebookPostId || body.facebookPostId || "",
           instagram: igVal,
-          instagramVideoId: result.instagramVideoId || "",
-          instagramUrl: result.instagramUrl || (result.instagramVideoId ? `https://www.instagram.com/reel/${result.instagramVideoId}` : ""),
-          instagramStoryId: result.instagramStoryId || "",
-          thumbnailUrl: result.thumbnailUrl || (result.youtubeVideoId ? `https://i.ytimg.com/vi/${result.youtubeVideoId}/hqdefault.jpg` : (result.facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${result.facebookVideoId}` : "")),
+          instagramVideoId: result.instagramVideoId || body.instagramVideoId || "",
+          instagramUrl: result.instagramUrl || (result.instagramVideoId ? `https://www.instagram.com/reel/${result.instagramVideoId}` : (body.instagramUrl || "")),
+          instagramStoryId: result.instagramStoryId || body.instagramStoryId || "",
+          thumbnailUrl: result.thumbnailUrl || body.thumbnailUrl || (result.youtubeVideoId ? `https://i.ytimg.com/vi/${result.youtubeVideoId}/hqdefault.jpg` : (result.facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${result.facebookVideoId}` : "")),
         };
+        if (body.duration) {
+          record.duration = Number(body.duration);
+        }
 
         if (database) {
-          // Write to top-level 'videos' collection
+          // Write to top-level 'videos' collection using finalDocId
           try {
-            await setDoc(doc(database, "videos", cleanDocId), record, { merge: true });
+            await setDoc(doc(database, "videos", finalDocId), record, { merge: true });
           } catch (e: any) {
             console.warn("Top-level videos save notice:", e.message);
           }
           // Also write to user subcollection so active realtime listeners update immediately
           try {
-            await setDoc(doc(database, "users", targetUserId, "videos", cleanDocId), record, { merge: true });
+            await setDoc(doc(database, "users", targetUserId, "videos", finalDocId), record, { merge: true });
           } catch (e: any) {
             console.warn("User subcollection save notice:", e.message);
+          }
+          // If a separate cleanDocId was generated, delete it to ensure zero duplicate documents
+          if (finalDocId !== cleanDocId) {
+            deleteDoc(doc(database, "videos", cleanDocId)).catch(() => {});
+            deleteDoc(doc(database, "users", targetUserId, "videos", cleanDocId)).catch(() => {});
           }
         }
       } catch (saveErr: any) {

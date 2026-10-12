@@ -1,0 +1,20 @@
+{
+  "categories": [
+    "Trending",
+    "Comedy",
+    "Motivational",
+    "Horror",
+    "Educational",
+    "Romance",
+    "Adventure",
+    "Music",
+    "Food"
+  ],
+  "latent_dim": 64,
+  "image_size": [
+    64,
+    64
+  ],
+  "training_samples": 23,
+  "created_at": 1791795100.7782278
+}

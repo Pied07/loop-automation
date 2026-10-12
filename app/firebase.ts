@@ -30,6 +30,10 @@ export type VideoRecord = {
   instagramUrl?: string;
   instagramStoryId?: string;
   format?: string;
+  isAiVideo?: boolean;
+  partNumber?: number;
+  totalParts?: number;
+  duration?: number;
   createdAt: string;
   status?: "completed" | "failed";
   sessionOnly?: boolean;
@@ -86,7 +90,8 @@ export function normalizeVideoRecord(video: any): VideoRecord {
     instagram: ig,
     instagramVideoId: ig === 1 ? (video.instagramVideoId || "") : "",
     instagramUrl: igUrl,
-    format: video.format || "Trending",
+    format: video.isAiVideo ? (video.format || "AI Video") : "Viral",
+    isAiVideo: Boolean(video.isAiVideo),
     createdAt: video.createdAt || new Date().toISOString(),
     status: video.status || "completed",
   };

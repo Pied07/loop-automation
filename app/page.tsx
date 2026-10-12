@@ -39,12 +39,14 @@ import {
   X,
   Trash2,
   RefreshCw,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { useEffect, useState, useRef, type FormEvent } from "react";
 import { auth, firebaseConfigured, database, listenToVideos, saveVideo, deleteVideo, clearAllUserVideos, normalizeVideoRecord, type VideoRecord } from "./firebase";
-import { doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
-import { deleteFromYouTube, deleteFromFacebook, deleteFromInstagram } from "./actions";
+import { doc, onSnapshot, setDoc, getDoc, deleteDoc } from "firebase/firestore";
+import { deleteFromYouTube, deleteFromFacebook, deleteFromInstagram, deleteFromCloudinary } from "./actions";
 import { FaYoutube, FaInstagram, FaFacebookF } from "react-icons/fa6";
 import { SiGmail } from "react-icons/si";
 
@@ -72,7 +74,7 @@ type ClipPublishResult = {
 };
 
 const formats = [
-  { name: "Trending", icon: TrendingUp, tone: "mint", detail: "Viral & trending now" },
+  { name: "Interesting Facts", icon: TrendingUp, tone: "mint", detail: "Untold facts & real world origins" },
   { name: "Comedy", icon: AudioLines, tone: "yellow", detail: "Funny & entertaining" },
   { name: "Motivational", icon: Sparkles, tone: "mint", detail: "Inspiring moments" },
   { name: "Horror", icon: Flame, tone: "coral", detail: "Spooky & thrilling" },
@@ -80,7 +82,7 @@ const formats = [
   { name: "Romance", icon: Flower2, tone: "pink", detail: "Love & emotion" },
   { name: "Adventure", icon: Mountain, tone: "sky", detail: "Action & outdoors" },
   { name: "Music", icon: Music2, tone: "lilac", detail: "Music & performance" },
-  { name: "Food", icon: WandSparkles, tone: "gold", detail: "Food & cooking" },
+  { name: "Others", icon: WandSparkles, tone: "gold", detail: "Custom story tag & theme" },
 ];
 
 type Screen = "home" | "studio" | "library" | "settings";
@@ -298,10 +300,15 @@ function areSameVideo(a: VideoRecord, b: VideoRecord): boolean {
     }
   }
 
-  // 10. Description match
+  // 10. Description match & script snippet match
   const descA = normalizeDescription(a.description);
   const descB = normalizeDescription(b.description);
   if (descA && descB && descA.length >= 15 && descA === descB) {
+    return true;
+  }
+  const cleanSnippetA = (a.description || a.title || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 45).toLowerCase();
+  const cleanSnippetB = (b.description || b.title || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 45).toLowerCase();
+  if (cleanSnippetA.length >= 22 && cleanSnippetB.length >= 22 && cleanSnippetA === cleanSnippetB) {
     return true;
   }
 
@@ -439,6 +446,11 @@ function deduplicateVideos(
       }
     }
 
+    const isAi = records.some((r) => r.isAiVideo);
+    const resolvedFormat = records.find((r) => r.isAiVideo && r.format && r.format !== "Viral")?.format ||
+      records.find((r) => r.format && r.format !== "Trending" && r.format !== "Viral")?.format ||
+      winner.format;
+
     const mergedRecord: VideoRecord = {
       ...winner,
       id: winner.id,
@@ -447,6 +459,8 @@ function deduplicateVideos(
       hashtags: Array.from(allHashtags),
       videoUrl: bestVideoUrl,
       thumbnailUrl: bestThumb,
+      isAiVideo: isAi,
+      format: resolvedFormat,
       youtube: isYt,
       facebook: isFb,
       instagram: isIg,
@@ -520,7 +534,8 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("Trending");
+  const [selectedCategory, setSelectedCategory] = useState("Interesting Facts");
+  const [customStoryTag, setCustomStoryTag] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [clips, setClips] = useState<ClipMeta[]>([]);
   const [clipResults, setClipResults] = useState<Record<number, ClipPublishResult>>({});
@@ -551,6 +566,29 @@ export default function Home() {
   const [isCustomOutro, setIsCustomOutro] = useState<boolean>(false);
   const [outroUpdatedAt, setOutroUpdatedAt] = useState<string | null>(null);
   const [isUploadingOutro, setIsUploadingOutro] = useState<boolean>(false);
+  const [studioMode, setStudioMode] = useState<"viral" | "ai">("viral");
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiVoice, setAiVoice] = useState("en-US-ChristopherNeural");
+  const [aiNumImages, setAiNumImages] = useState<number>(3);
+  const [aiDuration, setAiDuration] = useState<number>(20);
+  const [aiNumParts, setAiNumParts] = useState<number>(1);
+  const [aiCurrentPart, setAiCurrentPart] = useState<number>(1);
+  const [isGeneratingScript, setIsGeneratingScript] = useState<boolean>(false);
+  const [generatedStoryParts, setGeneratedStoryParts] = useState<any[]>([]);
+  const [lastFactId, setLastFactId] = useState<string>("");
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const sampleAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [isGeneratingAiVideo, setIsGeneratingAiVideo] = useState(false);
+  const [aiProgress, setAiProgress] = useState<number>(0);
+  const [aiProgressStep, setAiProgressStep] = useState<string>("");
+  const [generatedAiVideo, setGeneratedAiVideo] = useState<any>(null);
+  const [generatedAiVideosList, setGeneratedAiVideosList] = useState<any[]>([]);
+  const [previewPartIdx, setPreviewPartIdx] = useState<number>(0);
+  const [isPublishingAi, setIsPublishingAi] = useState(false);
+  const [isPublishingAllAi, setIsPublishingAllAi] = useState(false);
+  const [aiPlatforms, setAiPlatforms] = useState({ youtube: true, facebook: true, instagram: true });
+  const [cronContentType, setCronContentType] = useState<"viral" | "ai" | "both">("viral");
+  const [repostingKey, setRepostingKey] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const outroFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -570,12 +608,21 @@ export default function Home() {
       try {
         const storedAuto = localStorage.getItem("tvd-auto-pilot") === "true";
         setAutoPilotEnabled(storedAuto);
+        const storedCronType = localStorage.getItem("tvd-cron-content-type") as "viral" | "ai" | "both";
+        if (storedCronType) setCronContentType(storedCronType);
         if (database) {
           getDoc(doc(database, "app_config", "auto_pilot"))
             .then((snap) => {
-              if (snap.exists() && typeof snap.data()?.enabled === "boolean") {
-                setAutoPilotEnabled(snap.data().enabled);
-                localStorage.setItem("tvd-auto-pilot", String(snap.data().enabled));
+              if (snap.exists()) {
+                const d = snap.data();
+                if (typeof d?.enabled === "boolean") {
+                  setAutoPilotEnabled(d.enabled);
+                  localStorage.setItem("tvd-auto-pilot", String(d.enabled));
+                }
+                if (d?.contentType) {
+                  setCronContentType(d.contentType);
+                  localStorage.setItem("tvd-cron-content-type", d.contentType);
+                }
               }
             })
             .catch(() => {});
@@ -747,7 +794,7 @@ export default function Home() {
       const response = await fetch("/api/viral-clips/auto-find", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category: selectedCategory, mode: autoFindSource }),
+        body: JSON.stringify({ category: "Viral", mode: autoFindSource }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.error) {
@@ -890,7 +937,7 @@ export default function Home() {
           sourceUrl: c.sourceUrl || c.sourceLink || videoUrl || "",
           sourceLink: c.sourceLink || c.sourceUrl || videoUrl || "",
           isCron: Boolean(c.isCron || (c.id && String(c.id).includes("cron"))),
-          format: selectedCategory,
+          format: "Viral",
           createdAt: new Date().toISOString(),
           status: "completed",
           sessionOnly: true,
@@ -960,7 +1007,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           videoUrl: targetUrl,
-          contentCategory: selectedCategory,
+          contentCategory: "Viral",
           mode: processMode,
           sourceTitle: sourceTitle || undefined,
         }),
@@ -1063,6 +1110,519 @@ export default function Home() {
     }
   }
 
+  function playSampleVoice(voiceId: string) {
+    if (playingVoiceId === voiceId) {
+      if (sampleAudioRef.current) {
+        sampleAudioRef.current.pause();
+        sampleAudioRef.current = null;
+      }
+      setPlayingVoiceId(null);
+      return;
+    }
+
+    if (sampleAudioRef.current) {
+      sampleAudioRef.current.pause();
+    }
+
+    const soundMap: Record<string, string> = {
+      "en-US-ChristopherNeural": "/voice_sample_christopher.mp3",
+      "en-US-JennyNeural": "/voice_sample_jenny.mp3",
+      "en-US-GuyNeural": "/voice_sample_guy.mp3",
+    };
+
+    const src = soundMap[voiceId] || "/voice_sample_christopher.mp3";
+    const audio = new Audio(src);
+    sampleAudioRef.current = audio;
+    setPlayingVoiceId(voiceId);
+    audio.play().catch(() => {});
+    audio.onended = () => {
+      setPlayingVoiceId(null);
+      sampleAudioRef.current = null;
+    };
+  }
+
+  function validateStudioInputs(): string | null {
+    if (!selectedCategory) {
+      return "Please choose a content category first.";
+    }
+    if (selectedCategory === "Others" && !customStoryTag.trim()) {
+      return "Please describe your custom story tag/theme for 'Others' first.";
+    }
+    if (!aiVoice) {
+      return "Please select an AI narrator voice first.";
+    }
+    if (!aiDuration || aiDuration < 10 || aiDuration > 120) {
+      return "Please select a video duration timer between 10s and 120s.";
+    }
+    if (!aiNumImages || aiNumImages < 1 || aiNumImages > 5) {
+      return "Please select the number of AI scene images (1 to 5).";
+    }
+    if (!aiNumParts || aiNumParts < 1 || aiNumParts > 5) {
+      return "Please select the number of parts (1 to 5).";
+    }
+    return null;
+  }
+
+  async function handleAutoGenerateScript() {
+    const errorMsg = validateStudioInputs();
+    if (errorMsg) {
+      notify(`⚠️ ${errorMsg}`);
+      return;
+    }
+
+    setIsGeneratingScript(true);
+    const catLabel = selectedCategory === "Others" ? (customStoryTag || "Custom") : selectedCategory;
+    notify(`🧠 Running from-scratch ML model to generate suspenseful story & scenes for ${catLabel}...`);
+    try {
+      const res = await fetch("/api/ai-video/generate-script", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: selectedCategory,
+          customTag: customStoryTag,
+          prompt: aiPrompt,
+          excludeId: lastFactId,
+          duration: aiDuration,
+          numImages: aiNumImages,
+          numParts: aiNumParts,
+          voice: aiVoice,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to auto-generate script");
+      }
+      if (data.factId) {
+        setLastFactId(data.factId);
+      }
+      const parts = Array.isArray(data.parts) ? data.parts : [];
+      setGeneratedStoryParts(parts);
+      setAiCurrentPart(1);
+      if (parts.length > 0) {
+        setAiPrompt(parts[0].script);
+      }
+      const partNotice = data.numParts > 1 ? `${data.numParts} cliffhanger parts` : '1 complete story';
+      notify(`✨ Generated ${partNotice} with ${aiNumImages} scenes calibrated to ${aiDuration}s!`);
+    } catch (err: any) {
+      notify("Failed to generate script: " + err.message);
+    } finally {
+      setIsGeneratingScript(false);
+    }
+  }
+
+  function handleSelectPart(partNum: number) {
+    setAiCurrentPart(partNum);
+    const target = generatedStoryParts.find((p) => p.partNumber === partNum);
+    if (target) {
+      setAiPrompt(target.script);
+    }
+  }
+
+  async function handleGenerateAiVideo() {
+    const errorMsg = validateStudioInputs();
+    if (errorMsg) {
+      notify(`⚠️ ${errorMsg}`);
+      return;
+    }
+
+    setIsGeneratingAiVideo(true);
+    setGeneratedAiVideo(null);
+    setGeneratedAiVideosList([]);
+    setPreviewPartIdx(0);
+    setAiProgress(5);
+
+    const totalPartsToGen = Math.max(1, Math.min(5, aiNumParts));
+    const allProducedVideos: any[] = [];
+
+    try {
+      for (let pIdx = 1; pIdx <= totalPartsToGen; pIdx++) {
+        // Determine script for this part
+        let partScript = aiPrompt;
+        const matchingPart = generatedStoryParts.find((gp) => gp.partNumber === pIdx);
+        if (matchingPart && matchingPart.script) {
+          partScript = matchingPart.script;
+        }
+
+        const basePct = Math.round(((pIdx - 1) / totalPartsToGen) * 100);
+        const nextPct = Math.round((pIdx / totalPartsToGen) * 100);
+        setAiProgress(basePct + 2);
+        const partLabel = totalPartsToGen > 1 ? `Part ${pIdx}/${totalPartsToGen}: ` : "";
+        setAiProgressStep(`${partLabel}Generating 9:16 vertical AI scenes with PyTorch...`);
+
+        // Interval to tick progress smoothly within the part's slice
+        let partLocalPct = basePct + 2;
+        const partTimer = setInterval(() => {
+          partLocalPct += Math.floor(Math.random() * 3) + 1;
+          if (partLocalPct > nextPct - 3) {
+            partLocalPct = nextPct - 3;
+          }
+          setAiProgress(partLocalPct);
+          const relPct = (partLocalPct - basePct) / (nextPct - basePct || 1);
+          if (relPct < 0.3) {
+            setAiProgressStep(`${partLabel}Generating 9:16 vertical AI scenes with PyTorch...`);
+          } else if (relPct < 0.6) {
+            setAiProgressStep(`${partLabel}Synthesizing neural voiceover & audio waveforms...`);
+          } else if (relPct < 0.85) {
+            setAiProgressStep(`${partLabel}Composing video, Ken-Burns zooms & captions...`);
+          } else {
+            setAiProgressStep(`${partLabel}Appending outro & finalizing MP4 encoding...`);
+          }
+        }, 700);
+
+        try {
+          const response = await fetch("/api/ai-video/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              category: selectedCategory,
+              customTag: customStoryTag,
+              prompt: partScript,
+              script: partScript,
+              voice: aiVoice,
+              numImages: aiNumImages,
+              duration: aiDuration,
+              numParts: totalPartsToGen,
+              partNumber: pIdx,
+              userId: auth?.currentUser?.uid || "creator",
+              userEmail: auth?.currentUser?.email || "",
+            }),
+          });
+          clearInterval(partTimer);
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.success) {
+            throw new Error(data.error || `Failed to generate Part ${pIdx}.`);
+          }
+
+          allProducedVideos.push(data);
+          setGeneratedAiVideosList([...allProducedVideos]);
+          if (pIdx === 1) {
+            setGeneratedAiVideo(data);
+          }
+
+          if (data.clip) {
+            const newRecord: VideoRecord = {
+              id: data.clip.id,
+              title: data.clip.title,
+              description: data.clip.description,
+              hashtags: data.clip.hashtags || [],
+              duration: data.clip.duration || aiDuration,
+              videoUrl: data.clip.videoUrl,
+              cloudinaryUrl: data.clip.cloudinaryUrl,
+              thumbnailUrl: data.clip.thumbnailUrl,
+              format: selectedCategory === "Others" ? (customStoryTag || "Custom") : selectedCategory,
+              isAiVideo: true,
+              createdAt: new Date().toISOString(),
+              status: "completed",
+            };
+            setVideos((prev) => deduplicateVideos([[newRecord], prev]));
+            const cached = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]") as VideoRecord[];
+            localStorage.setItem("tvd-studio-session-videos", JSON.stringify(deduplicateVideos([[newRecord], cached])));
+            if (database && auth?.currentUser?.uid) {
+              saveVideo(auth.currentUser.uid, newRecord).catch(() => {});
+            }
+          }
+          setAiProgress(nextPct);
+        } catch (subErr: any) {
+          clearInterval(partTimer);
+          throw subErr;
+        }
+      }
+
+      setAiProgress(100);
+      setAiProgressStep(
+        totalPartsToGen > 1
+          ? `✅ All ${totalPartsToGen} Parts Generated Successfully with Outro!`
+          : "✅ AI Video Generated Successfully with Outro!"
+      );
+      if (allProducedVideos.length > 0) {
+        setGeneratedAiVideo(allProducedVideos[0]);
+      }
+      notify(
+        totalPartsToGen > 1
+          ? `🎉 Generated all ${totalPartsToGen} parts! Review each part and click 'Publish All' below.`
+          : `🎉 AI Video generated successfully with outro!`
+      );
+    } catch (err: any) {
+      setAiProgress(0);
+      setAiProgressStep("");
+      notify("AI Video generation error: " + err.message);
+    } finally {
+      setIsGeneratingAiVideo(false);
+    }
+  }
+
+  async function handlePublishAiVideo(videoItem?: any) {
+    const targetVideo = videoItem || generatedAiVideosList[previewPartIdx] || generatedAiVideo;
+    if (!targetVideo || !targetVideo.clip) return;
+    const activePlatforms = [];
+    if (aiPlatforms.youtube) activePlatforms.push("YouTube");
+    if (aiPlatforms.facebook) activePlatforms.push("Facebook");
+    if (aiPlatforms.instagram) activePlatforms.push("Instagram");
+    if (!activePlatforms.length) {
+      notify("Select at least one social platform to publish to.");
+      return;
+    }
+    setIsPublishingAi(true);
+    try {
+      const clip = targetVideo.clip;
+      const res = await fetch("/api/viral-clips/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clipId: clip.id,
+          id: clip.id,
+          clipPath: clip.videoUrl || clip.cloudinaryUrl,
+          videoUrl: clip.videoUrl || clip.cloudinaryUrl,
+          partNumber: clip.partNumber || 1,
+          totalParts: clip.totalParts || 1,
+          title: clip.title,
+          description: clip.description,
+          hashtags: clip.hashtags,
+          platforms: activePlatforms,
+          userEmail: auth?.currentUser?.email || "",
+          connections,
+          cloudinaryPublicId: clip.cloudinaryPublicId,
+          format: clip.format || selectedCategory,
+          category: clip.format || selectedCategory,
+          isAiVideo: true,
+          thumbnailUrl: clip.thumbnailUrl,
+          duration: clip.duration || aiDuration,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Publishing failed.");
+      }
+
+      const updatedRecord: VideoRecord = {
+        id: clip.id,
+        title: clip.title,
+        description: clip.description,
+        hashtags: clip.hashtags || [],
+        duration: clip.duration || aiDuration,
+        videoUrl: clip.videoUrl || clip.cloudinaryUrl,
+        cloudinaryUrl: clip.cloudinaryUrl,
+        thumbnailUrl: clip.thumbnailUrl || data.thumbnailUrl,
+        format: clip.format || selectedCategory,
+        isAiVideo: true,
+        createdAt: clip.createdAt || new Date().toISOString(),
+        status: "completed",
+        youtube: (data.youtubeUrl || data.youtubeVideoId) ? 1 : 0,
+        youtubeVideoId: data.youtubeVideoId || "",
+        youtubeUrl: data.youtubeUrl || "",
+        facebook: (data.facebookUrl || data.facebookVideoId) ? 1 : 0,
+        facebookVideoId: data.facebookVideoId || "",
+        facebookUrl: data.facebookUrl || "",
+        instagram: (data.instagramUrl || data.instagramVideoId) ? 1 : 0,
+        instagramVideoId: data.instagramVideoId || "",
+        instagramUrl: data.instagramUrl || "",
+      };
+
+      setVideos((prev) => deduplicateVideos([[updatedRecord], prev], auth?.currentUser?.uid));
+      const cached = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]") as VideoRecord[];
+      localStorage.setItem("tvd-studio-session-videos", JSON.stringify(deduplicateVideos([[updatedRecord], cached])));
+      if (database && auth?.currentUser?.uid) {
+        saveVideo(auth.currentUser.uid, updatedRecord).catch(() => {});
+      }
+
+      const partTag = clip.totalParts > 1 ? ` (Part ${clip.partNumber}/${clip.totalParts})` : "";
+      notify(`🚀 AI Video${partTag} published successfully across selected platforms!`);
+      // Redirect to library immediately just like viral clips
+      setScreen("library");
+    } catch (err: any) {
+      notify("Publish error: " + err.message);
+    } finally {
+      setIsPublishingAi(false);
+    }
+  }
+
+  async function handlePublishAllAiVideos() {
+    const listToPublish = generatedAiVideosList.length > 0 ? generatedAiVideosList : (generatedAiVideo ? [generatedAiVideo] : []);
+    if (!listToPublish.length) return;
+
+    const activePlatforms = [];
+    if (aiPlatforms.youtube) activePlatforms.push("YouTube");
+    if (aiPlatforms.facebook) activePlatforms.push("Facebook");
+    if (aiPlatforms.instagram) activePlatforms.push("Instagram");
+    if (!activePlatforms.length) {
+      notify("Select at least one social platform to publish to.");
+      return;
+    }
+
+    setIsPublishingAllAi(true);
+    let publishedCount = 0;
+    try {
+      for (let i = 0; i < listToPublish.length; i++) {
+        const item = listToPublish[i];
+        if (!item || !item.clip) continue;
+        const clip = item.clip;
+        notify(`Publishing Part ${i + 1} of ${listToPublish.length} across socials...`);
+        const res = await fetch("/api/viral-clips/publish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clipId: clip.id,
+            id: clip.id,
+            clipPath: clip.videoUrl || clip.cloudinaryUrl,
+            videoUrl: clip.videoUrl || clip.cloudinaryUrl,
+            partNumber: clip.partNumber || (i + 1),
+            totalParts: listToPublish.length,
+            title: clip.title,
+            description: clip.description,
+            hashtags: clip.hashtags,
+            platforms: activePlatforms,
+            userEmail: auth?.currentUser?.email || "",
+            connections,
+            cloudinaryPublicId: clip.cloudinaryPublicId,
+            format: clip.format || selectedCategory,
+            category: clip.format || selectedCategory,
+            isAiVideo: true,
+            thumbnailUrl: clip.thumbnailUrl,
+            duration: clip.duration || aiDuration,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+          notify(`⚠️ Part ${i + 1} publishing failed: ${data.error || 'Server error'}`);
+        } else {
+          publishedCount++;
+          const updatedRecord: VideoRecord = {
+            id: clip.id,
+            title: clip.title,
+            description: clip.description,
+            hashtags: clip.hashtags || [],
+            duration: clip.duration || aiDuration,
+            videoUrl: clip.videoUrl || clip.cloudinaryUrl,
+            cloudinaryUrl: clip.cloudinaryUrl,
+            thumbnailUrl: clip.thumbnailUrl || data.thumbnailUrl,
+            format: clip.format || selectedCategory,
+            isAiVideo: true,
+            createdAt: clip.createdAt || new Date().toISOString(),
+            status: "completed",
+            youtube: (data.youtubeUrl || data.youtubeVideoId) ? 1 : 0,
+            youtubeVideoId: data.youtubeVideoId || "",
+            youtubeUrl: data.youtubeUrl || "",
+            facebook: (data.facebookUrl || data.facebookVideoId) ? 1 : 0,
+            facebookVideoId: data.facebookVideoId || "",
+            facebookUrl: data.facebookUrl || "",
+            instagram: (data.instagramUrl || data.instagramVideoId) ? 1 : 0,
+            instagramVideoId: data.instagramVideoId || "",
+            instagramUrl: data.instagramUrl || "",
+          };
+          setVideos((prev) => deduplicateVideos([[updatedRecord], prev], auth?.currentUser?.uid));
+          const cached = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]") as VideoRecord[];
+          localStorage.setItem("tvd-studio-session-videos", JSON.stringify(deduplicateVideos([[updatedRecord], cached])));
+          if (database && auth?.currentUser?.uid) {
+            saveVideo(auth.currentUser.uid, updatedRecord).catch(() => {});
+          }
+        }
+      }
+      notify(`🎉 Successfully published ${publishedCount} of ${listToPublish.length} parts across socials!`);
+      // Redirect to library view upon publishing all parts
+      setScreen("library");
+    } catch (err: any) {
+      notify("Publish all error: " + err.message);
+    } finally {
+      setIsPublishingAllAi(false);
+    }
+  }
+
+  async function updateCronContentType(type: "viral" | "ai" | "both") {
+    setCronContentType(type);
+    try {
+      localStorage.setItem("tvd-cron-content-type", type);
+      if (database) {
+        await setDoc(doc(database, "app_config", "auto_pilot"), { contentType: type, updatedAt: new Date().toISOString() }, { merge: true });
+      }
+    } catch (err) {}
+    notify(`Cron Content Mode set to: ${type === "viral" ? "Viral Reels Only" : type === "ai" ? "AI Story Only" : "Both (Alternating)"}`);
+  }
+
+  async function handleRepostPlatform(video: VideoRecord, platform: "YouTube" | "Facebook" | "Instagram") {
+    const key = `${video.id}-${platform}`;
+    if (repostingKey) return;
+    setRepostingKey(key);
+
+    try {
+      const vidUrl = video.cloudinaryUrl || video.videoUrl || "";
+      if (!vidUrl) {
+        throw new Error("No video file URL found for this clip.");
+      }
+
+      notify(`Publishing to ${platform}...`);
+      const res = await fetch("/api/viral-clips/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clipId: video.id,
+          clipPath: vidUrl,
+          partNumber: video.partNumber || 1,
+          totalParts: video.totalParts || 1,
+          title: video.title,
+          description: video.description || "",
+          hashtags: Array.isArray(video.hashtags) ? video.hashtags : [],
+          platforms: [platform],
+          userEmail: auth?.currentUser?.email || "",
+          userId: auth?.currentUser?.uid || video.userId || "creator",
+          connections: [platform],
+          cloudinaryPublicId: video.cloudinaryPublicId,
+          cloudinaryUrl: video.cloudinaryUrl,
+          videoUrl: video.videoUrl,
+          thumbnailUrl: video.thumbnailUrl,
+          format: video.format,
+          category: video.format,
+          isAiVideo: Boolean(video.isAiVideo),
+          createdAt: video.createdAt,
+          youtube: video.youtube,
+          youtubeVideoId: video.youtubeVideoId,
+          youtubeUrl: video.youtubeUrl,
+          facebook: video.facebook,
+          facebookVideoId: video.facebookVideoId,
+          facebookUrl: video.facebookUrl,
+          instagram: video.instagram,
+          instagramVideoId: video.instagramVideoId,
+          instagramUrl: video.instagramUrl,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || (!data.success && !data.youtubeVideoId && !data.facebookVideoId && !data.instagramVideoId)) {
+        throw new Error(data.error || `Failed to post to ${platform}.`);
+      }
+
+      setVideos((prev) =>
+        prev.map((v) => {
+          if (v.id === video.id) {
+            const updated: VideoRecord = { ...v };
+            if (platform === "YouTube" && (data.youtubeUrl || data.youtubeVideoId)) {
+              updated.youtube = 1;
+              updated.youtubeVideoId = data.youtubeVideoId || v.youtubeVideoId;
+              updated.youtubeUrl = data.youtubeUrl || (data.youtubeVideoId ? `https://www.youtube.com/shorts/${data.youtubeVideoId}` : v.youtubeUrl);
+            }
+            if (platform === "Facebook" && (data.facebookUrl || data.facebookVideoId)) {
+              updated.facebook = 1;
+              updated.facebookVideoId = data.facebookVideoId || v.facebookVideoId;
+              updated.facebookUrl = data.facebookUrl || (data.facebookVideoId ? `https://www.facebook.com/reel/${data.facebookVideoId}` : v.facebookUrl);
+            }
+            if (platform === "Instagram" && (data.instagramUrl || data.instagramVideoId)) {
+              updated.instagram = 1;
+              updated.instagramVideoId = data.instagramVideoId || v.instagramVideoId;
+              updated.instagramUrl = data.instagramUrl || (data.instagramVideoId ? `https://www.instagram.com/reel/${data.instagramVideoId}` : v.instagramUrl);
+            }
+            return updated;
+          }
+          return v;
+        })
+      );
+
+      notify(`🎉 Successfully published to ${platform}!`);
+    } catch (err: any) {
+      notify(`❌ ${platform} error: ${err.message}`);
+    } finally {
+      setRepostingKey(null);
+    }
+  }
+
   async function handlePublishClip(clip: ClipMeta) {
     const activePlatforms = connections.filter((c) => ["YouTube", "Facebook", "Instagram"].includes(c));
     if (!activePlatforms.length) {
@@ -1142,7 +1702,7 @@ export default function Home() {
           (data.facebookVideoId ? `/api/viral-clips/thumbnail?facebookId=${data.facebookVideoId}` : undefined) ||
           (data.thumbnailUrl && !data.thumbnailUrl.includes("story") ? data.thumbnailUrl : undefined) ||
           existingRecord?.thumbnailUrl,
-        format: selectedCategory,
+        format: existingRecord?.isAiVideo ? (existingRecord?.format || "AI Video") : "Viral",
         sourceUrl: videoUrl || existingRecord?.sourceUrl || existingRecord?.sourceLink || "",
         sourceLink: videoUrl || existingRecord?.sourceLink || existingRecord?.sourceUrl || "",
         isCron: Boolean(existingRecord?.isCron || (existingRecord?.id && String(existingRecord.id).includes("cron"))),
@@ -1187,6 +1747,17 @@ export default function Home() {
     const currentUser = auth?.currentUser;
     if (!currentUser) return;
     try {
+      // Clean up Cloudinary assets for all cleared videos
+      for (const v of videos) {
+        if (v.cloudinaryPublicId || v.cloudinaryUrl || v.videoUrl?.includes("res.cloudinary.com")) {
+          deleteFromCloudinary({
+            cloudinaryPublicId: v.cloudinaryPublicId,
+            cloudinaryUrl: v.cloudinaryUrl,
+            videoUrl: v.videoUrl,
+            thumbnailUrl: v.thumbnailUrl,
+          }).catch(() => {});
+        }
+      }
       await clearAllUserVideos(currentUser.uid);
       setVideos([]);
       notify("Video library cleared cleanly.");
@@ -1272,6 +1843,14 @@ export default function Home() {
     const target = videoToDelete;
     setIsDeleting(true);
     try {
+      // 1. Delete video & thumbnail assets from Cloudinary immediately
+      await deleteFromCloudinary({
+        cloudinaryPublicId: target.cloudinaryPublicId,
+        cloudinaryUrl: target.cloudinaryUrl,
+        videoUrl: target.videoUrl,
+        thumbnailUrl: target.thumbnailUrl,
+      }).catch((e) => console.warn("Cloudinary delete notice:", e.message));
+
       if (deleteFromSocialsToo && target.youtubeVideoId) {
         await deleteFromYouTube(target.youtubeVideoId).catch((e) => console.warn("YouTube delete notice:", e.message));
       }
@@ -1292,6 +1871,10 @@ export default function Home() {
       const currentUser = auth?.currentUser;
       if (currentUser) {
         deleteVideo(currentUser.uid, target.id).catch(() => {});
+      } else {
+        if (database) {
+          deleteDoc(doc(database, "videos", target.id)).catch(() => {});
+        }
       }
 
       const cachedVideos = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]") as VideoRecord[];
@@ -1336,7 +1919,16 @@ export default function Home() {
   }
 
   const filteredVideos = videos.filter((video) => {
-    const matchesFormat = filter === "All videos" || video.format === filter;
+    let matchesFormat = true;
+    if (filter === "All videos") {
+      matchesFormat = true;
+    } else if (filter === "Viral") {
+      matchesFormat = !video.isAiVideo || video.format === "Viral";
+    } else if (filter === "AI Videos") {
+      matchesFormat = Boolean(video.isAiVideo);
+    } else {
+      matchesFormat = video.format === filter;
+    }
     const term = query.toLowerCase();
     const matchesQuery = `${video.title} ${video.description} ${video.hashtags.join(" ")}`.toLowerCase().includes(term);
 
@@ -1395,14 +1987,523 @@ export default function Home() {
     <main className="main-panel">
       <header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Toggle menu"><Menu size={20} /></button><div className="breadcrumb"><span>Workspace</span><span className="crumb-divider">/</span><strong>{screen === "studio" ? "Create viral clips" : screen === "library" ? "My clips" : "Settings"}</strong></div><div className="topbar-actions"><a href="/privacy" style={{ color: "#94a3b8", textDecoration: "none", fontSize: "11px" }}>Privacy</a><a href="/terms" style={{ color: "#94a3b8", textDecoration: "none", fontSize: "11px" }}>Terms</a><span className={`connection-pill ${firebaseConfigured ? "connected" : "preview"}`}><span />{firebaseConfigured ? "Firebase connected" : "Preview mode"}</span><button className="help-button" onClick={() => notify("Connect Firebase and platform accounts to enable production workflows.")}><CircleHelp size={16} /><span>Help</span></button></div></header>
       {screen === "studio" && <section className="studio-content">
-        <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> THE VIRAL DESK STUDIO</div><h1>Turn viral videos into <em>your content.</em></h1><p>Paste a viral video URL, split it into clips, auto-generate descriptions &amp; hashtags, and post — all free.</p></div><button className="secondary-button export-button" onClick={exportCsv}><ArrowDownToLine size={16} /> Export spreadsheet</button></div>
+        <div className="page-heading">
+          <div>
+            <div className="eyebrow"><span className="eyebrow-dot" /> THE VIRAL DESK STUDIO</div>
+            <h1>{studioMode === "viral" ? <>Turn viral videos into <em>your content.</em></> : <>Generate &amp; post <em>AI videos.</em></>}</h1>
+            <p>{studioMode === "viral" ? "Paste a viral video URL or auto-find trending videos, split it into clips, auto-generate descriptions & hashtags, and post — all free." : "Create viral vertical videos from scratch using ONNX ML models trained on 10,500+ trending videos with neural voiceover, animated captions, and one-click publishing."}</p>
+          </div>
+          <button className="secondary-button export-button" onClick={exportCsv}><ArrowDownToLine size={16} /> Export spreadsheet</button>
+        </div>
+
+        {/* Studio Mode Selector: Scrape Viral Videos vs Post AI Videos */}
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setStudioMode("viral")}
+            className={`pill-btn ${studioMode === "viral" ? "active-scrape" : ""}`}
+            style={{ padding: '8px 16px', fontSize: '13px', borderRadius: '8px', cursor: 'pointer' }}
+          >
+            <Scissors size={15} /> 🎬 Scrape Viral Videos
+          </button>
+          <button
+            type="button"
+            onClick={() => setStudioMode("ai")}
+            className={`pill-btn ${studioMode === "ai" ? "active-ai" : ""}`}
+            style={{ padding: '8px 16px', fontSize: '13px', borderRadius: '8px', cursor: 'pointer' }}
+          >
+            <Sparkles size={15} /> 🤖 Post AI Videos (ML Engine)
+          </button>
+        </div>
+
         <div className="creator-layout">
           <div className="creator-form">
-            <div className="form-section"><div className="section-title"><span className="step-number">01</span><div><h2>Choose content category</h2><p>What type of viral content is this?</p></div></div>
-              <div className="format-grid">{formats.map(({ name, icon: Icon, tone, detail }) => <button key={name} onClick={() => setSelectedCategory(name)} className={`format-option ${selectedCategory === name ? "selected" : ""}`}><span className={`format-icon ${tone}`}><Icon size={18} /></span><span className="format-copy"><strong>{name}</strong><small>{detail}</small></span>{selectedCategory === name && <Check className="format-check" size={16} />}</button>)}
+            {studioMode === "ai" && (
+              <div className="form-section">
+                <div className="section-title"><span className="step-number">01</span><div><h2>Choose content category</h2><p>Select a story genre or untold interesting facts for the ML model to generate.</p></div></div>
+                <div className="format-grid">{formats.map(({ name, icon: Icon, tone, detail }) => <button key={name} onClick={() => setSelectedCategory(name)} className={`format-option ${selectedCategory === name ? "selected" : ""}`}><span className={`format-icon ${tone}`}><Icon size={18} /></span><span className="format-copy"><strong>{name}</strong><small>{detail}</small></span>{selectedCategory === name && <Check className="format-check" size={16} />}</button>)}
+                </div>
+
+                {/* Custom Story Tag Input if "Others" is selected */}
+                {selectedCategory === "Others" && (
+                  <div style={{ marginTop: '14px', background: '#12141c', padding: '14px 16px', borderRadius: '10px', border: '1px solid #1e2230' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#e2e8f0', marginBottom: '6px' }}>
+                      Custom Story Tag / Theme: <span style={{ color: '#ec4899' }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={customStoryTag}
+                      onChange={(e) => setCustomStoryTag(e.target.value)}
+                      placeholder="e.g. Cyberpunk detective mystery, Secret subterranean bunker, Ancient mythological curse..."
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        background: '#0e1017',
+                        border: '1px solid #272a38',
+                        color: '#fff',
+                        fontSize: '13px',
+                      }}
+                    />
+                    <p style={{ fontSize: '11px', color: '#64748b', marginTop: '6px' }}>
+                      Describe your custom story universe or theme. The ML model will construct custom visual scenes and cliffhanger suspense for this specific theme.
+                    </p>
+                  </div>
+                )}
               </div>
-            </div>
-            <div className="form-section brief-section"><div className="section-title"><span className="step-number">02</span><div><h2>Select video source</h2><p>Paste a YouTube link, or upload an MP4 file directly (zero bot blocks).</p></div></div>
+            )}
+
+            {studioMode === "ai" && (
+              <div className="form-section brief-section">
+                <div className="section-title"><span className="step-number">02</span><div><h2>Customize AI video &amp; generate</h2><p>Generate cliffhanger scripts, configure narration voice, scene backdrops, duration timer, and multi-part series.</p></div></div>
+                <div style={{ position: 'relative', marginTop: '8px', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+                  
+                  {/* Script Textarea & Auto-Generate Button Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#9ca3af' }}>
+                      Script &amp; Scene Prompts {aiNumParts > 1 ? `(Part ${aiCurrentPart} of ${aiNumParts})` : ''}:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAutoGenerateScript}
+                      disabled={isGeneratingScript || isGeneratingAiVideo}
+                      style={{
+                        background: 'linear-gradient(135deg, #ec4899, #8b5cf6)',
+                        border: '1px solid #c084fc',
+                        color: '#fff',
+                        padding: '6px 14px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: isGeneratingScript ? 'not-allowed' : 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 10px rgba(139,92,246,0.3)',
+                      }}
+                    >
+                      {isGeneratingScript ? (
+                        <LoaderCircle className="spin" size={13} />
+                      ) : generatedStoryParts.length > 0 ? (
+                        <RefreshCw size={13} />
+                      ) : (
+                        <Sparkles size={13} />
+                      )}
+                      {isGeneratingScript
+                        ? 'Writing suspenseful script with ML...'
+                        : generatedStoryParts.length > 0
+                        ? '🔄 Regenerate Another Script & Scenes'
+                        : '✨ Auto-Generate Script & Scenes'}
+                    </button>
+                  </div>
+
+                  <textarea
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    rows={5}
+                    placeholder={
+                      selectedCategory === "Interesting Facts"
+                        ? "Click '✨ Auto-Generate Script & Scenes' to fetch untold real-world historical and marketing facts (e.g. Tobacco PR revolution, Graham Bell's Hello origin, De Beers diamond monopoly)... or enter your custom fact."
+                        : `Enter your custom script & scenes, or click '✨ Auto-Generate Script & Scenes' for an AI suspense story customized for ${selectedCategory === "Others" ? (customStoryTag || "your theme") : selectedCategory}...`
+                    }
+                    className="video-url-input"
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      background: '#0e1017',
+                      border: '1px solid #272a38',
+                      color: '#fff',
+                      fontSize: '13px',
+                      lineHeight: '1.5',
+                      resize: 'vertical',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+
+                  {/* Multi-part tabs if parts have been generated */}
+                  {generatedStoryParts.length > 1 && (
+                    <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8' }}>Switch Generated Part:</span>
+                      {generatedStoryParts.map((p) => {
+                        const pNum = p.partNumber || p.part_number;
+                        const isSelected = aiCurrentPart === pNum;
+                        return (
+                          <button
+                            key={pNum}
+                            type="button"
+                            onClick={() => handleSelectPart(pNum)}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              border: `1px solid ${isSelected ? '#ec4899' : '#272a38'}`,
+                              background: isSelected ? 'rgba(236,72,153,0.2)' : '#161922',
+                              color: isSelected ? '#f472b6' : '#cbd5e1',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Part {pNum}{p.isLastPart || p.is_final ? ' (Finale)' : ' (Cliffhanger)'}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* AI Narrator Selection with Sample Voice Audio Preview */}
+                  <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#9ca3af' }}>AI Narrator Voice:</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      {[
+                        { id: "en-US-ChristopherNeural", label: "Christopher", desc: "Cinematic Deep" },
+                        { id: "en-US-JennyNeural", label: "Jenny", desc: "Warm Storyteller" },
+                        { id: "en-US-GuyNeural", label: "Guy", desc: "Energetic Viral" },
+                      ].map((v) => {
+                        const isSelected = aiVoice === v.id;
+                        const isPlaying = playingVoiceId === v.id;
+                        return (
+                          <div
+                            key={v.id}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              background: isSelected ? 'rgba(14,165,233,0.18)' : '#161922',
+                              border: `1px solid ${isSelected ? '#38bdf8' : '#272a38'}`,
+                              borderRadius: '8px',
+                              padding: '4px 8px',
+                              gap: '6px',
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setAiVoice(v.id)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: isSelected ? '#38bdf8' : '#e2e8f0',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                padding: '2px 4px',
+                              }}
+                            >
+                              🎙️ {v.label} <span style={{ opacity: 0.65, fontWeight: 400, fontSize: '11px' }}>({v.desc})</span>
+                            </button>
+                            <button
+                              type="button"
+                              title={isPlaying ? "Stop sample voice" : "Listen to sample voice"}
+                              onClick={() => playSampleVoice(v.id)}
+                              style={{
+                                background: isPlaying ? '#38bdf8' : '#232733',
+                                border: 'none',
+                                color: isPlaying ? '#000' : '#38bdf8',
+                                borderRadius: '50%',
+                                width: '26px',
+                                height: '26px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                              }}
+                            >
+                              {isPlaying ? <VolumeX size={13} /> : <Volume2 size={13} />}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Multi-Part Counter, Scene Count, and Duration Slider Controls */}
+                  <div style={{ marginTop: '16px', background: '#12141c', padding: '14px 16px', borderRadius: '10px', border: '1px solid #1e2230' }}>
+                    
+                    {/* Top Row: Number of Parts & Scene Count */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
+                      {/* Number of Parts (1 to 5, default 1) */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0' }}>Number of Parts:</span>
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: '#ec4899', background: 'rgba(236,72,153,0.15)', padding: '2px 8px', borderRadius: '4px' }}>
+                            {aiNumParts} {aiNumParts === 1 ? 'Part (Standalone)' : 'Parts (Series)'}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          {[1, 2, 3, 4, 5].map((n) => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => {
+                                setAiNumParts(n);
+                                if (aiCurrentPart > n) setAiCurrentPart(1);
+                              }}
+                              style={{
+                                flex: 1,
+                                padding: '6px 0',
+                                borderRadius: '6px',
+                                border: `1px solid ${aiNumParts === n ? '#ec4899' : '#2a2e3d'}`,
+                                background: aiNumParts === n ? '#db2777' : '#181b24',
+                                color: '#fff',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {n}
+                            </button>
+                          ))}
+                        </div>
+                        <p style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                          {aiNumParts === 1 ? "1 part = standalone video (no 'Part 1' in title/description)." : "Cliffhangers on each part; resolved only at final part."}
+                        </p>
+                      </div>
+
+                      {/* Scene Count 1 to 5 */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0' }}>AI Scene Images:</span>
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: '#38bdf8', background: 'rgba(56,189,248,0.15)', padding: '2px 8px', borderRadius: '4px' }}>
+                            {aiNumImages} {aiNumImages === 1 ? 'Scene' : 'Scenes'}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          {[1, 2, 3, 4, 5].map((n) => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setAiNumImages(n)}
+                              style={{
+                                flex: 1,
+                                padding: '6px 0',
+                                borderRadius: '6px',
+                                border: `1px solid ${aiNumImages === n ? '#38bdf8' : '#2a2e3d'}`,
+                                background: aiNumImages === n ? '#0284c7' : '#181b24',
+                                color: '#fff',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {n}
+                            </button>
+                          ))}
+                        </div>
+                        <p style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>Visual backdrops generated per part by local PyTorch model.</p>
+                      </div>
+                    </div>
+
+                    {/* Timer Slider 10 sec to 120 sec (2 mins) - Full Length Width */}
+                    <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid #1e2230', width: '100%' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0' }}>Video Duration:</span>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#a855f7', background: 'rgba(168,85,247,0.15)', padding: '2px 8px', borderRadius: '4px' }}>
+                          ⏱️ {aiDuration >= 60 ? `${Math.floor(aiDuration / 60)}m ${aiDuration % 60}s` : `${aiDuration}s`}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={10}
+                        max={120}
+                        step={5}
+                        value={aiDuration}
+                        onChange={(e) => setAiDuration(Number(e.target.value))}
+                        style={{ width: '100%', cursor: 'pointer', accentColor: '#a855f7', display: 'block' }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#64748b', marginTop: '4px' }}>
+                        <span>10 sec (Short)</span>
+                        <span>60 sec (1 min)</span>
+                        <span>120 sec (2 mins)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Generate Button */}
+                  <div style={{ marginTop: '16px' }}>
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={handleGenerateAiVideo}
+                      disabled={isGeneratingAiVideo}
+                      style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', borderColor: '#38bdf8', padding: '10px 20px', fontSize: '14px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                    >
+                      {isGeneratingAiVideo ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />}
+                      {isGeneratingAiVideo
+                        ? 'Running local ML model & synthesizing video...'
+                        : aiNumParts > 1
+                        ? `✨ Generate AI Video (Part ${aiCurrentPart} of ${aiNumParts})`
+                        : `✨ Generate AI Video for ${selectedCategory === "Others" ? (customStoryTag || "Custom") : selectedCategory}`}
+                    </button>
+                  </div>
+
+                  {isGeneratingAiVideo && (
+                    <div style={{ marginTop: '16px', padding: '16px 18px', background: '#111218', borderRadius: '12px', border: '1px solid rgba(14,165,233,0.35)', boxShadow: '0 4px 24px rgba(0,0,0,0.45)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: '#38bdf8' }}>
+                          <LoaderCircle className="spin" size={16} />
+                          <span>{aiProgressStep || "Generating AI video with local ML models..."}</span>
+                        </div>
+                        <span style={{ fontSize: '14px', fontWeight: 800, color: '#38bdf8', background: 'rgba(56,189,248,0.15)', padding: '3px 10px', borderRadius: '6px' }}>
+                          {aiProgress}%
+                        </span>
+                      </div>
+
+                      {/* Animated Progress Bar Track */}
+                      <div style={{ width: '100%', height: '10px', background: '#1e2230', borderRadius: '999px', overflow: 'hidden', position: 'relative' }}>
+                        <div
+                          style={{
+                            width: `${aiProgress}%`,
+                            height: '100%',
+                            background: 'linear-gradient(90deg, #0ea5e9, #a855f7, #ec4899)',
+                            borderRadius: '999px',
+                            transition: 'width 0.4s ease-out',
+                            boxShadow: '0 0 14px rgba(168,85,247,0.7)',
+                          }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', fontSize: '11px', color: '#64748b', flexWrap: 'wrap', gap: '6px' }}>
+                        <span>⚡ Local PyTorch Neural Engine • 100% Free Forever</span>
+                        <span>✨ Zero Watermarks • 9:16 Vertical HD</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {studioMode === "ai" && (generatedAiVideosList.length > 0 || generatedAiVideo) && (() => {
+              const activeList = generatedAiVideosList.length > 0 ? generatedAiVideosList : [generatedAiVideo];
+              const curIdx = Math.min(previewPartIdx, activeList.length - 1);
+              const curVideo = activeList[curIdx] || activeList[0];
+
+              return (
+                <div className="form-section">
+                  <div className="section-title">
+                    <span className="step-number">03</span>
+                    <div>
+                      <h2>Review &amp; Publish AI Video{activeList.length > 1 ? ` (${activeList.length} Parts Ready)` : ""}</h2>
+                      <p>All parts generated with neural voice, timed captions, cinematic motion, and outro attached.</p>
+                    </div>
+                  </div>
+
+                  {/* Multi-part tabs if more than 1 part */}
+                  {activeList.length > 1 && (
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
+                      {activeList.map((item: any, idx: number) => {
+                        const isSelected = idx === curIdx;
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setPreviewPartIdx(idx)}
+                            style={{
+                              padding: '8px 16px',
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              border: isSelected ? '1px solid #e50914' : '1px solid #272a38',
+                              background: isSelected ? 'rgba(229,9,20,0.15)' : '#161922',
+                              color: isSelected ? '#ff3b45' : '#94a3b8',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              transition: 'all 0.2s ease',
+                            }}
+                          >
+                            <span>Part {idx + 1}</span>
+                            <span style={{ fontSize: '10px', opacity: 0.8, color: '#38bdf8' }}>({item.duration || aiDuration}s)</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div style={{ marginTop: '12px', padding: '16px', background: '#111218', borderRadius: '12px', border: '1px solid #272a38' }}>
+                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                      <div style={{ width: '200px', height: '355px', borderRadius: '8px', overflow: 'hidden', background: '#000', flexShrink: 0, position: 'relative' }}>
+                        <video
+                          key={curVideo.videoUrl}
+                          src={curVideo.videoUrl}
+                          controls
+                          playsInline
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      </div>
+                      <div style={{ flex: 1, minWidth: '260px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                          <span className="thumb-tag-badge thumb-tag-format" style={{ display: 'inline-block' }}>
+                            🤖 {curVideo.category || selectedCategory}
+                          </span>
+                          {activeList.length > 1 && (
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: '#38bdf8', background: 'rgba(56,189,248,0.12)', padding: '3px 8px', borderRadius: '6px' }}>
+                              Part {curIdx + 1} of {activeList.length}
+                            </span>
+                          )}
+                          <span style={{ fontSize: '11px', color: '#10b981', background: 'rgba(16,185,129,0.12)', padding: '3px 8px', borderRadius: '6px' }}>
+                            🎬 Outro Attached
+                          </span>
+                        </div>
+                        <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#fff', margin: '4px 0 8px 0' }}>{curVideo.title}</h3>
+                        <p style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5, maxHeight: '120px', overflowY: 'auto' }}>{curVideo.description}</p>
+                        <div className="hashtag-row" style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                          {(curVideo.hashtags || []).slice(0, 15).map((t: string) => (
+                            <span key={t} style={{ fontSize: '11px', color: '#38bdf8' }}>#{t}</span>
+                          ))}
+                        </div>
+
+                        <div style={{ marginTop: '18px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#d1d5db', cursor: 'pointer' }}>
+                              <input type="checkbox" checked={aiPlatforms.youtube} onChange={(e) => setAiPlatforms(p => ({ ...p, youtube: e.target.checked }))} />
+                              <FaYoutube color="#ef4444" /> Shorts
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#d1d5db', cursor: 'pointer' }}>
+                              <input type="checkbox" checked={aiPlatforms.facebook} onChange={(e) => setAiPlatforms(p => ({ ...p, facebook: e.target.checked }))} />
+                              <FaFacebookF color="#3b82f6" /> Facebook
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#d1d5db', cursor: 'pointer' }}>
+                              <input type="checkbox" checked={aiPlatforms.instagram} onChange={(e) => setAiPlatforms(p => ({ ...p, instagram: e.target.checked }))} />
+                              <FaInstagram color="#ec4899" /> Instagram
+                            </label>
+                          </div>
+
+                          {/* Publish Single Part Button */}
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={() => handlePublishAiVideo(curVideo)}
+                            disabled={isPublishingAi || isPublishingAllAi}
+                            style={{ padding: '8px 14px', fontSize: '12px' }}
+                          >
+                            {isPublishingAi ? <LoaderCircle className="spin" size={13} /> : <Share2 size={13} />}
+                            {isPublishingAi ? 'Publishing...' : activeList.length > 1 ? `Publish Part ${curIdx + 1}` : 'Publish Video'}
+                          </button>
+
+                          {/* Publish All Parts Button */}
+                          {activeList.length > 1 && (
+                            <button
+                              type="button"
+                              className="primary-button"
+                              onClick={handlePublishAllAiVideos}
+                              disabled={isPublishingAllAi || isPublishingAi}
+                              style={{ background: 'linear-gradient(135deg,#e50914,#b20710)', padding: '8px 16px', fontSize: '13px' }}
+                            >
+                              {isPublishingAllAi ? <LoaderCircle className="spin" size={14} /> : <Share2 size={14} />}
+                              {isPublishingAllAi ? `Publishing all ${activeList.length} parts...` : `🚀 Publish All (${activeList.length} Parts)`}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {studioMode === "viral" && (
+              <div className="form-section brief-section"><div className="section-title"><span className="step-number">01</span><div><h2>Select video source</h2><p>Paste a YouTube link, or upload an MP4 file directly (zero bot blocks).</p></div></div>
               <input
                 type="file"
                 ref={fileInputRef}
@@ -1532,10 +2633,11 @@ export default function Home() {
                 )}
               </div>
             </div>
+            )}
 
             {clips.length > 0 && (
               <div className="form-section">
-                <div className="section-title"><span className="step-number">03</span><div><h2>Review &amp; Publish Clips</h2><p>{clips.length} clips ready from &quot;{sourceTitle}&quot;. Each has auto-generated description &amp; hashtags.</p></div></div>
+                <div className="section-title"><span className="step-number">02</span><div><h2>Review &amp; Publish Clips</h2><p>{clips.length} clips ready from &quot;{sourceTitle}&quot;. Each has auto-generated description &amp; hashtags.</p></div></div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '8px' }}>
                   {clips.map((clip) => {
                     const result = clipResults[clip.partNumber];
@@ -1600,18 +2702,33 @@ export default function Home() {
             )}
           </div>
           <aside className="preview-panel">
-            <div className="preview-head"><div><span className="preview-kicker">WORKFLOW</span><h3>Automated Studio Pipeline</h3></div><span className="preview-status"><span /> ACTIVE</span></div>
+            <div className="preview-head">
+              <div>
+                <span className="preview-kicker">{studioMode === "ai" ? "ML ENGINE" : "WORKFLOW"}</span>
+                <h3>{studioMode === "ai" ? "AI Video Generation Pipeline" : "Automated Studio Pipeline"}</h3>
+              </div>
+              <span className="preview-status" style={{ color: studioMode === "ai" ? "#38bdf8" : undefined }}>
+                <span style={{ background: studioMode === "ai" ? "#38bdf8" : undefined }} /> {studioMode === "ai" ? "ONNX ACTIVE" : "ACTIVE"}
+              </span>
+            </div>
             <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {[
+              {(studioMode === "ai" ? [
+                { step: '01', icon: '🧠', title: 'ONNX Semantic Latent Model', desc: 'Trained on 10,500+ trending videos to formulate viral hooks' },
+                { step: '02', icon: '📜', title: 'Dynamic Story Synthesis', desc: 'Crafts high-retention 4-part viral narrative and topic focus' },
+                { step: '03', icon: '🎙️', title: 'Neural Voice Synthesis', desc: 'Studio-grade natural human speech generated via Edge-TTS' },
+                { step: '04', icon: '⚡', title: 'Visuals & Timed Captions', desc: '1080x1920 vertical canvas with synchronized animated text' },
+                { step: '05', icon: '🏷️', title: '30 High-Ranking Tags', desc: 'Predicted by ONNX viral tagger for maximum organic reach' },
+                { step: '06', icon: '🚀', title: 'One-Click Syndication', desc: 'Direct multi-post to YouTube Shorts, FB & IG Reels' },
+              ] : [
                 { step: '01', icon: '🔗', title: 'Input Source Video', desc: 'Compatible with YouTube, TikTok, X, Instagram & direct .mp4' },
                 { step: '02', icon: '✂️', title: 'Intelligent Segmentation', desc: 'Automatically segmented into optimal vertical short slices' },
                 { step: '03', icon: '✍️', title: 'Metadata & Outro Injection', desc: 'Tailored descriptions, hashtags & branded outro attached' },
                 { step: '04', icon: '🚀', title: 'Multi-Platform Syndication', desc: 'Simultaneous distribution to YouTube Shorts, FB & IG Reels' },
                 { step: '05', icon: '📧', title: 'Automated Delivery Alert', desc: 'Published post links delivered directly to your Gmail inbox' },
                 { step: '06', icon: '🗑️', title: 'Storage Optimization', desc: 'Temporary slice files purged automatically after upload' },
-              ].map(({ step, icon, title, desc }) => (
+              ]).map(({ step, icon, title, desc }) => (
                 <div key={step} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                  <span style={{ background: 'linear-gradient(135deg,#e50914,#b20710)', color: '#fff', width: '26px', height: '26px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 800, flexShrink: 0, boxShadow: '0 0 10px rgba(229,9,20,0.4)' }}>{step}</span>
+                  <span style={{ background: studioMode === "ai" ? 'linear-gradient(135deg,#0ea5e9,#6366f1)' : 'linear-gradient(135deg,#e50914,#b20710)', color: '#fff', width: '26px', height: '26px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 800, flexShrink: 0, boxShadow: studioMode === "ai" ? '0 0 10px rgba(14,165,233,0.4)' : '0 0 10px rgba(229,9,20,0.4)' }}>{step}</span>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '12px', color: '#ffffff' }}>{icon} {title}</div>
                     <div style={{ fontSize: '11px', color: '#94a3b8', lineHeight: 1.4, marginTop: '2px' }}>{desc}</div>
@@ -1619,7 +2736,7 @@ export default function Home() {
                 </div>
               ))}
             </div>
-            <div className="preview-bottom"><span><span className="quality-dot" /> High Definition</span><span>Zero API costs · 100% Free</span></div>
+            <div className="preview-bottom"><span><span className="quality-dot" style={{ background: studioMode === "ai" ? "#38bdf8" : undefined }} /> {studioMode === "ai" ? "ONNX Format ML" : "High Definition"}</span><span>{studioMode === "ai" ? "100% Free · Real Dataset" : "Zero API costs · 100% Free"}</span></div>
           </aside>
         </div>
         <div className="below-stats">
@@ -1664,6 +2781,8 @@ export default function Home() {
           <span className="sr-only">Filter by category</span>
           <select value={filter} onChange={(event) => { setFilter(event.target.value); setCurrentPage(1); }}>
             <option>All videos</option>
+            <option>Viral</option>
+            <option>AI Videos</option>
             {formats.map((item) => <option key={item.name}>{item.name}</option>)}
           </select>
           <ChevronDown size={15} />
@@ -1752,9 +2871,7 @@ export default function Home() {
               <span className="thumb-unavailable">Preview unavailable</span>
             )}
             <div className="thumb-tags-row">
-              {video.format && (
-                <span className="thumb-tag-badge thumb-tag-format">{video.format}</span>
-              )}
+              <span className="thumb-tag-badge thumb-tag-format">{video.isAiVideo ? (video.format || "AI Video") : "Viral"}</span>
               {video.isCron && (
                 <span className="thumb-tag-badge thumb-tag-autopilot">Auto-Pilot</span>
               )}
@@ -1762,7 +2879,7 @@ export default function Home() {
           </div>
         )}
     <div className="video-details">
-      <div className="video-type-label"><Film size={11} /> {video.format || "Viral Clip"}</div>
+      <div className="video-type-label"><Film size={11} /> {video.isAiVideo ? (video.format || "AI Video") : "Viral"}</div>
       <h3>{video.title}</h3>
       <p style={{ color: video.status === 'failed' ? '#d32f2f' : 'inherit' }}>{video.description}</p>
       {video.status !== 'failed' && <div className="hashtag-row">{Array.from(new Set(video.hashtags || [])).map((tag, idx) => <span key={`${tag}-${idx}`}>#{tag.replace(/^#/, '')}</span>)}</div>}
@@ -1781,7 +2898,7 @@ export default function Home() {
               <span>Source</span>
             </a>
           )}
-          {video.youtube === 1 && Boolean(video.youtubeUrl) && (
+          {video.youtube === 1 && Boolean(video.youtubeUrl) ? (
             <a
               href={video.youtubeUrl}
               target="_blank"
@@ -1792,8 +2909,25 @@ export default function Home() {
               <FaYoutube size={12} />
               <span>Shorts</span>
             </a>
+          ) : (
+            <button
+              type="button"
+              disabled={repostingKey === `${video.id}-YouTube`}
+              onClick={() => handleRepostPlatform(video, "YouTube")}
+              className="platform-btn repost-btn repost-yt"
+              title={((video.youtube === 1 && video.youtubeUrl) || (video.facebook === 1 && video.facebookUrl) || (video.instagram === 1 && video.instagramUrl)) ? "Repost to YouTube Shorts" : "Publish to YouTube Shorts"}
+            >
+              <FaYoutube size={12} />
+              <span>
+                {repostingKey === `${video.id}-YouTube`
+                  ? "Posting..."
+                  : (((video.youtube === 1 && video.youtubeUrl) || (video.facebook === 1 && video.facebookUrl) || (video.instagram === 1 && video.instagramUrl))
+                      ? "Repost YT"
+                      : "Post Shorts")}
+              </span>
+            </button>
           )}
-          {video.facebook === 1 && Boolean(video.facebookUrl) && (
+          {video.facebook === 1 && Boolean(video.facebookUrl) ? (
             <a
               href={video.facebookUrl}
               target="_blank"
@@ -1804,8 +2938,25 @@ export default function Home() {
               <FaFacebookF size={11} />
               <span>FB Reel</span>
             </a>
+          ) : (
+            <button
+              type="button"
+              disabled={repostingKey === `${video.id}-Facebook`}
+              onClick={() => handleRepostPlatform(video, "Facebook")}
+              className="platform-btn repost-btn repost-fb"
+              title={((video.youtube === 1 && video.youtubeUrl) || (video.facebook === 1 && video.facebookUrl) || (video.instagram === 1 && video.instagramUrl)) ? "Repost to Facebook Reels" : "Publish to Facebook Reels"}
+            >
+              <FaFacebookF size={11} />
+              <span>
+                {repostingKey === `${video.id}-Facebook`
+                  ? "Posting..."
+                  : (((video.youtube === 1 && video.youtubeUrl) || (video.facebook === 1 && video.facebookUrl) || (video.instagram === 1 && video.instagramUrl))
+                      ? "Repost FB"
+                      : "Post FB")}
+              </span>
+            </button>
           )}
-          {video.instagram === 1 && Boolean(video.instagramUrl) && (
+          {video.instagram === 1 && Boolean(video.instagramUrl) ? (
             <a
               href={video.instagramUrl}
               target="_blank"
@@ -1816,6 +2967,23 @@ export default function Home() {
               <FaInstagram size={12} />
               <span>IG Reel</span>
             </a>
+          ) : (
+            <button
+              type="button"
+              disabled={repostingKey === `${video.id}-Instagram`}
+              onClick={() => handleRepostPlatform(video, "Instagram")}
+              className="platform-btn repost-btn repost-ig"
+              title={((video.youtube === 1 && video.youtubeUrl) || (video.facebook === 1 && video.facebookUrl) || (video.instagram === 1 && video.instagramUrl)) ? "Repost to Instagram Reels" : "Publish to Instagram Reels"}
+            >
+              <FaInstagram size={12} />
+              <span>
+                {repostingKey === `${video.id}-Instagram`
+                  ? "Posting..."
+                  : (((video.youtube === 1 && video.youtubeUrl) || (video.facebook === 1 && video.facebookUrl) || (video.instagram === 1 && video.instagramUrl))
+                      ? "Repost IG"
+                      : "Post IG")}
+              </span>
+            </button>
           )}
         </div>
         <div className="card-footer-meta">
@@ -1924,6 +3092,80 @@ export default function Home() {
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: autoPilotEnabled ? '#22c55e' : '#64748b' }} />
             {autoPilotEnabled ? "Auto-Pilot ON" : "Auto-Pilot OFF"}
           </button>
+        </div>
+
+        {/* Content Mode Selection (Viral, AI Story, Both) */}
+        <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #1f2230' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: '#f8fafc', marginBottom: '8px' }}>
+            🎯 Automated Content Mode:
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => updateCronContentType("viral")}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: cronContentType === "viral" ? '1.5px solid #ff3b45' : '1px solid #272a38',
+                background: cronContentType === "viral" ? 'rgba(255, 59, 69, 0.15)' : '#0d0e15',
+                color: cronContentType === "viral" ? '#ff4d56' : '#94a3b8',
+                transition: 'all 0.2s',
+              }}
+            >
+              🎬 Viral Reels Only
+            </button>
+            <button
+              type="button"
+              onClick={() => updateCronContentType("ai")}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: cronContentType === "ai" ? '1.5px solid #a855f7' : '1px solid #272a38',
+                background: cronContentType === "ai" ? 'rgba(168, 85, 247, 0.15)' : '#0d0e15',
+                color: cronContentType === "ai" ? '#c084fc' : '#94a3b8',
+                transition: 'all 0.2s',
+              }}
+            >
+              🤖 AI Story Only
+            </button>
+            <button
+              type="button"
+              onClick={() => updateCronContentType("both")}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: cronContentType === "both" ? '1.5px solid #38bdf8' : '1px solid #272a38',
+                background: cronContentType === "both" ? 'rgba(56, 189, 248, 0.15)' : '#0d0e15',
+                color: cronContentType === "both" ? '#38bdf8' : '#94a3b8',
+                transition: 'all 0.2s',
+              }}
+            >
+              🔄 Both (Alternating)
+            </button>
+          </div>
+          <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#64748b' }}>
+            {cronContentType === "viral" && "Each cron execution publishes trending viral reels."}
+            {cronContentType === "ai" && "Each cron execution automatically generates and publishes high-retention AI stories."}
+            {cronContentType === "both" && "Each cron execution alternates one by one: first Viral Reels, next AI Stories, and so on."}
+          </p>
         </div>
 
         {autoPilotEnabled && (
@@ -2242,18 +3484,41 @@ export default function Home() {
     )}
     {videoToDelete && (
       <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget && !isDeleting) setVideoToDelete(null); }}>
-        <section className="auth-modal" role="dialog" style={{ maxWidth: '400px' }}>
+        <section
+          className="auth-modal"
+          role="dialog"
+          style={{
+            maxWidth: '440px',
+            maxHeight: '88vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflowY: 'auto',
+          }}
+        >
           {!isDeleting && <button className="icon-button modal-close" onClick={() => setVideoToDelete(null)} aria-label="Close"><X size={19} /></button>}
           <div className="eyebrow"><span className="eyebrow-dot" style={{ background: '#ea4335' }} /> DELETE VIDEO</div>
-          <h2 id="auth-title">Delete "{videoToDelete.title}"?</h2>
-          <p>Where would you like to delete this video from?</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
+          <h2
+            id="auth-title"
+            style={{
+              fontSize: '18px',
+              fontWeight: 700,
+              lineHeight: 1.4,
+              margin: '12px 0 8px',
+              wordBreak: 'break-word',
+            }}
+          >
+            Delete "{videoToDelete.title.length > 70 ? `${videoToDelete.title.slice(0, 67)}...` : videoToDelete.title}"?
+          </h2>
+          <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#94a3b8' }}>
+            Where would you like to delete this video from?
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: 'auto', paddingTop: '10px' }}>
             <button className="primary-button" disabled={isDeleting} onClick={() => executeDelete(false)} style={{ justifyContent: 'center' }}>
-              {isDeleting ? <LoaderCircle className="spin" size={17} /> : "Remove from Library Only"}
+              {isDeleting ? <LoaderCircle className="spin" size={17} /> : "Remove from Library & Cloudinary"}
             </button>
             { (videoToDelete.youtubeVideoId || videoToDelete.facebookVideoId || videoToDelete.instagramVideoId || videoToDelete.youtube === 1 || videoToDelete.facebook === 1 || videoToDelete.instagram === 1) && (
               <button className="secondary-button" disabled={isDeleting} onClick={() => executeDelete(true)} style={{ justifyContent: 'center', borderColor: '#ea4335', color: '#ea4335', backgroundColor: '#ea433511' }}>
-                {isDeleting ? <LoaderCircle className="spin" size={17} /> : "Delete from Library & Socials"}
+                {isDeleting ? <LoaderCircle className="spin" size={17} /> : "Delete from Library, Cloudinary & Socials"}
               </button>
             )}
             <button className="secondary-button" disabled={isDeleting} onClick={() => setVideoToDelete(null)} style={{ justifyContent: 'center', border: 'none' }}>Cancel</button>

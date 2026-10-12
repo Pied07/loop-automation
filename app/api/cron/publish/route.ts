@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { database } from "@/app/firebase";
 import { collection, doc, getDoc, getDocs, limit, query, setDoc } from "firebase/firestore";
-import { scrapeOnlineViralVideo, cleanViralTitle } from "@/app/viral-actions";
+import { scrapeOnlineViralVideo, cleanViralTitle, generateAiVideoAction } from "@/app/viral-actions";
 import { extractUrlSignatures, isUrlDuplicate, isAudioOnlyUrl } from "@/app/lib/url-utils";
 
 export const maxDuration = 300;
@@ -23,6 +23,8 @@ async function handleCronPublish(req: NextRequest) {
   try {
     let ownerUserId = "auto-pilot";
     let ownerEmail = "";
+    let selectedContentType = "viral";
+
     // 1. Verify if auto-pilot is enabled in Firestore app settings
     if (database) {
       try {
@@ -41,10 +43,67 @@ async function handleCronPublish(req: NextRequest) {
           if (autoData.ownerEmail) {
             ownerEmail = autoData.ownerEmail;
           }
+          if (autoData.contentType) {
+            selectedContentType = autoData.contentType;
+          }
         }
       } catch (err: any) {
         console.warn("Notice: Firestore auto_pilot check fallback:", err.message);
       }
+    }
+
+    // Determine execution mode: 'viral', 'ai', or alternating 'both'
+    let cronMode: "viral" | "ai" = "viral";
+    if (selectedContentType === "ai") {
+      cronMode = "ai";
+    } else if (selectedContentType === "both") {
+      let lastType = "viral";
+      if (database) {
+        try {
+          const cronSnap = await getDoc(doc(database, "app_config", "cron_history"));
+          if (cronSnap.exists() && cronSnap.data()?.lastCronType) {
+            lastType = cronSnap.data().lastCronType;
+          }
+        } catch {}
+      }
+      cronMode = lastType === "viral" ? "ai" : "viral";
+    }
+
+    // If AI Story mode is triggered: generate and auto-publish an AI video
+    if (cronMode === "ai") {
+      console.log("[Cron Auto-Pilot] Generating and auto-publishing fresh AI Story Video...");
+      const aiResult = await generateAiVideoAction({
+        category: "Interesting Facts",
+        numImages: 3,
+        duration: 60,
+        numParts: 1,
+        userId: ownerUserId,
+        userEmail: ownerEmail,
+        autoPublish: true,
+        platforms: { youtube: true, facebook: true, instagram: true },
+      });
+
+      if (database) {
+        try {
+          const cronHistoryRef = doc(database, "app_config", "cron_history");
+          await setDoc(cronHistoryRef, {
+            lastRunAt: new Date().toISOString(),
+            lastTitle: aiResult.title || "AI Story Video",
+            lastCategory: "Interesting Facts",
+            lastCronType: "ai",
+          }, { merge: true });
+        } catch {}
+      }
+
+      return NextResponse.json({
+        success: true,
+        mode: "ai-story",
+        category: "Interesting Facts",
+        title: aiResult.title,
+        videoUrl: aiResult.videoUrl,
+        message: `[Cron Auto-Pilot] AI Story "${aiResult.title}" synthesized and published across socials!`,
+        result: aiResult,
+      });
     }
 
     // 2. Fetch past video source links to ensure 100% freshness (zero duplicates)
@@ -139,6 +198,7 @@ async function handleCronPublish(req: NextRequest) {
           lastTitle: cleanTitle,
           lastCategory: chosenCategory,
           lastSourceUrl: scraped.url,
+          lastCronType: "viral",
         }, { merge: true });
       } catch (err: any) {
         console.warn("Cron history save notice:", err.message);

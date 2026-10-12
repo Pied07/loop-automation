@@ -118,9 +118,11 @@ export async function uploadVideoToCloudinary(filePath: string, publicId: string
 
 export async function deleteCloudinaryAsset(publicId: string, resourceType: "video" | "image" = "video") {
   try {
-    const result = await signedRequest("destroy", { public_id: publicId }, resourceType);
+    const cleanId = publicId.replace(/\.[a-zA-Z0-9]+$/, "");
+    const result = await signedRequest("destroy", { public_id: cleanId }, resourceType);
     return result.result === "ok";
-  } catch {
+  } catch (err: any) {
+    console.warn(`deleteCloudinaryAsset warning (${publicId}):`, err?.message);
     return false;
   }
 }

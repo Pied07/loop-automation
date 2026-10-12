@@ -62,6 +62,9 @@ huggingface-worker/
 
 # Local scratch and model cache
 scratch/
+public/generated-videos/
+*.parquet
 scripts/models/whisper-tiny/*.bin
+scripts/models/dataset_real_images/
 __pycache__/
 *.py[cod]

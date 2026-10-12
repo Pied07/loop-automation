@@ -1,0 +1,218 @@
+{
+  "Motivational": {
+    "name": "Marcus (High Energy Mentor)",
+    "url": "https://raw.githubusercontent.com/OpenTalker/SadTalker/main/examples/source_image/full_body_1.png",
+    "gender": "male",
+    "style": "professional_suit",
+    "face_box": [
+      0.3,
+      0.08,
+      0.7,
+      0.4
+    ],
+    "mouth_box": [
+      0.42,
+      0.28,
+      0.58,
+      0.35
+    ],
+    "eyes_box": [
+      0.38,
+      0.17,
+      0.62,
+      0.23
+    ]
+  },
+  "Horror": {
+    "name": "Damian (Mystery Narrator)",
+    "url": "https://raw.githubusercontent.com/OpenTalker/SadTalker/main/examples/source_image/art_0.png",
+    "gender": "male",
+    "style": "dark_cinematic",
+    "face_box": [
+      0.25,
+      0.12,
+      0.75,
+      0.52
+    ],
+    "mouth_box": [
+      0.4,
+      0.38,
+      0.6,
+      0.47
+    ],
+    "eyes_box": [
+      0.35,
+      0.23,
+      0.65,
+      0.31
+    ]
+  },
+  "Educational": {
+    "name": "Elena (Science & Tech Presenter)",
+    "url": "https://raw.githubusercontent.com/OpenTalker/SadTalker/main/examples/source_image/full_body_2.png",
+    "gender": "female",
+    "style": "smart_casual",
+    "face_box": [
+      0.32,
+      0.1,
+      0.68,
+      0.42
+    ],
+    "mouth_box": [
+      0.43,
+      0.3,
+      0.57,
+      0.37
+    ],
+    "eyes_box": [
+      0.39,
+      0.19,
+      0.61,
+      0.25
+    ]
+  },
+  "Comedy": {
+    "name": "Leo (Standup & Entertainment)",
+    "url": "https://raw.githubusercontent.com/OpenTalker/SadTalker/main/examples/source_image/people_0.png",
+    "gender": "male",
+    "style": "expressive_vibrant",
+    "face_box": [
+      0.2,
+      0.15,
+      0.8,
+      0.75
+    ],
+    "mouth_box": [
+      0.38,
+      0.52,
+      0.62,
+      0.64
+    ],
+    "eyes_box": [
+      0.32,
+      0.32,
+      0.68,
+      0.42
+    ]
+  },
+  "Romance": {
+    "name": "Sophia (Emotional Storyteller)",
+    "url": "https://raw.githubusercontent.com/OpenTalker/SadTalker/main/examples/source_image/art_13.png",
+    "gender": "female",
+    "style": "warm_aesthetic",
+    "face_box": [
+      0.22,
+      0.12,
+      0.78,
+      0.7
+    ],
+    "mouth_box": [
+      0.39,
+      0.5,
+      0.61,
+      0.6
+    ],
+    "eyes_box": [
+      0.34,
+      0.3,
+      0.66,
+      0.4
+    ]
+  },
+  "Adventure": {
+    "name": "Alex (Explorer Host)",
+    "url": "https://raw.githubusercontent.com/OpenTalker/SadTalker/main/examples/source_image/art_1.png",
+    "gender": "male",
+    "style": "rugged_outdoor",
+    "face_box": [
+      0.22,
+      0.12,
+      0.78,
+      0.72
+    ],
+    "mouth_box": [
+      0.39,
+      0.5,
+      0.61,
+      0.62
+    ],
+    "eyes_box": [
+      0.33,
+      0.3,
+      0.67,
+      0.4
+    ]
+  },
+  "Music": {
+    "name": "Aria (Pop & Beats Host)",
+    "url": "https://raw.githubusercontent.com/OpenTalker/SadTalker/main/examples/source_image/art_14.png",
+    "gender": "female",
+    "style": "neon_studio",
+    "face_box": [
+      0.2,
+      0.12,
+      0.8,
+      0.7
+    ],
+    "mouth_box": [
+      0.38,
+      0.49,
+      0.62,
+      0.6
+    ],
+    "eyes_box": [
+      0.33,
+      0.28,
+      0.67,
+      0.38
+    ]
+  },
+  "Food": {
+    "name": "Gordon (Culinary Critic)",
+    "url": "https://raw.githubusercontent.com/OpenTalker/SadTalker/main/examples/source_image/art_15.png",
+    "gender": "male",
+    "style": "chef_coat",
+    "face_box": [
+      0.22,
+      0.12,
+      0.78,
+      0.72
+    ],
+    "mouth_box": [
+      0.39,
+      0.5,
+      0.61,
+      0.62
+    ],
+    "eyes_box": [
+      0.33,
+      0.3,
+      0.67,
+      0.4
+    ]
+  },
+  "Trending": {
+    "name": "Jordan (Viral News Anchor)",
+    "url": "https://raw.githubusercontent.com/OpenTalker/SadTalker/main/examples/source_image/full_body_1.png",
+    "gender": "unisex",
+    "style": "broadcast_studio",
+    "face_box": [
+      0.3,
+      0.08,
+      0.7,
+      0.4
+    ],
+    "mouth_box": [
+      0.42,
+      0.28,
+      0.58,
+      0.35
+    ],
+    "eyes_box": [
+      0.38,
+      0.17,
+      0.62,
+      0.23
+    ]
+  }
+}

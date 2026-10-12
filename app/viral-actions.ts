@@ -5,6 +5,8 @@ import fs from "fs";
 import { exec, spawn } from "child_process";
 import { promisify } from "util";
 import { extractUrlSignatures, isUrlDuplicate, isAudioOnlyUrl, isVerifiedVideoUrl } from "@/app/lib/url-utils";
+import { database } from "@/app/firebase";
+import { doc, setDoc } from "firebase/firestore";
 
 const execAsync = promisify(exec);
 const SHORT_CLIP_LENGTH_SECONDS = 90;
@@ -819,25 +821,38 @@ export async function publishClipAndCleanup(params: {
     ? (viralTitle.toLowerCase().includes("#shorts") ? viralTitle.slice(0, 100) : `${viralTitle.slice(0, 85)} #Shorts`)
     : viralTitle.slice(0, 100);
 
-  // Helper: Assembles social captions with ZERO duplicate titles, lines, or redundant CTAs
+  // Helper: Assembles high-converting social captions with clean structure, zero duplicate hashtags, and strict length limits
   const assembleDeduplicatedCaption = ({
     captionTitle,
     captionDesc,
     callToAction,
     captionHashtags,
     titlePrefix,
+    maxChars = 2000,
+    maxTags = 25,
   }: {
     captionTitle: string;
     captionDesc: string;
     callToAction?: string;
     captionHashtags: string[];
     titlePrefix?: string;
+    maxChars?: number;
+    maxTags?: number;
   }): string => {
+    // 1. Extract any existing hashtags from description to avoid duplicates
+    const embeddedTags = (captionDesc.match(/#[a-zA-Z0-9_\u00c0-\u024f]+/g) || []).map((t) => t.trim());
+
+    // Clean description body by removing embedded hashtag text
+    const cleanDescBody = (captionDesc || "")
+      .replace(/#[a-zA-Z0-9_\u00c0-\u024f]+/g, "")
+      .replace(/[ \t]{2,}/g, " ")
+      .trim();
+
     const normTitle = captionTitle.trim().toLowerCase().replace(/^[^\w]+|[^\w]+$/g, "");
     const lines: string[] = [];
     const seenNormLines = new Set<string>();
 
-    const descLower = (captionDesc || "").toLowerCase();
+    const descLower = cleanDescBody.toLowerCase();
     const descHasTitle = normTitle.length > 5 && descLower.includes(normTitle);
 
     // If description does NOT already contain/feature the title, prepend it cleanly
@@ -847,7 +862,7 @@ export async function publishClipAndCleanup(params: {
       seenNormLines.add(normTitle);
     }
 
-    const rawLines = (captionDesc || "").split("\n");
+    const rawLines = cleanDescBody.split("\n");
     for (const raw of rawLines) {
       const trimmed = raw.trim();
       if (!trimmed) {
@@ -887,35 +902,61 @@ export async function publishClipAndCleanup(params: {
       }
     }
 
-    if (captionHashtags && captionHashtags.length > 0) {
-      if (lines.length > 0 && lines[lines.length - 1] !== "") {
-        lines.push("");
-      }
-      lines.push(captionHashtags.slice(0, 30).join(" "));
+    // Build deduplicated hashtags list up to maxTags limit
+    const allCandidateTags = Array.from(new Set([...(captionHashtags || []), ...embeddedTags]))
+      .map((tag) => (tag.startsWith("#") ? tag : `#${tag}`))
+      .filter((tag) => tag.length > 1 && tag.length <= 35);
+
+    const safeTags = allCandidateTags.slice(0, maxTags);
+    const tagsString = safeTags.join(" ");
+
+    // Budget character length: reserve room for hashtags string + separator
+    const reservedForTags = tagsString.length > 0 ? tagsString.length + 2 : 0;
+    const bodyBudget = Math.max(80, maxChars - reservedForTags);
+
+    let bodyText = lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+    if (bodyText.length > bodyBudget) {
+      bodyText = bodyText.slice(0, bodyBudget - 4).trim() + "...";
     }
 
-    return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+    if (tagsString) {
+      return `${bodyText}\n\n${tagsString}`.trim();
+    }
+    return bodyText;
   };
+
+  const isAi = Boolean(
+    params.title?.toLowerCase().includes("story") ||
+    (description && description.toLowerCase().includes("part")) ||
+    formattedHashtags.some((h) => /facts|story|mystery|science|knowledge|history|mythology/i.test(h))
+  );
 
   const youtubeDescription = assembleDeduplicatedCaption({
     captionTitle: viralTitle,
     titlePrefix: "🎬",
     captionDesc: description,
+    callToAction: isAi ? "🔔 Subscribe for daily mind-blowing facts & stories!" : "🔔 Subscribe for daily viral moments!",
     captionHashtags: formattedHashtags,
+    maxChars: 4000,
+    maxTags: 28,
   });
 
   const instagramCaption = assembleDeduplicatedCaption({
     captionTitle: viralTitle,
     captionDesc: description,
-    callToAction: `👉 Follow @${igHandle} for daily cinema & drama scenes! 🍿`,
+    callToAction: isAi ? `👉 Follow @${igHandle} for daily stories & facts! ✨` : `👉 Follow @${igHandle} for daily viral scenes! 🍿`,
     captionHashtags: formattedHashtags,
+    maxChars: 1800,
+    maxTags: 25,
   });
 
   const facebookReelCaption = assembleDeduplicatedCaption({
     captionTitle: viralTitle,
     captionDesc: description,
-    callToAction: "Who was in the wrong here? Drop your thoughts below 👇",
+    callToAction: isAi ? "What surprised you the most about this? Drop your thoughts below 👇" : "Who was in the wrong here? Drop your thoughts below 👇",
     captionHashtags: formattedHashtags,
+    maxChars: 2000,
+    maxTags: 25,
   });
 
   let youtubeVideoId: string | undefined;
@@ -1211,41 +1252,108 @@ export async function publishClipAndCleanup(params: {
             throw new Error("Instagram Reels require a direct video file. Please configure Cloudinary in .env or provide a public video URL.");
           }
 
-          // 1. Post Instagram Reel
-          const createRes = await fetch(`${instagramApi}/${igUserId}/media`, {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-              access_token: instagramToken,
-              media_type: "REELS",
-              video_url: publicVideoUrl,
-              caption: instagramCaption,
-              share_to_feed: "true",
-            }),
-          });
-          const createData = await createRes.json();
-          if (!createRes.ok || createData.error) throw new Error(createData.error?.message || `HTTP ${createRes.status}`);
-
-          const creationId = createData.id;
-          let finished = false;
-          for (let i = 0; i < 16; i++) {
-            await new Promise((r) => setTimeout(r, 2500));
-            const statusUrl = new URL(`${instagramApi}/${creationId}`);
-            statusUrl.search = new URLSearchParams({
-              fields: "status_code,status",
-              access_token: instagramToken,
-            }).toString();
-            const statusRes = await fetch(statusUrl, { cache: "no-store" });
-            const statusData = await statusRes.json();
-            if (statusData.status_code === "FINISHED") { finished = true; break; }
-            if (statusData.status_code === "ERROR") throw new Error(statusData.status || "Instagram processing failed.");
+          // Format Cloudinary video delivery URL with progressive faststart & H.264 profile
+          // This eliminates error 2207076 caused by missing moov atom / streaming headers
+          if (publicVideoUrl.includes("/video/upload/") && !publicVideoUrl.includes("/video/upload/f_mp4")) {
+            publicVideoUrl = publicVideoUrl.replace("/video/upload/", "/video/upload/f_mp4,vc_h264/");
           }
-          if (!finished) throw new Error("Instagram processing timed out.");
+
+          // CDN readiness probe: ensure the video is cached and returns 200/206 before Meta attempts to crawl
+          try {
+            for (let cdnCheck = 0; cdnCheck < 4; cdnCheck++) {
+              const headRes = await fetch(publicVideoUrl, { method: "HEAD", signal: AbortSignal.timeout(6000) }).catch(() => null);
+              if (headRes && (headRes.status === 200 || headRes.status === 206)) {
+                break;
+              }
+              await new Promise((r) => setTimeout(r, 1500));
+            }
+          } catch {}
+
+          // 1. Post Instagram Reel (with automatic 2-attempt resilience for transient Meta 2207076 errors)
+          let finished = false;
+          let publishCreationId = "";
+          let lastInstagramError = "";
+          const maxContainerAttempts = 2;
+
+          for (let cAttempt = 1; cAttempt <= maxContainerAttempts; cAttempt++) {
+            let createRes = await fetch(`${instagramApi}/${igUserId}/media`, {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({
+                access_token: instagramToken,
+                media_type: "REELS",
+                video_url: publicVideoUrl,
+                caption: instagramCaption,
+                share_to_feed: "true",
+              }),
+            });
+            let createData = await createRes.json();
+            // If rejected due to caption length or hashtag limits, automatically retry with safe concise caption
+            if (!createRes.ok || createData.error) {
+              const errStr = String(createData.error?.message || "");
+              if (errStr.toLowerCase().includes("caption") || errStr.toLowerCase().includes("too long")) {
+                const safeCompactCaption = `${viralTitle}\n\n👉 Follow @${igHandle} for more!\n\n${formattedHashtags.slice(0, 15).join(" ")}`;
+                createRes = await fetch(`${instagramApi}/${igUserId}/media`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                  body: new URLSearchParams({
+                    access_token: instagramToken,
+                    media_type: "REELS",
+                    video_url: publicVideoUrl,
+                    caption: safeCompactCaption,
+                    share_to_feed: "true",
+                  }),
+                });
+                createData = await createRes.json();
+              }
+            }
+            if (!createRes.ok || createData.error) {
+              if (cAttempt < maxContainerAttempts) {
+                await new Promise((r) => setTimeout(r, 4000));
+                continue;
+              }
+              throw new Error(createData.error?.message || `HTTP ${createRes.status}`);
+            }
+
+            const creationId = createData.id;
+            let containerError = "";
+            for (let i = 0; i < 20; i++) {
+              await new Promise((r) => setTimeout(r, 3000));
+              const statusUrl = new URL(`${instagramApi}/${creationId}`);
+              statusUrl.search = new URLSearchParams({
+                fields: "status_code,status",
+                access_token: instagramToken,
+              }).toString();
+              const statusRes = await fetch(statusUrl, { cache: "no-store" });
+              const statusData = await statusRes.json();
+              if (statusData.status_code === "FINISHED") {
+                finished = true;
+                publishCreationId = creationId;
+                break;
+              }
+              if (statusData.status_code === "ERROR") {
+                containerError = statusData.status || "Instagram processing failed.";
+                break;
+              }
+            }
+
+            if (finished) break;
+
+            lastInstagramError = containerError;
+            if (cAttempt < maxContainerAttempts) {
+              console.warn(`Instagram Reel container attempt ${cAttempt} failed (${containerError}). Retrying container in 6s...`);
+              await new Promise((r) => setTimeout(r, 6000));
+            }
+          }
+
+          if (!finished || !publishCreationId) {
+            throw new Error(lastInstagramError || "Instagram processing timed out.");
+          }
 
           const publishRes = await fetch(`${instagramApi}/${igUserId}/media_publish`, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({ access_token: instagramToken, creation_id: creationId }),
+            body: new URLSearchParams({ access_token: instagramToken, creation_id: publishCreationId }),
           });
           const publishData = await publishRes.json();
           instagramVideoId = publishData.id;
@@ -1428,9 +1536,15 @@ export async function publishClipAndCleanup(params: {
     }
 
     // 3. Delete clip from Cloudinary (Auto-cleanup to keep storage at 0 MB)
+    // Preserves asset if any selected platform failed so user can use the "Repost" button
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
     const apiKey = process.env.CLOUDINARY_API_KEY;
     const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+    const allRequestedPlatformsPublished =
+      (!platforms.includes("YouTube") || !!youtubeUrl || !!youtubeVideoId) &&
+      (!platforms.includes("Facebook") || !!facebookUrl || !!facebookVideoId) &&
+      (!platforms.includes("Instagram") || !!instagramUrl || !!instagramVideoId);
 
     let targetPublicId = params.cloudinaryPublicId || uploadedCloudinaryId;
     if (!targetPublicId && clipPath.includes("res.cloudinary.com")) {
@@ -1438,51 +1552,33 @@ export async function publishClipAndCleanup(params: {
       if (match) targetPublicId = match[1];
     }
 
-    if (targetPublicId && cloudName && apiKey && apiSecret && process.env.CLOUDINARY_DELETE_AFTER_PUBLISH === "true") {
+    if (allRequestedPlatformsPublished && targetPublicId && cloudName && apiKey && apiSecret) {
       try {
-        const timestamp = Math.floor(Date.now() / 1000);
-        const crypto = await import("crypto");
-        const signature = crypto
-          .createHash("sha1")
-          .update(`public_id=${targetPublicId}&timestamp=${timestamp}${apiSecret}`)
-          .digest("hex");
-
-        const formData = new FormData();
-        formData.append("public_id", targetPublicId);
-        formData.append("api_key", apiKey);
-        formData.append("timestamp", timestamp.toString());
-        formData.append("signature", signature);
-
-        const destroyRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/video/destroy`, {
-          method: "POST",
-          body: formData,
-        });
-        const destroyData = await destroyRes.json();
-        if (destroyData.result === "ok") {
-          logs.push(`🗑️ Cloudinary storage cleaned up (${targetPublicId}).`);
-        } else {
-          console.warn("Cloudinary destroy response:", destroyData);
+        const { deleteCloudinaryAsset } = await import("@/app/cloudinary-upload");
+        const ok = await deleteCloudinaryAsset(targetPublicId, "video");
+        if (ok) {
+          logs.push(`🗑️ Cloudinary video deleted (${targetPublicId}).`);
         }
       } catch (cErr: any) {
         console.warn("Could not delete clip from Cloudinary:", cErr.message);
       }
     }
 
-    // 4. Delete story thumbnail / video from Cloudinary (Auto-cleanup to keep storage at 0 MB)
+    // 4. Delete story thumbnail / image / video from Cloudinary (Auto-cleanup to keep storage at 0 MB)
     let storyTargetId = uploadedStoryCardId;
     if (!storyTargetId && storyCardUrl && storyCardUrl.includes("res.cloudinary.com")) {
       const match = storyCardUrl.match(/\/(?:image|video)\/upload\/(?:v\d+\/)?([^.]+)/);
       if (match) storyTargetId = match[1];
     }
 
-    if (storyTargetId && cloudName && apiKey && apiSecret && process.env.CLOUDINARY_DELETE_AFTER_PUBLISH === "true") {
+    if (storyTargetId && cloudName && apiKey && apiSecret) {
       try {
         const { deleteCloudinaryAsset } = await import("@/app/cloudinary-upload");
         await Promise.allSettled([
           deleteCloudinaryAsset(storyTargetId, "video"),
           deleteCloudinaryAsset(storyTargetId, "image"),
         ]);
-        logs.push(`🗑️ Cloudinary story asset cleaned up (${storyTargetId}).`);
+        logs.push(`🗑️ Cloudinary story asset deleted (${storyTargetId}).`);
       } catch (cErr: any) {
         console.warn("Could not delete story asset from Cloudinary:", cErr.message);
       }
@@ -2014,4 +2110,207 @@ export async function autoFindViralVideo(
     return { error: error.message || "Failed to find viral video." };
   }
 }
+
+// ─── AI Video Generation Action (Using ONNX Model on Real Dataset) ────────────
+export async function generateAiVideoAction(params: {
+  category: string;
+  customTag?: string;
+  prompt?: string;
+  script?: string;
+  voice?: string;
+  numImages?: number;
+  duration?: number;
+  numParts?: number;
+  partNumber?: number;
+  userId?: string;
+  userEmail?: string;
+  autoPublish?: boolean;
+  platforms?: { youtube?: boolean; facebook?: boolean; instagram?: boolean };
+}): Promise<{
+  success: boolean;
+  videoUrl?: string;
+  thumbnailUrl?: string;
+  title?: string;
+  description?: string;
+  hashtags?: string[];
+  category?: string;
+  isAiVideo?: boolean;
+  partNumber?: number;
+  totalParts?: number;
+  duration?: number;
+  clip?: any;
+  publishResult?: any;
+  error?: string;
+}> {
+  try {
+    const category = params.category?.trim() || "Interesting Facts";
+    const customTag = params.customTag?.trim() || "";
+    const prompt = params.prompt?.trim() || "";
+    const script = params.script?.trim() || "";
+    const voice = params.voice?.trim() || "en-US-ChristopherNeural";
+    const numImages = params.numImages ? Math.max(1, Math.min(5, Number(params.numImages))) : 3;
+    const duration = params.duration ? Math.max(10, Math.min(120, Number(params.duration))) : 20;
+    const numParts = params.numParts ? Math.max(1, Math.min(5, Number(params.numParts))) : 1;
+    const partNumber = params.partNumber ? Math.max(1, Math.min(numParts, Number(params.partNumber))) : 1;
+
+    const pyExe = process.platform === "win32" ? "py" : "python3";
+    const scriptPath = path.join(process.cwd(), "scripts", "ai_video_engine.py");
+
+    // Write custom script to temp file if provided to avoid CLI quote escaping limits
+    let scriptArg = "";
+    if (script) {
+      const tempScriptPath = path.join(process.cwd(), "scratch", `custom_script_${Date.now()}.txt`);
+      await fs.promises.mkdir(path.dirname(tempScriptPath), { recursive: true });
+      await fs.promises.writeFile(tempScriptPath, script, "utf-8");
+      scriptArg = `--script "${script.replace(/["\r\n]/g, " ")}"`;
+    }
+
+    const args = [
+      `"${scriptPath}"`,
+      `--category "${category.replace(/"/g, "")}"`,
+      `--custom-tag "${customTag.replace(/"/g, "")}"`,
+      `--prompt "${prompt.replace(/"/g, "")}"`,
+      scriptArg,
+      `--voice "${voice.replace(/"/g, "")}"`,
+      `--num-images ${numImages}`,
+      `--duration ${duration}`,
+      `--num-parts ${numParts}`,
+      `--part-number ${partNumber}`,
+    ].filter(Boolean);
+
+    const { stdout } = await execAsync(`"${pyExe}" ${args.join(" ")}`, {
+      maxBuffer: 20 * 1024 * 1024,
+    });
+
+    const lines = stdout.trim().split("\n");
+    const jsonStartIdx = lines.findIndex((l) => l.trim().startsWith("{"));
+    if (jsonStartIdx === -1) {
+      throw new Error(`AI Video engine output could not be parsed: ${stdout.slice(0, 300)}`);
+    }
+    const jsonStr = lines.slice(jsonStartIdx).join("\n");
+    const parsed = JSON.parse(jsonStr);
+
+    if (!parsed.success || !parsed.videoPath) {
+      throw new Error(parsed.error || "AI video engine did not produce video.");
+    }
+
+    let cloudinaryUrl = "";
+    let cloudinaryThumb = "";
+    const clipId = `ai_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    try {
+      const { uploadVideoToCloudinary, uploadImageToCloudinary } = await import("@/app/cloudinary-upload");
+      const upVid = await uploadVideoToCloudinary(parsed.videoPath, `ai_videos/${clipId}`);
+      cloudinaryUrl = upVid.secureUrl;
+
+      if (parsed.thumbnailPath && fs.existsSync(parsed.thumbnailPath)) {
+        try {
+          const upThumb = await uploadImageToCloudinary(parsed.thumbnailPath, `ai_thumbs/${clipId}`);
+          cloudinaryThumb = upThumb.secureUrl;
+        } catch {}
+      }
+    } catch (cErr: any) {
+      console.warn("Notice: Cloudinary upload fallback for AI video:", cErr.message);
+    }
+
+    const clipObj = {
+      id: clipId,
+      partNumber,
+      totalParts: numParts,
+      title: parsed.title,
+      description: parsed.description,
+      hashtags: parsed.hashtags || [],
+      videoUrl: cloudinaryUrl || parsed.videoPath,
+      cloudinaryUrl: cloudinaryUrl || undefined,
+      cloudinaryPublicId: cloudinaryUrl ? `ai_videos/${clipId}` : undefined,
+      thumbnailUrl: cloudinaryThumb || undefined,
+      format: category,
+      category,
+      isAiVideo: true,
+      createdAt: new Date().toISOString(),
+      duration: parsed.duration || duration,
+    };
+
+    let publishResult = undefined;
+    if (params.platforms && (params.platforms.youtube || params.platforms.facebook || params.platforms.instagram)) {
+      const activePlats: string[] = [];
+      if (params.platforms.youtube) activePlats.push("YouTube");
+      if (params.platforms.facebook) activePlats.push("Facebook");
+      if (params.platforms.instagram) activePlats.push("Instagram");
+
+      publishResult = await publishClipAndCleanup({
+        clipPath: cloudinaryUrl || parsed.videoPath,
+        title: parsed.title,
+        description: parsed.description,
+        hashtags: parsed.hashtags,
+        partNumber,
+        totalParts: numParts,
+        platforms: activePlats,
+        userEmail: params.userEmail || "",
+        connections: activePlats,
+        cloudinaryPublicId: cloudinaryUrl ? `ai_videos/${clipId}` : undefined,
+      });
+
+      if (database && publishResult && (publishResult.youtubeVideoId || publishResult.facebookVideoId || publishResult.instagramVideoId)) {
+        try {
+          const ytVal: 0 | 1 = (publishResult.youtubeUrl || publishResult.youtubeVideoId) ? 1 : 0;
+          const fbVal: 0 | 1 = (publishResult.facebookUrl || publishResult.facebookVideoId) ? 1 : 0;
+          const igVal: 0 | 1 = (publishResult.instagramUrl || publishResult.instagramVideoId) ? 1 : 0;
+          const record = {
+            id: clipId,
+            userId: params.userId || "auto-pilot",
+            title: parsed.title,
+            description: parsed.description,
+            hashtags: (parsed.hashtags || []).map((h: string) => h.startsWith("#") ? h : `#${h}`),
+            format: category,
+            isAiVideo: true,
+            createdAt: new Date().toISOString(),
+            status: "completed",
+            videoUrl: cloudinaryUrl || parsed.videoPath,
+            cloudinaryUrl: cloudinaryUrl || undefined,
+            youtube: ytVal,
+            youtubeVideoId: publishResult.youtubeVideoId || "",
+            youtubeUrl: publishResult.youtubeUrl || (publishResult.youtubeVideoId ? `https://www.youtube.com/shorts/${publishResult.youtubeVideoId}` : ""),
+            facebook: fbVal,
+            facebookVideoId: publishResult.facebookVideoId || "",
+            facebookUrl: publishResult.facebookUrl || (publishResult.facebookVideoId ? `https://www.facebook.com/reel/${publishResult.facebookVideoId}` : ""),
+            instagram: igVal,
+            instagramVideoId: publishResult.instagramVideoId || "",
+            instagramUrl: publishResult.instagramUrl || (publishResult.instagramVideoId ? `https://www.instagram.com/reel/${publishResult.instagramVideoId}` : ""),
+            thumbnailUrl: cloudinaryThumb || publishResult.thumbnailUrl || undefined,
+            duration: parsed.duration || duration,
+            isCron: params.userId === "auto-pilot" || !params.userId,
+          };
+          const targetUser = params.userId || "auto-pilot";
+          await setDoc(doc(database, "videos", clipId), record, { merge: true });
+          await setDoc(doc(database, "users", targetUser, "videos", clipId), record, { merge: true });
+        } catch (dbErr: any) {
+          console.warn("Notice: Firestore save in generateAiVideoAction:", dbErr.message);
+        }
+      }
+    }
+
+    return {
+      success: true,
+      videoUrl: cloudinaryUrl || parsed.videoPath,
+      thumbnailUrl: cloudinaryThumb || undefined,
+      title: parsed.title,
+      description: parsed.description,
+      hashtags: parsed.hashtags,
+      category,
+      isAiVideo: true,
+      partNumber,
+      totalParts: numParts,
+      duration: parsed.duration || duration,
+      clip: clipObj,
+      publishResult,
+    };
+  } catch (err: any) {
+    console.error("AI Video Generation error:", err);
+    return {
+      success: false,
+      error: err.message || "Failed to generate AI video.",
+    };
+  }
+}
+
 

@@ -229,3 +229,83 @@ export async function deleteFromInstagram(
 
   return { success: true };
 }
+
+// ─── Delete from Cloudinary (Videos & Associated Thumbnails) ─────────────────
+export async function deleteFromCloudinary(params: {
+  cloudinaryPublicId?: string;
+  cloudinaryUrl?: string;
+  videoUrl?: string;
+  thumbnailUrl?: string;
+}) {
+  const { cloudinaryPublicId, cloudinaryUrl, videoUrl, thumbnailUrl } = params;
+  const { deleteCloudinaryAsset } = await import("@/app/cloudinary-upload");
+
+  const results: { videoDeleted: boolean; imageDeleted: boolean; deletedIds: string[] } = {
+    videoDeleted: false,
+    imageDeleted: false,
+    deletedIds: [],
+  };
+
+  const candidateVideoIds = new Set<string>();
+  const candidateImageIds = new Set<string>();
+
+  const extractPublicId = (rawUrlOrId?: string, type: "video" | "image" = "video") => {
+    if (!rawUrlOrId) return "";
+    const str = rawUrlOrId.trim();
+    if (str.includes("res.cloudinary.com")) {
+      const regex = new RegExp(`\\/${type}\\/upload\\/(?:v\\d+\\/)?([^.]+)`);
+      const match = str.match(regex);
+      if (match && match[1]) return decodeURIComponent(match[1]);
+      const generalMatch = str.match(/\/upload\/(?:v\d+\/)?([^.]+)/);
+      if (generalMatch && generalMatch[1]) return decodeURIComponent(generalMatch[1]);
+    }
+    return str.replace(/\.[a-zA-Z0-9]+$/, "");
+  };
+
+  if (cloudinaryPublicId) {
+    candidateVideoIds.add(extractPublicId(cloudinaryPublicId, "video"));
+  }
+  if (cloudinaryUrl) {
+    candidateVideoIds.add(extractPublicId(cloudinaryUrl, "video"));
+  }
+  if (videoUrl && videoUrl.includes("res.cloudinary.com")) {
+    candidateVideoIds.add(extractPublicId(videoUrl, "video"));
+  }
+  if (thumbnailUrl && thumbnailUrl.includes("res.cloudinary.com")) {
+    candidateImageIds.add(extractPublicId(thumbnailUrl, "image"));
+  }
+
+  for (const vId of Array.from(candidateVideoIds)) {
+    if (vId.startsWith("ai_videos/")) {
+      candidateImageIds.add(vId.replace("ai_videos/", "ai_thumbs/"));
+    }
+  }
+
+  for (const vidId of Array.from(candidateVideoIds)) {
+    if (!vidId) continue;
+    try {
+      const ok = await deleteCloudinaryAsset(vidId, "video");
+      if (ok) {
+        results.videoDeleted = true;
+        results.deletedIds.push(vidId);
+      }
+    } catch (e: any) {
+      console.warn(`Could not delete video ${vidId} from Cloudinary:`, e.message);
+    }
+  }
+
+  for (const imgId of Array.from(candidateImageIds)) {
+    if (!imgId) continue;
+    try {
+      const ok = await deleteCloudinaryAsset(imgId, "image");
+      if (ok) {
+        results.imageDeleted = true;
+        results.deletedIds.push(imgId);
+      }
+    } catch (e: any) {
+      console.warn(`Could not delete image ${imgId} from Cloudinary:`, e.message);
+    }
+  }
+
+  return results;
+}

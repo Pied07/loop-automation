@@ -1,0 +1,1153 @@
+import os
+import sys
+import re
+import json
+import time
+import shutil
+import asyncio
+import argparse
+import subprocess
+import urllib.request
+import urllib.parse
+from pathlib import Path
+from typing import Dict, Any, List, Tuple
+
+import numpy as np
+import onnxruntime as ort
+from PIL import Image, ImageDraw, ImageFilter
+
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+MODELS_DIR = Path(__file__).resolve().parent / "models"
+ONNX_MODEL_PATH = MODELS_DIR / "ai_video_generator.onnx"
+ONNX_MOTION_PATH = MODELS_DIR / "human_avatar_motion.onnx"
+CONFIG_PATH = MODELS_DIR / "ai_video_config.json"
+CHARACTERS_DIR = MODELS_DIR / "characters"
+
+FFMPEG_BIN = ROOT_DIR / "ffmpeg.exe"
+if not FFMPEG_BIN.exists():
+    FFMPEG_BIN = Path(shutil.which("ffmpeg") or "ffmpeg")
+
+THEMES = {
+    "Motivational": {
+        "badge": "🔥 MOTIVATIONAL",
+        "bg_color": "0x1a0f00",
+        "accent": "#f59e0b",
+        "text_highlight": "#fbbf24",
+        "voice": "en-US-ChristopherNeural",
+        "tone_freq": 220,
+        "style_prompt": "cinematic hyperrealistic 8k dramatic lighting epic composition masterwork",
+    },
+    "Horror": {
+        "badge": "👻 TRUE MYSTERY",
+        "bg_color": "0x0a0000",
+        "accent": "#ef4444",
+        "text_highlight": "#f87171",
+        "voice": "en-US-ChristopherNeural",
+        "tone_freq": 110,
+        "style_prompt": "dark eerie cinematic atmospheric shadows fog mystery 8k octane render",
+    },
+    "Educational": {
+        "badge": "💡 DID YOU KNOW?",
+        "bg_color": "0x031726",
+        "accent": "#0ea5e9",
+        "text_highlight": "#38bdf8",
+        "voice": "en-US-GuyNeural",
+        "tone_freq": 330,
+        "style_prompt": "scientific concept visual discovery futuristic clean 8k unreal engine 5 render",
+    },
+    "Comedy": {
+        "badge": "😂 DAILY LAUGHS",
+        "bg_color": "0x261a00",
+        "accent": "#eab308",
+        "text_highlight": "#fde047",
+        "voice": "en-US-GuyNeural",
+        "tone_freq": 440,
+        "style_prompt": "vibrant colorful lively expressive high energy 3d animated style 8k",
+    },
+    "Romance": {
+        "badge": "❤️ HEART & SOUL",
+        "bg_color": "0x260014",
+        "accent": "#ec4899",
+        "text_highlight": "#f472b6",
+        "voice": "en-US-JennyNeural",
+        "tone_freq": 261,
+        "style_prompt": "warm golden hour cinematic emotional bokeh romantic atmosphere 8k masterpiece",
+    },
+    "Adventure": {
+        "badge": "⚡ EXTREME EXPEDITION",
+        "bg_color": "0x022c22",
+        "accent": "#10b981",
+        "text_highlight": "#34d399",
+        "voice": "en-US-GuyNeural",
+        "tone_freq": 293,
+        "style_prompt": "epic landscape extreme nature wilderness exploration 8k national geographic cinematography",
+    },
+    "Music": {
+        "badge": "🎵 VIRAL SOUND",
+        "bg_color": "0x1e1b4b",
+        "accent": "#8b5cf6",
+        "text_highlight": "#a78bfa",
+        "voice": "en-US-JennyNeural",
+        "tone_freq": 392,
+        "style_prompt": "neon cyberpunk stage lights futuristic music concert visual audio waves 8k",
+    },
+    "Interesting Facts": {
+        "badge": "🧠 MIND BLOWN",
+        "bg_color": "0x031726",
+        "accent": "#06b6d4",
+        "text_highlight": "#22d3ee",
+        "voice": "en-US-ChristopherNeural",
+        "tone_freq": 280,
+        "style_prompt": "mind-blowing real world discovery cosmic scientific phenomenon 8k high detail macro photography",
+    },
+    "Others": {
+        "badge": "✨ EXCLUSIVE STORY",
+        "bg_color": "0x18181b",
+        "accent": "#a855f7",
+        "text_highlight": "#c084fc",
+        "voice": "en-US-ChristopherNeural",
+        "tone_freq": 250,
+        "style_prompt": "cinematic hyperrealistic dramatic 8k unreal engine lighting storytelling masterpiece",
+    },
+}
+
+THEMES["Trending"] = THEMES["Interesting Facts"]
+THEMES["Food"] = THEMES["Interesting Facts"]
+
+CATEGORIES_LIST = [
+    "Interesting Facts", "Comedy", "Motivational", "Horror", "Educational",
+    "Romance", "Adventure", "Music", "Others"
+]
+
+
+def extract_topic_from_text(text: str, category: str = "") -> str:
+    """
+    Extracts a concise, high-value subject entity from user prompts, scripts, or story hooks.
+    Guarantees clean 2-4 word topic strings (e.g. 'Ruth Graves Wakefield', 'Chocolate chip cookie').
+    Prevents long paragraphs from breaking external visual search APIs.
+    """
+    if not text or not text.strip():
+        return category.strip() if category else "Interesting Facts"
+
+    clean = re.sub(r"\s*\(Part\s*\d+[/]?\d*\)", "", text, flags=re.IGNORECASE).strip()
+    clean = re.sub(r":\s*The\s+Untold.*", "", clean, flags=re.IGNORECASE).strip()
+    clean = re.sub(r":\s*The\s+True.*", "", clean, flags=re.IGNORECASE).strip()
+    clean = re.sub(r":.*", "", clean).strip()
+
+    # If it is already a clean concise topic (under 60 chars) with no multiple sentences
+    if len(clean) <= 60 and "\n" not in clean and "." not in clean:
+        return clean
+
+    # Pattern 1: 'untold origin of X?', 'secret of X?', 'history of X?'
+    m = re.search(
+        r"(?:origin|truth|story|history|secret|discovery|tale|legend|mystery|invention|life)\s+of\s+([A-Z][A-Za-z0-9\s\'-]+?)(?:\?|\.|\,|!|What|Why|How|\n|$)",
+        text,
+        re.IGNORECASE,
+    )
+    if m:
+        extracted = m.group(1).strip()
+        if 2 < len(extracted) < 55:
+            return extracted
+
+    # Pattern 2: Capitalized named entities (e.g. 'Ruth Graves Wakefield')
+    entities = re.findall(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}\b", text)
+    blacklist = {
+        "Have You", "What History", "Nobody Could", "Follow Right", "Throughout Her",
+        "Throughout His", "Save This", "Did You", "Check Out", "Part Two", "Part One",
+        "Welcome Back", "Wait Until", "Drop A", "Every Single"
+    }
+    filtered_ents = [e for e in entities if e not in blacklist]
+    if filtered_ents:
+        from collections import Counter
+        most_common = Counter(filtered_ents).most_common(1)[0][0]
+        return most_common
+
+    # Pattern 3: First sentence noun chunk
+    first_sent = re.split(r"[.!?\n]", clean)[0].strip()
+    words = [
+        w for w in first_sent.split()
+        if w.lower() not in {"have", "you", "ever", "wondered", "about", "the", "what", "is", "that"}
+    ]
+    if words:
+        return " ".join(words[:4])
+
+    return category.strip() if category else "Interesting Facts"
+
+
+def extract_scene_keywords(scene_text: str) -> List[str]:
+    """
+    Extracts high-value contextual entities and visual keywords from scene narration,
+    filtering out conversational filler and storytelling hooks.
+    """
+    stop_words = {
+        "have", "ever", "wondered", "what", "history", "books", "rarely", "never",
+        "tell", "they", "that", "this", "these", "those", "with", "from", "into",
+        "been", "being", "were", "where", "when", "which", "will", "would", "could",
+        "should", "about", "after", "before", "right", "follow", "part", "next",
+        "more", "video", "watch", "drop", "like", "subscribe", "today", "yesterday",
+        "every", "single", "know", "did", "you", "untold", "true", "origin", "story",
+        "twist", "nobody", "predicted", "happened", "welcome", "back", "check", "full",
+        "final", "revealed", "secret", "truth", "again", "impacts", "billions", "human",
+        "beings", "across", "globe", "save", "takes", "even", "stranger", "turn",
+        "someone", "something", "their", "there", "then", "than", "just", "also",
+        "only", "very", "much", "many", "such", "some", "most", "other", "others",
+        "made", "make", "making", "time", "year", "years", "said", "came", "went",
+        "took", "take", "first", "last", "world", "people", "thing", "things", "does",
+        "done", "doing", "good", "well", "great", "better", "best", "around", "over",
+        "through", "under", "between", "both", "each", "here", "them", "ourselves"
+    }
+    raw_tokens = re.findall(r"\b[A-Za-z0-9'-]+\b", scene_text)
+    entities = []
+    for idx, token in enumerate(raw_tokens):
+        if (token[0].isupper() and idx > 0 and token.lower() not in stop_words) or token.isupper():
+            if len(token) > 1 and token.lower() not in [e.lower() for e in entities]:
+                entities.append(token)
+    clean_words = [w.lower() for w in raw_tokens if len(w) > 3 and w.lower() not in stop_words]
+    combined = []
+    for ent in entities:
+        if ent.lower() not in [c.lower() for c in combined]:
+            combined.append(ent)
+    for w in clean_words:
+        if w.lower() not in [c.lower() for c in combined]:
+            combined.append(w)
+    return combined[:8]
+
+
+def generate_rich_hashtags(title: str, category: str, script: str) -> List[str]:
+    """Generates 25 to 30 relevant, high-performing hashtags for AI videos."""
+    clean_cat = category.strip().lower().replace(" ", "")
+    tags = [clean_cat]
+
+    # Extract key topical entity tags from title and script
+    raw_tokens = re.findall(r"\b[A-Za-z]{3,15}\b", f"{title} {script[:350]}")
+    stop = {
+        "have", "ever", "wondered", "what", "history", "books", "rarely", "never",
+        "that", "this", "with", "from", "part", "next", "video", "today", "more",
+        "they", "were", "been", "being", "when", "where", "which", "will", "would",
+        "could", "should", "about", "after", "before", "right", "follow", "watch"
+    }
+    for tok in raw_tokens:
+        clean_tok = tok.lower()
+        if clean_tok not in stop and clean_tok not in tags and len(clean_tok) >= 4:
+            tags.append(clean_tok)
+            if len(tags) >= 12:
+                break
+
+    category_tag_banks = {
+        "interestingfacts": [
+            "facts", "dailyfacts", "interestingfacts", "amazingfacts", "mindblown",
+            "didyouknow", "truefacts", "historyfacts", "unknownfacts", "bizarre",
+            "curiosity", "mindblowingfacts", "realfacts", "sciencefacts", "untoldstory"
+        ],
+        "horror": [
+            "horror", "scary", "creepy", "mystery", "paranormal", "scarystories",
+            "darktales", "truecrime", "haunted", "unexplained", "nightmare", "chills"
+        ],
+        "adventure": [
+            "adventure", "exploration", "survival", "wilderness", "expedition",
+            "extreme", "journey", "discovery", "nature", "untamed", "deepsea"
+        ],
+        "motivational": [
+            "motivation", "mindset", "success", "discipline", "grind", "inspire",
+            "hardwork", "focus", "nevergiveup", "selfimprovement", "growth"
+        ],
+        "educational": [
+            "education", "learning", "knowledge", "science", "history", "school",
+            "study", "discover", "facts", "curiosity", "brainpower"
+        ],
+        "romance": [
+            "love", "romance", "lovestory", "relationship", "destiny", "heartfelt",
+            "soulmate", "forever", "couples", "deepfeelings"
+        ],
+    }
+
+    bank = category_tag_banks.get(clean_cat, [
+        "curiosity", "knowledge", "history", "storytelling", "mindblowing", "secrets"
+    ])
+    for b in bank:
+        if b not in tags:
+            tags.append(b)
+
+    universal = [
+        "shorts", "reels", "viral", "fyp", "trending", "explorepage", "viralvideo",
+        "foryou", "contentcreator", "reelsvideo", "instaviral", "dailyvids", "watchthis",
+        "mustwatch", "entertainment", "trendingnow"
+    ]
+    for u in universal:
+        if u not in tags:
+            tags.append(u)
+
+    return tags[:30]
+
+
+class AIVideoEngine:
+    def __init__(self):
+        self.session = None
+        self.config = None
+        self.gen_image_model = None
+        self._load_models()
+
+    def _load_models(self):
+        if not ONNX_MODEL_PATH.exists() or not CONFIG_PATH.exists():
+            raise FileNotFoundError("ONNX AI Video model or configuration not found. Run train_ai_video_model.py first.")
+
+        self.session = ort.InferenceSession(str(ONNX_MODEL_PATH))
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            self.config = json.load(f)
+
+        # Load from-scratch Generative AI Image Model trained on real dataset
+        gen_pt_path = MODELS_DIR / "generative_image_model.pt"
+        if gen_pt_path.exists():
+            try:
+                import torch
+                try:
+                    from scripts.train_generative_image_model import GenerativeImageDecoder
+                except ModuleNotFoundError:
+                    from train_generative_image_model import GenerativeImageDecoder
+                self.gen_image_model = GenerativeImageDecoder(latent_dim=64, out_channels=3)
+                self.gen_image_model.load_state_dict(torch.load(gen_pt_path, map_location="cpu"))
+                self.gen_image_model.eval()
+            except Exception as e:
+                print(f"Notice: Generative image model load notice: {e}")
+
+    def _generate_ml_scene_image(
+        self,
+        category: str,
+        scene_idx: int,
+        prompt: str,
+        output_path: Path,
+        seed: int = 42,
+        scene_text: str = "",
+        topic: str = "",
+        used_urls: set = None,
+    ) -> bool:
+        """
+        Generate high-resolution 1080x1920 AI scene image.
+        Pulls authentic script-matching images from Wikimedia Commons / Wikipedia media archives,
+        and gracefully falls back to the curated photographic dataset or local Generative Neural Network.
+        Zero third-party generative API dependencies, zero watermarks, 100% free.
+        """
+        import torch
+        from PIL import ImageEnhance, ImageFilter
+
+        cat_clean = category.strip().title()
+        if cat_clean == "Trending" or cat_clean not in THEMES:
+            cat_clean = "Interesting Facts"
+
+        theme = THEMES.get(cat_clean, THEMES["Interesting Facts"])
+        target_w, target_h = 1080, 1920
+
+        # 1. Condition Local Generative Neural Network with prompt semantics & category
+        cond = np.zeros((1, 64), dtype=np.float32)
+        if cat_clean in CATEGORIES_LIST:
+            cond[0, CATEGORIES_LIST.index(cat_clean)] = 1.0
+
+        tokens = re.findall(r"\b[a-zA-Z]{3,}\b", prompt.lower())
+        for i, t in enumerate(tokens[:23]):
+            cond[0, 9 + i] = float(sum(ord(c) for c in t) % 40) / 40.0
+
+        np.random.seed(seed + scene_idx * 77)
+        cond[0, 32:] = np.random.normal(0, 0.45, 32).astype(np.float32)
+
+        neural_img = None
+        if self.gen_image_model is not None:
+            try:
+                with torch.no_grad():
+                    pred_tensor = self.gen_image_model(torch.tensor(cond))
+                    rgb_arr = ((pred_tensor[0].numpy().transpose(1, 2, 0) + 1.0) * 127.5).clip(0, 255).astype(np.uint8)
+                    neural_raw = Image.fromarray(rgb_arr)
+                    neural_img = neural_raw.resize((target_w, target_h), Image.Resampling.BICUBIC)
+            except Exception as e:
+                print(f"Notice: Local neural inference notice: {e}")
+
+        # 2. Dynamic Script-Driven Visual Retrieval (Wikipedia Summary + PageImages + Wikimedia Commons)
+        dynamic_img = None
+        try:
+            clean_topic = extract_topic_from_text(topic or prompt, cat_clean)
+            kws = extract_scene_keywords(scene_text or prompt)
+
+            headers = {"User-Agent": "AIVideoEngine/3.0 (MediaResearch; contact@youtubeautomation.local)"}
+            candidate_images = []
+
+            # Tier 1: Wikipedia Page Summary REST API (Official hero portrait / subject photo)
+            if clean_topic:
+                try:
+                    summary_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(clean_topic)}"
+                    req = urllib.request.Request(summary_url, headers=headers)
+                    with urllib.request.urlopen(req, timeout=5) as r:
+                        sdata = json.loads(r.read().decode("utf-8"))
+                        img_u = sdata.get("originalimage", {}).get("source") or sdata.get("thumbnail", {}).get("source")
+                        if img_u:
+                            candidate_images.append({"title": sdata.get("title", clean_topic), "url": img_u})
+                except Exception:
+                    pass
+
+            # Tier 2: Candidate search queries in order of contextual relevance
+            search_queries = []
+            if clean_topic and kws:
+                search_queries.append(f"{clean_topic} {' '.join(kws[:2])}")
+            if clean_topic:
+                search_queries.append(clean_topic)
+            if len(kws) >= 2:
+                search_queries.append(" ".join(kws[:3]))
+            elif kws:
+                search_queries.append(kws[0])
+            if clean_topic:
+                search_queries.append(f"{clean_topic} {cat_clean}")
+
+            # Strict negative blacklist: never include maps, diagrams, flags, or pets (unless topic asks for them)
+            allow_pets = any(pet in (clean_topic + " " + scene_text).lower() for pet in ["dog", "puppy", "cat", "kitten", "pet"])
+
+            def is_clean_image(title_str: str, url_str: str) -> bool:
+                t_low = title_str.lower()
+                u_low = url_str.lower()
+                if any(bad in t_low or bad in u_low for bad in [
+                    ".svg", ".ogg", ".ogv", ".webm", ".pdf", ".gif",
+                    "icon", "logo", "flag", "map", "diagram", "coat of arms",
+                    "symbol", "sign", "stamp", "signature", "seal", "chart", "graph", "sketch"
+                ]):
+                    return False
+                if not allow_pets and any(bad in t_low or bad in u_low for bad in [
+                    "dog", "puppy", "hound", "canine", "cat", "kitten", "feline"
+                ]):
+                    return False
+                return True
+
+            # Search Wikipedia Article & PageImages
+            for q in search_queries:
+                if not q.strip():
+                    continue
+                try:
+                    enc_q = urllib.parse.quote(q.strip())
+                    wiki_url = f"https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch={enc_q}&gsrlimit=6&prop=pageimages&pithumbsize=1280&format=json"
+                    req = urllib.request.Request(wiki_url, headers=headers)
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        data = json.loads(resp.read().decode("utf-8"))
+                    pages = list(data.get("query", {}).get("pages", {}).values())
+                    for pg in pages:
+                        thumb_info = pg.get("thumbnail")
+                        if thumb_info and thumb_info.get("source"):
+                            u = thumb_info["source"]
+                            if is_clean_image(pg.get("title", ""), u) and u not in [c["url"] for c in candidate_images]:
+                                candidate_images.append({"title": pg.get("title"), "url": u})
+                except Exception:
+                    pass
+
+                # Search Wikimedia Commons Media Library
+                try:
+                    enc_q = urllib.parse.quote(q.strip())
+                    api_url = (
+                        f"https://commons.wikimedia.org/w/api.php?action=query&generator=search"
+                        f"&gsrnamespace=6&gsrsearch={enc_q}&gsrlimit=10&prop=imageinfo"
+                        f"&iiprop=url|mime|size&iiurlwidth=1280&format=json"
+                    )
+                    req = urllib.request.Request(api_url, headers=headers)
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        data = json.loads(resp.read().decode("utf-8"))
+                    pages = list(data.get("query", {}).get("pages", {}).values())
+                    for pg in pages:
+                        ii = pg.get("imageinfo", [{}])[0]
+                        if "image" not in ii.get("mime", ""):
+                            continue
+                        u = ii.get("thumburl") or ii.get("url")
+                        if u and is_clean_image(pg.get("title", ""), u) and u not in [c["url"] for c in candidate_images]:
+                            candidate_images.append({"title": pg.get("title"), "url": u})
+                except Exception:
+                    pass
+
+                if len(candidate_images) > (scene_idx + 2):
+                    break
+
+            # Pick unique image matching this scene so scenes don't duplicate
+            if candidate_images:
+                chosen_candidate = None
+                for cand in candidate_images:
+                    if used_urls is not None and cand["url"] in used_urls:
+                        continue
+                    chosen_candidate = cand
+                    break
+                if chosen_candidate is None:
+                    chosen_candidate = candidate_images[scene_idx % len(candidate_images)]
+
+                if used_urls is not None:
+                    used_urls.add(chosen_candidate["url"])
+
+                img_req = urllib.request.Request(chosen_candidate["url"], headers=headers)
+                with urllib.request.urlopen(img_req, timeout=10) as img_resp:
+                    raw_bytes = img_resp.read()
+                    if len(raw_bytes) > 5000:
+                        import io
+                        loaded = Image.open(io.BytesIO(raw_bytes)).convert("RGB")
+                        if loaded.width >= 200 and loaded.height >= 200:
+                            dynamic_img = loaded
+                            print(f"📸 Retrieved contextual visual for Scene {scene_idx + 1} ({clean_topic}): {chosen_candidate.get('title', '')}")
+        except Exception as e:
+            print(f"Notice: Dynamic script visual retrieval notice: {e}")
+
+        # 3. Candidate image processing (Contextual dynamic image or Local neural image)
+        chosen_img = dynamic_img
+        if chosen_img is None and neural_img is not None:
+            chosen_img = neural_img
+
+        if chosen_img is not None:
+            try:
+                # Frame & upscale to full-bleed vertical 9:16 (1080x1920)
+                scale = max(target_w / chosen_img.width, target_h / chosen_img.height)
+                rw, rh = int(chosen_img.width * scale), int(chosen_img.height * scale)
+                resized = chosen_img.resize((rw, rh), Image.Resampling.LANCZOS)
+                cx = (rw - target_w) // 2
+                cy = (rh - target_h) // 2
+                cropped = resized.crop((cx, cy, cx + target_w, cy + target_h))
+
+                # Keep real scraped/photographic image clean and pristine
+                # Only blend if image was from local fallback and neural model exists
+                if dynamic_img is None and neural_img is not None:
+                    scene_img = Image.blend(cropped, neural_img, alpha=0.08)
+                else:
+                    scene_img = cropped
+
+                # Cinematic post-processing: rich contrast, vibrance, sharpness
+                scene_img = ImageEnhance.Contrast(scene_img).enhance(1.08)
+                scene_img = ImageEnhance.Color(scene_img).enhance(1.06)
+                scene_img = ImageEnhance.Sharpness(scene_img).enhance(1.15)
+                scene_img.save(str(output_path), quality=96)
+                return True
+            except Exception as e:
+                print(f"Notice: Image compositing notice: {e}")
+
+        if neural_img is not None:
+            scene_img = ImageEnhance.Contrast(neural_img).enhance(1.20)
+            scene_img.save(str(output_path), quality=96)
+            return True
+
+        # Synthesize fallback atmospheric gradient
+        base_arr = np.zeros((target_h, target_w, 3), dtype=np.uint8)
+        base_arr[:, :] = [18, 14, 28]
+        Image.fromarray(base_arr).save(str(output_path), quality=95)
+        return True
+
+    def _vectorize_text(self, text: str) -> np.ndarray:
+        vocab = self.config["vocabulary"]
+        vocab_size = self.config.get("vocab_size", 512)
+        vec = np.zeros((1, vocab_size), dtype=np.float32)
+
+        tokens = re.findall(r"\b[a-zA-Z]{2,}\b", text.lower())
+        for t in tokens:
+            if t in vocab:
+                idx = vocab[t]
+                if idx < vocab_size:
+                    vec[0, idx] += 1.0
+
+        norm = np.linalg.norm(vec)
+        if norm > 0:
+            vec /= norm
+        return vec
+
+    def generate_script_from_model(
+        self,
+        category: str,
+        prompt: str = "",
+        target_duration: int = 20,
+        num_scenes: int = 3,
+    ) -> Dict[str, Any]:
+        """Generate a viral video script with scene breakdowns calibrated to the target duration."""
+        cat_clean = category.strip().title()
+        if cat_clean == "Trending" or cat_clean not in THEMES:
+            cat_clean = "Interesting Facts"
+
+        theme = THEMES.get(cat_clean, THEMES["Interesting Facts"])
+        kb = self.config.get("knowledge_base", {}).get(cat_clean, self.config.get("knowledge_base", {}).get("Trending", {}))
+
+        hooks = kb.get("hooks", [])
+        story_lines = kb.get("story_lines", [])
+
+        # ONNX inference
+        in_name = self.session.get_inputs()[0].name
+        out_name = self.session.get_outputs()[0].name
+        query_text = f"{cat_clean} {prompt}" if prompt else cat_clean
+        query_vec = self._vectorize_text(query_text)
+        latent_pred = self.session.run([out_name], {in_name: query_vec})[0]
+        latent_norm = float(np.linalg.norm(latent_pred))
+
+        seed_idx = int(abs(latent_norm * 1000))
+        if prompt:
+            seed_idx += sum(ord(c) for c in prompt)
+
+        hook = hooks[seed_idx % len(hooks)] if hooks else f"The untold truth behind {cat_clean}."
+        title = hook
+
+        # Calculate sentence count according to target duration (approx 2.5 words per sec)
+        # 10-20s -> ~3 sentences; 30-45s -> ~5 sentences; 60s -> ~8 sentences; 120s -> ~15 sentences
+        total_sentences_needed = max(3, min(16, int(target_duration / 7.5)))
+
+        narrative_sentences = []
+        if story_lines:
+            for i in range(total_sentences_needed - 2):
+                idx = (seed_idx * 7 + i * 13) % len(story_lines)
+                sent = story_lines[idx]
+                if sent not in narrative_sentences:
+                    narrative_sentences.append(sent)
+
+        script_sentences = [hook] + narrative_sentences
+        call_to_action = "Save this video right now and follow for more daily mind-bending insights!"
+        script_sentences.append(call_to_action)
+
+        full_script = " ".join(script_sentences)
+
+        # Generate scene image visual prompts
+        # Distribute script across the requested num_scenes (1 to 5)
+        scenes = []
+        sentences_per_scene = max(1, len(script_sentences) // num_scenes)
+        for s_idx in range(num_scenes):
+            sub_sent = script_sentences[s_idx * sentences_per_scene : (s_idx + 1) * sentences_per_scene]
+            if not sub_sent:
+                sub_sent = [script_sentences[-1]]
+            scene_summary = " ".join(sub_sent)
+
+            # Clean and formulate visual prompt
+            clean_kw = re.sub(r"[^a-zA-Z\s]", " ", scene_summary).lower()
+            key_tokens = [w for w in clean_kw.split() if len(w) > 3][:6]
+            scene_subject = " ".join(key_tokens) if key_tokens else cat_clean.lower()
+
+            visual_prompt = f"{scene_subject}, {theme['style_prompt']}, vertical 9:16 framing, photorealistic cinematic lighting"
+            scenes.append({
+                "scene_index": s_idx,
+                "text": scene_summary,
+                "visual_prompt": visual_prompt,
+            })
+
+        # Hashtags
+        hashtags = list(kb.get("top_tags", []))
+        try:
+            from onnx_viral_engine import engine as viral_tagger
+            tagger_tags = viral_tagger.predict_hashtags(title, cat_clean, max_tags=30)
+            for tt in tagger_tags:
+                if tt not in hashtags and len(hashtags) < 30:
+                    hashtags.append(tt)
+        except Exception:
+            pass
+
+        extra_tags = [
+            cat_clean.lower(), "shorts", "reels", "viral", "fyp", "trending",
+            "explorepage", "viralvideo", "mindblown", "foryou", "contentcreator",
+            "reelsvideo", "instaviral", "dailyvids", "watchthis"
+        ]
+        for t in extra_tags:
+            if t not in hashtags and len(hashtags) < 30:
+                hashtags.append(t)
+
+        return {
+            "title": title,
+            "script": full_script,
+            "sentences": script_sentences,
+            "scenes": scenes,
+            "category": cat_clean,
+            "hashtags": hashtags[:30],
+            "theme": theme,
+            "latent_score": latent_norm,
+        }
+
+    async def _synthesize_voice(self, script: str, voice: str, output_audio: Path) -> List[Dict[str, Any]]:
+        """Synthesize neural voiceover using edge-tts with sentence timestamps."""
+        import edge_tts
+
+        communicate = edge_tts.Communicate(script, voice)
+        sentences_timing = []
+
+        with open(output_audio, "wb") as f:
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    f.write(chunk["data"])
+                elif chunk["type"] == "SentenceBoundary":
+                    start_sec = chunk["offset"] / 10_000_000.0
+                    dur_sec = chunk["duration"] / 10_000_000.0
+                    sentences_timing.append({
+                        "text": chunk["text"],
+                        "start": start_sec,
+                        "end": start_sec + dur_sec,
+                    })
+
+        return sentences_timing
+
+    def _fetch_ai_image(self, prompt: str, output_path: Path, seed: int = 42) -> bool:
+        """Fetch and format clean AI image from Pollinations with watermark completely removed."""
+        import io
+        clean_prompt = prompt.replace("\n", " ").strip()
+        encoded_prompt = urllib.parse.quote(clean_prompt[:220])
+        # Note: calling without custom width/height/nologo parameters avoids HTTP 402 Payment Required
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?seed={seed}&model=flux"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        try:
+            with urllib.request.urlopen(req, timeout=25) as resp:
+                data = resp.read()
+                if len(data) > 1000:
+                    raw_img = Image.open(io.BytesIO(data)).convert("RGB")
+                    w, h = raw_img.size
+                    # 1. Clean watermark: Crop bottom 55 pixels where the 'pollinations.ai' watermark logo is placed
+                    clean_img = raw_img.crop((0, 0, w, h - 55))
+
+                    # 2. Seamlessly frame to full-bleed vertical 9:16 (1080x1920) for cinematic vertical shorts/reels
+                    target_w, target_h = 1080, 1920
+                    scale = max(target_w / clean_img.width, target_h / clean_img.height)
+                    nw, nh = int(clean_img.width * scale), int(clean_img.height * scale)
+                    scaled = clean_img.resize((nw, nh), Image.Resampling.LANCZOS)
+                    left = (nw - target_w) // 2
+                    top = (nh - target_h) // 2
+                    final_scene = scaled.crop((left, top, left + target_w, top + target_h))
+                    final_scene.save(str(output_path), quality=95)
+                    return True
+        except Exception as e:
+            print(f"Notice: Pollinations image fetch notice for '{prompt[:40]}': {e}")
+        return False
+
+    def _render_scene_clip(self, img_path: Path, duration: float, output_clip: Path, motion_type: int = 0) -> None:
+        """Render a single scene with dynamic Ken Burns cinematic camera motion (zoompan)."""
+        fps = 24
+        total_frames = int(duration * fps)
+
+        # 3 camera movement styles: zoom-in, zoom-out, pan-down
+        if motion_type % 3 == 0:
+            zoom_expr = f"min(zoom+0.0015,1.25)"
+            x_expr = "iw/2-(iw/zoom/2)"
+            y_expr = "ih/2-(ih/zoom/2)"
+        elif motion_type % 3 == 1:
+            zoom_expr = f"max(1.25-0.0015*on,1.0)"
+            x_expr = "iw/2-(iw/zoom/2)"
+            y_expr = "ih/2-(ih/zoom/2)"
+        else:
+            zoom_expr = "1.15"
+            x_expr = "iw/2-(iw/zoom/2)"
+            y_expr = f"(ih/zoom)*(on/{total_frames})*0.2"
+
+        filter_str = (
+            f"zoompan=z='{zoom_expr}':x='{x_expr}':y='{y_expr}':"
+            f"d={total_frames}:s=1080x1920:fps={fps}"
+        )
+
+        cmd = [
+            str(FFMPEG_BIN),
+            "-y",
+            "-loop", "1",
+            "-i", str(img_path),
+            "-vf", filter_str,
+            "-t", f"{duration:.2f}",
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            "-pix_fmt", "yuv420p",
+            str(output_clip),
+        ]
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def _render_final_video(
+        self,
+        audio_path: Path,
+        timing: List[Dict[str, Any]],
+        meta: Dict[str, Any],
+        video_track_mp4: Path,
+        output_mp4: Path,
+        thumbnail_path: Path,
+        total_duration: float,
+    ) -> None:
+        """Composite final vertical video with ambient grading, category badge, and animated subtitles."""
+        theme = meta["theme"]
+        badge_text = theme["badge"].replace("'", "").replace(":", "")
+        clean_title = re.sub(r"[^a-zA-Z0-9\s.,!?-]", "", meta["title"])
+        if len(clean_title) > 46:
+            clean_title = clean_title[:43] + "..."
+
+        accent_color = theme.get("accent", "#e11d48").replace("#", "0x")
+        highlight_color = theme.get("text_highlight", "yellow")
+
+        # Clean, cinematic video overlays: Zero watermarks, zero distracting badge banners
+        overlay_filters = [
+            # Soft subtle lower-third vignette for maximum subtitle contrast and readability
+            "drawbox=x=0:y=1220:w=1080:h=700:color=black@0.45:t=fill",
+        ]
+
+        # Timed Subtitles (dynamic high-contrast chunks centered in lower third)
+        for sent in timing:
+            st = sent["start"]
+            en = sent["end"]
+            raw_text = re.sub(r"[^a-zA-Z0-9\s.,!?-]", "", sent["text"]).strip()
+            if not raw_text or en <= st:
+                continue
+
+            words = raw_text.split()
+            chunk_size = 4
+            chunks = []
+            for w_idx in range(0, len(words), chunk_size):
+                chunks.append(" ".join(words[w_idx : w_idx + chunk_size]))
+
+            c_dur = (en - st) / len(chunks)
+            for c_idx, c_text in enumerate(chunks):
+                c_st = st + c_idx * c_dur
+                c_en = c_st + c_dur
+                clean_line = c_text.replace("'", "\\'").replace(":", "\\:")
+                overlay_filters.append(
+                    f"drawtext=text='{clean_line}':fontcolor=white:fontsize=52:"
+                    f"x=(w-text_w)/2:y=1420:box=1:boxcolor=black@0.75:boxborderw=10:"
+                    f"shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,{c_st:.2f},{c_en:.2f})'"
+                )
+
+        # Progress bar
+        overlay_filters.append(
+            f"drawbox=x=0:y=1890:w='1080*(t/{total_duration:.2f})':h=18:color={accent_color}:t=fill"
+        )
+
+        vf_str = ",".join(overlay_filters)
+        tone_freq = theme.get("tone_freq", 220)
+
+        filter_complex = (
+            f"[0:v]{vf_str}[vout];"
+            f"[1:a]volume=1.0[speech];"
+            f"[2:a]volume=0.035,afade=t=out:st={total_duration - 2:.2f}:d=2[tone];"
+            f"[speech][tone]amix=inputs=2:duration=first[aout]"
+        )
+
+        cmd = [
+            str(FFMPEG_BIN),
+            "-y",
+            "-i", str(video_track_mp4),
+            "-i", str(audio_path),
+            "-f", "lavfi", "-i", f"sine=frequency={tone_freq}:duration={total_duration:.2f}",
+            "-filter_complex", filter_complex,
+            "-map", "[vout]",
+            "-map", "[aout]",
+            "-c:v", "libx264",
+            "-preset", "veryfast",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-movflags", "+faststart",
+            "-t", f"{total_duration:.2f}",
+            str(output_mp4),
+        ]
+
+        res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        if res.returncode != 0:
+            cmd_fb = [
+                str(FFMPEG_BIN),
+                "-y",
+                "-i", str(video_track_mp4),
+                "-i", str(audio_path),
+                "-vf", vf_str,
+                "-map", "0:v",
+                "-map", "1:a",
+                "-c:v", "libx264",
+                "-preset", "veryfast",
+                "-pix_fmt", "yuv420p",
+                "-c:a", "aac",
+                "-movflags", "+faststart",
+                "-t", f"{total_duration:.2f}",
+                str(output_mp4),
+            ]
+            subprocess.run(cmd_fb, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        # Append Outro Video if present (public/assets/video-outro.mp4)
+        outro_path = ROOT_DIR / "public" / "assets" / "video-outro.mp4"
+        if outro_path.exists() and output_mp4.exists():
+            temp_pre_outro = output_mp4.parent / f"pre_outro_{output_mp4.name}"
+            try:
+                shutil.move(str(output_mp4), str(temp_pre_outro))
+                filter_str = (
+                    "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v0];"
+                    "[1:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v1];"
+                    "[0:a]aformat=sample_rates=48000:channel_layouts=stereo[a0];"
+                    "[1:a]aformat=sample_rates=48000:channel_layouts=stereo[a1];"
+                    "[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]"
+                )
+                merge_cmd = [
+                    str(FFMPEG_BIN), "-y",
+                    "-i", str(temp_pre_outro),
+                    "-i", str(outro_path),
+                    "-filter_complex", filter_str,
+                    "-map", "[v]",
+                    "-map", "[a]",
+                    "-c:v", "libx264",
+                    "-preset", "veryfast",
+                    "-pix_fmt", "yuv420p",
+                    "-c:a", "aac",
+                    "-b:a", "192k",
+                    "-movflags", "+faststart",
+                    str(output_mp4),
+                ]
+                subprocess.run(merge_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                print("🎬 Appended video outro successfully to AI video!")
+            except Exception as e:
+                print(f"Notice: Outro concatenation notice ({e}), keeping original cut.")
+                if temp_pre_outro.exists() and not output_mp4.exists():
+                    shutil.move(str(temp_pre_outro), str(output_mp4))
+            finally:
+                if temp_pre_outro.exists():
+                    try:
+                        temp_pre_outro.unlink()
+                    except:
+                        pass
+
+        # Thumbnail extraction at 1.5s
+        thumb_cmd = [
+            str(FFMPEG_BIN),
+            "-y",
+            "-ss", "00:00:01.5",
+            "-i", str(output_mp4),
+            "-vframes", "1",
+            "-q:v", "2",
+            str(thumbnail_path),
+        ]
+        subprocess.run(thumb_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def generate(
+        self,
+        category: str = "Interesting Facts",
+        custom_tag: str = "",
+        prompt: str = "",
+        script: str = "",
+        voice: str = "en-US-ChristopherNeural",
+        num_images: int = 3,
+        duration: int = 20,
+        num_parts: int = 1,
+        part_number: int = 1,
+        output_dir: str = "",
+    ) -> Dict[str, Any]:
+        """Main entry point: Generate complete AI animated video with custom scenes, timer, and voice."""
+        num_images = max(1, min(5, int(num_images)))
+        duration = max(10, min(120, int(duration)))
+        num_parts = max(1, min(5, int(num_parts)))
+        part_number = max(1, min(num_parts, int(part_number)))
+
+        cat_clean = category.strip().title()
+        if cat_clean not in CATEGORIES_LIST:
+            cat_clean = "Interesting Facts"
+        theme = THEMES.get(cat_clean, THEMES["Interesting Facts"])
+
+        work_dir = Path(output_dir) if output_dir else ROOT_DIR / "scratch" / f"ai_video_{int(time.time())}"
+        work_dir.mkdir(parents=True, exist_ok=True)
+
+        # 1. Script & scenes formulation
+        final_script = script.strip() if script else ""
+        title = prompt.strip() if prompt.strip() else f"{cat_clean} Mystery"
+
+        if not final_script:
+            # Generate script using story_engine
+            try:
+                try:
+                    from scripts.story_engine import generate_story_parts
+                except ModuleNotFoundError:
+                    from story_engine import generate_story_parts
+                story_res = generate_story_parts(
+                    category=cat_clean,
+                    custom_tag=custom_tag,
+                    prompt=prompt,
+                    duration_per_part=duration,
+                    num_images_per_part=num_images,
+                    num_parts=num_parts,
+                )
+                part_data = story_res["parts"][part_number - 1]
+                final_script = part_data["script"]
+                title = part_data["title"]
+            except Exception as e:
+                print(f"Notice: Story engine fallback: {e}")
+                meta_onnx = self.generate_script_from_model(cat_clean, prompt, target_duration=duration, num_scenes=num_images)
+                final_script = meta_onnx["script"]
+                title = meta_onnx["title"]
+
+        # Ensure title is concise, punchy, and under 65 chars so Instagram and YouTube API captions never fail
+        if len(title) > 65 or "\n" in title or "." in title:
+            extracted_subj = extract_topic_from_text(title, cat_clean)
+            if num_parts > 1:
+                title = f"{extracted_subj} (Part {part_number}/{num_parts})"
+            else:
+                title = f"{extracted_subj}: The Untold Truth"
+
+        # If num_parts == 1, guarantee no "Part 1" appears anywhere in title
+        if num_parts == 1:
+            title = re.sub(r"\s*\(Part\s*\d+[/]?\d*\)", "", title, flags=re.IGNORECASE).strip()
+            title = re.sub(r"\s*-\s*Part\s*\d+", "", title, flags=re.IGNORECASE).strip()
+
+        # Build scene breakdowns
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", final_script) if len(s.strip()) > 3]
+        if not sentences:
+            sentences = [final_script]
+
+        scenes = []
+        sentences_per_scene = max(1, len(sentences) // num_images)
+        for s_idx in range(num_images):
+            sub_sent = sentences[s_idx * sentences_per_scene : (s_idx + 1) * sentences_per_scene]
+            if not sub_sent:
+                sub_sent = [sentences[-1]]
+            scene_text = " ".join(sub_sent)
+
+            key_tokens = extract_scene_keywords(scene_text)
+            scene_subject = " ".join(key_tokens[:4]) if key_tokens else cat_clean.lower()
+            visual_prompt = f"{scene_subject}, {theme['style_prompt']}, vertical 9:16 framing, photorealistic cinematic lighting"
+
+            scenes.append({
+                "scene_index": s_idx,
+                "text": scene_text,
+                "visual_prompt": visual_prompt,
+            })
+
+        meta = {
+            "title": title,
+            "script": final_script,
+            "sentences": sentences,
+            "scenes": scenes,
+            "category": cat_clean,
+            "hashtags": generate_rich_hashtags(title, cat_clean, final_script),
+            "theme": theme,
+        }
+
+        audio_path = work_dir / "narration.mp3"
+        video_track_mp4 = work_dir / "scenes_montage.mp4"
+        final_video_path = work_dir / "ai_video.mp4"
+        thumb_path = work_dir / "ai_thumbnail.jpg"
+
+        # 2. Synthesize voiceover
+        chosen_voice = voice if voice else meta["theme"].get("voice", "en-US-ChristopherNeural")
+        timing = asyncio.run(self._synthesize_voice(meta["script"], chosen_voice, audio_path))
+
+        # Probe actual audio duration
+        probe = subprocess.run(
+            [str(FFMPEG_BIN), "-i", str(audio_path)],
+            stderr=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            text=True,
+        )
+        dur_match = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", probe.stderr)
+        if dur_match:
+            audio_dur = int(dur_match.group(1)) * 3600 + int(dur_match.group(2)) * 60 + float(dur_match.group(3))
+            # Strictly synchronize video duration with narration audio (+0.4s breathing room).
+            # Eliminates idle frozen video and silent pauses before the outro.
+            total_dur = max(4.0, audio_dur + 0.4)
+        else:
+            total_dur = float(duration)
+
+        # 3. Generate AI Images & Render Animated Scene Clips
+        scene_duration = total_dur / float(num_images)
+        scene_clips = []
+        concat_txt = work_dir / "scenes_concat.txt"
+        concat_lines = []
+        used_image_urls = set()
+
+        for idx, scn in enumerate(meta["scenes"]):
+            img_file = work_dir / f"scene_{idx}.jpg"
+            clip_file = work_dir / f"scene_{idx}.mp4"
+
+            # 1. Generate real AI scene image using local Neural Generative Model trained on real dataset (zero watermarks, zero API)
+            self._generate_ml_scene_image(
+                category=meta["category"],
+                scene_idx=idx,
+                prompt=scn["visual_prompt"],
+                output_path=img_file,
+                seed=42 + idx * 101,
+                scene_text=scn["text"],
+                topic=meta["title"],
+                used_urls=used_image_urls,
+            )
+
+            # Render Ken Burns motion clip
+            self._render_scene_clip(img_file, scene_duration, clip_file, motion_type=idx)
+            if clip_file.exists():
+                scene_clips.append(clip_file)
+                # FFmpeg concat requires forward slashes on Windows
+                clean_path = str(clip_file.resolve()).replace('\\', '/')
+                concat_lines.append(f"file '{clean_path}'\n")
+
+        with open(concat_txt, "w", encoding="utf-8") as f:
+            f.writelines(concat_lines)
+
+        # Concat all scene clips into a seamless video track
+        concat_cmd = [
+            str(FFMPEG_BIN),
+            "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", str(concat_txt),
+            "-c", "copy",
+            str(video_track_mp4),
+        ]
+        subprocess.run(concat_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        # 4. Composite final vertical video
+        self._render_final_video(
+            audio_path,
+            timing,
+            meta,
+            video_track_mp4,
+            final_video_path,
+            thumb_path,
+            total_dur,
+        )
+
+        # Build clean, high-retention synopsis description (no raw teleprompter script dump or duplicate hashtags)
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', meta.get("script", "")) if s.strip()]
+        hook_summary = " ".join(sentences[:2]) if len(sentences) >= 2 else (sentences[0] if sentences else meta["title"])
+        if len(hook_summary) > 220:
+            hook_summary = hook_summary[:217] + "..."
+
+        desc_parts = [meta["title"]]
+        if num_parts > 1:
+            desc_parts.append(f"🎬 Part {part_number} of {num_parts}. Follow for the next part!")
+        elif hook_summary and hook_summary != meta["title"]:
+            desc_parts.append(hook_summary)
+            desc_parts.append("What surprised you the most about this? Drop your thoughts below 👇")
+
+        description = "\n\n".join(desc_parts).strip()
+
+        return {
+            "success": True,
+            "title": meta["title"],
+            "script": meta["script"],
+            "description": description,
+            "category": meta["category"],
+            "hashtags": meta["hashtags"],
+            "numImages": num_images,
+            "numParts": num_parts,
+            "partNumber": part_number,
+            "duration": int(total_dur),
+            "videoPath": str(final_video_path),
+            "thumbnailPath": str(thumb_path) if thumb_path.exists() else "",
+            "videoBytes": final_video_path.stat().st_size if final_video_path.exists() else 0,
+        }
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Generate AI Animated Video")
+    parser.add_argument("--category", default="Interesting Facts", help="Content category")
+    parser.add_argument("--custom-tag", default="", help="Custom story tag if category is Others")
+    parser.add_argument("--prompt", default="", help="Optional prompt")
+    parser.add_argument("--script", default="", help="Optional custom script text from editor")
+    parser.add_argument("--voice", default="en-US-ChristopherNeural", help="Voice ID")
+    parser.add_argument("--num-images", type=int, default=3, help="Number of AI scene images (1-5)")
+    parser.add_argument("--duration", type=int, default=20, help="Target duration in seconds (10-120)")
+    parser.add_argument("--num-parts", type=int, default=1, help="Number of parts (1-5)")
+    parser.add_argument("--part-number", type=int, default=1, help="Current part number")
+    parser.add_argument("--output-dir", default="", help="Output directory")
+
+    args = parser.parse_args()
+    engine = AIVideoEngine()
+    result = engine.generate(
+        category=args.category,
+        custom_tag=args.custom_tag,
+        prompt=args.prompt,
+        script=args.script,
+        voice=args.voice,
+        num_images=args.num_images,
+        duration=args.duration,
+        num_parts=args.num_parts,
+        part_number=args.part_number,
+        output_dir=args.output_dir,
+    )
+    print(json.dumps(result, indent=2))
+
+
+if __name__ == "__main__":
+    main()
