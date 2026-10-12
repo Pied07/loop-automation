@@ -1751,10 +1751,14 @@ export default function Home() {
             ) : (
               <span className="thumb-unavailable">Preview unavailable</span>
             )}
-            <span className="thumb-tag">{video.format}</span>
-            {video.isCron && (
-              <span className="thumb-tag" style={{ background: '#7c3aed', color: '#fff', marginLeft: '6px' }}>Auto-Pilot</span>
-            )}
+            <div className="thumb-tags-row">
+              {video.format && (
+                <span className="thumb-tag-badge thumb-tag-format">{video.format}</span>
+              )}
+              {video.isCron && (
+                <span className="thumb-tag-badge thumb-tag-autopilot">Auto-Pilot</span>
+              )}
+            </div>
           </div>
         )}
     <div className="video-details">

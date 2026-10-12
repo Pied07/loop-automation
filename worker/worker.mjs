@@ -279,6 +279,17 @@ async function processJob(job) {
   const { jobId, videoUrl, contentCategory } = job;
   console.log(`\n[WORKER] 📥 Picked up Job [${jobId}] for: ${videoUrl}`);
 
+  const lowerUrl = (videoUrl || "").toLowerCase();
+  if (lowerUrl.includes("mime_type=audio") || lowerUrl.includes("music.tiktokcdn") || lowerUrl.includes("ies-music")) {
+    console.error(`[WORKER] ❌ Rejected audio-only stream: ${videoUrl}`);
+    await updateJobStatus({
+      jobId,
+      status: "failed",
+      error: "Discovered source is an audio stream instead of a video.",
+    });
+    return;
+  }
+
   await updateJobStatus({
     jobId,
     status: "processing",

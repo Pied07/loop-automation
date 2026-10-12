@@ -4,7 +4,7 @@ import path from "path";
 import fs from "fs";
 import { exec, spawn } from "child_process";
 import { promisify } from "util";
-import { extractUrlSignatures, isUrlDuplicate } from "@/app/lib/url-utils";
+import { extractUrlSignatures, isUrlDuplicate, isAudioOnlyUrl, isVerifiedVideoUrl } from "@/app/lib/url-utils";
 
 const execAsync = promisify(exec);
 const SHORT_CLIP_LENGTH_SECONDS = 90;
@@ -1739,12 +1739,25 @@ export async function scrapeTikTokTrendingVideos(category: string, excludedSigna
     const rawVideos: any[] = data.data || [];
     if (!Array.isArray(rawVideos) || rawVideos.length === 0) return null;
 
-    // Filter valid videos: direct MP4, real title, exclude synthetic AI generations & past duplicates
+    // Filter valid videos: direct MP4, real title, exclude photo slideshows, audio-only streams & past duplicates
     const valid = rawVideos.filter((v) => {
       if (!v.play || !v.title) return false;
+
+      // 1. MUST NOT be a photo carousel / slideshow (TikWM returns images array and background audio in v.play)
+      if (v.images && Array.isArray(v.images) && v.images.length > 0) return false;
+
+      // 2. MUST NOT be audio-only (e.g. mime_type=audio_mpeg, music.tiktokcdn, .mp3, etc.)
+      if (isAudioOnlyUrl(v.play)) return false;
+      if (v.music_info?.play && v.play === v.music_info.play) return false;
+      if (v.music && v.play === v.music) return false;
+      if (typeof v.duration === "number" && v.duration < 3) return false;
+
+      // 3. Exclude synthetic AI generations
       const t = String(v.title).toLowerCase();
       const u = String(v.play).toLowerCase();
       if (t.includes("ai generated") || t.includes("ai-generation") || u.includes("user-ai-generation")) return false;
+
+      // 4. Exclude past duplicates
       if (excludedSignatures && excludedSignatures.size > 0) {
         if (isUrlDuplicate(v.play, excludedSignatures)) return false;
         if (v.video_id && excludedSignatures.has(String(v.video_id).toLowerCase())) return false;
@@ -1773,20 +1786,29 @@ export async function scrapeTikTokTrendingVideos(category: string, excludedSigna
     // Sort by highest view count so the most viral videos appear first
     candidateList.sort((a, b) => (b.play_count || 0) - (a.play_count || 0));
 
-    // Pick from top 6 engaging videos
-    const picked = candidateList[Math.floor(Math.random() * Math.min(candidateList.length, 6))];
-    if (!picked) return null;
+    // Pick from top candidates and verify the stream is a real playable video (not audio-only)
+    const topCandidates = candidateList.slice(0, 10).sort(() => 0.5 - Math.random());
+    for (const picked of topCandidates) {
+      if (!picked || !picked.play) continue;
+      if (isAudioOnlyUrl(picked.play)) continue;
 
-    const author = picked.author?.nickname || picked.author?.unique_id || "Creator";
-    const views = picked.play_count ? Number(picked.play_count).toLocaleString() : "";
-    const cleanTitle = picked.title.replace(/#[a-zA-Z0-9_]+/g, "").replace(/\s+/g, " ").trim();
-    const displayTitle = cleanTitle.length > 5 ? cleanTitle : picked.title.trim();
+      const isRealVideo = await isVerifiedVideoUrl(picked.play);
+      if (!isRealVideo) {
+        console.warn(`[Scraper] Discarded audio/non-video candidate: ${picked.play.slice(0, 60)}...`);
+        continue;
+      }
 
-    return {
-      title: displayTitle.slice(0, 80),
-      url: picked.play,
-      source: `Live Trending TikTok (${views ? `${views} views • ` : ""}@${author})`,
-    };
+      const author = picked.author?.nickname || picked.author?.unique_id || "Creator";
+      const views = picked.play_count ? Number(picked.play_count).toLocaleString() : "";
+      const cleanTitle = picked.title.replace(/#[a-zA-Z0-9_]+/g, "").replace(/\s+/g, " ").trim();
+      const displayTitle = cleanTitle.length > 5 ? cleanTitle : picked.title.trim();
+
+      return {
+        title: displayTitle.slice(0, 80),
+        url: picked.play,
+        source: `Live Trending TikTok (${views ? `${views} views • ` : ""}@${author})`,
+      };
+    }
   } catch (err: any) {
     console.warn("TikTok live trending feed notice:", err.message);
   }
@@ -1923,7 +1945,14 @@ async function fetchTikTokVideoById(videoId: string, excludedSignatures?: Set<st
     if (!res.ok) return null;
     const data = await res.json();
     if (data.code === 0 && data.data?.play) {
+      // Must NOT be a photo slideshow or audio-only stream
+      if (data.data.images && Array.isArray(data.data.images) && data.data.images.length > 0) return null;
+      if (isAudioOnlyUrl(data.data.play)) return null;
       if (excludedSignatures && isUrlDuplicate(data.data.play, excludedSignatures)) return null;
+
+      const isReal = await isVerifiedVideoUrl(data.data.play);
+      if (!isReal) return null;
+
       const cleanTitle = (data.data.title || "Viral Clip").replace(/#[a-zA-Z0-9_]+/g, "").replace(/\s+/g, " ").trim();
       const author = data.data.author?.nickname || data.data.author?.unique_id || "Creator";
       const views = data.data.play_count ? Number(data.data.play_count).toLocaleString() : "";
@@ -1946,11 +1975,11 @@ export async function scrapeOnlineViralVideo(category: string, excludedSignature
   // 1. If Trending: scrape live trending TikTok videos (real creators, speech, sound, ban-safe)
   if (isTrending) {
     const fromTikTok = await scrapeTikTokTrendingVideos("Trending", excludedSignatures);
-    if (fromTikTok) return fromTikTok;
+    if (fromTikTok && !isAudioOnlyUrl(fromTikTok.url)) return fromTikTok;
   } else {
     // 2. Specific Category: Check if live TikTok feed contains keyword-matched clips with audio
     const fromTikTok = await scrapeTikTokTrendingVideos(cleanCat, excludedSignatures);
-    if (fromTikTok) return fromTikTok;
+    if (fromTikTok && !isAudioOnlyUrl(fromTikTok.url)) return fromTikTok;
 
     // 3. Category Verified Bank: Get verified viral TikTok video with original creator sound (100% ban-safe)
     const rawIds = CATEGORY_VERIFIED_BANK[cleanCat] || [];
@@ -1958,13 +1987,13 @@ export async function scrapeOnlineViralVideo(category: string, excludedSignature
     if (availableIds.length > 0) {
       const pickedId = availableIds[Math.floor(Math.random() * availableIds.length)];
       const fromVerified = await fetchTikTokVideoById(pickedId, excludedSignatures);
-      if (fromVerified) return fromVerified;
+      if (fromVerified && !isAudioOnlyUrl(fromVerified.url)) return fromVerified;
     }
   }
 
   // 4. Fallback: High engagement TikTok video with real audio
   const fallbackTikTok = await scrapeTikTokTrendingVideos("Trending", excludedSignatures);
-  if (fallbackTikTok) return fallbackTikTok;
+  if (fallbackTikTok && !isAudioOnlyUrl(fallbackTikTok.url)) return fallbackTikTok;
 
   throw new Error(`Could not find a viral video with audio for "${cleanCat}". Please paste a video URL directly.`);
 }

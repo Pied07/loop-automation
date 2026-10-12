@@ -327,6 +327,17 @@ def run():
         print("ERROR: No VIDEO_URL provided.")
         sys.exit(1)
 
+    lowered_url = VIDEO_URL.lower()
+    if (
+        "mime_type=audio" in lowered_url
+        or "music.tiktokcdn" in lowered_url
+        or "ies-music" in lowered_url
+        or any(lowered_url.split("?")[0].endswith(ext) for ext in [".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"])
+    ):
+        print(f"ERROR: Rejecting audio-only stream URL: {VIDEO_URL}")
+        update_job_status(status="failed", error="Discovered source was an audio stream instead of a video. Scraping was refreshed.")
+        sys.exit(1)
+
     print(f"Starting cloud video pipeline for: {VIDEO_URL}")
     update_job_status(status="processing", progress=20, step="Downloading video in GitHub cloud...")
 

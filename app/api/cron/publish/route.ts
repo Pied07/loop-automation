@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { database } from "@/app/firebase";
 import { collection, doc, getDoc, getDocs, limit, query, setDoc } from "firebase/firestore";
 import { scrapeOnlineViralVideo, cleanViralTitle } from "@/app/viral-actions";
-import { extractUrlSignatures, isUrlDuplicate } from "@/app/lib/url-utils";
+import { extractUrlSignatures, isUrlDuplicate, isAudioOnlyUrl } from "@/app/lib/url-utils";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -100,6 +100,10 @@ async function handleCronPublish(req: NextRequest) {
       for (let attempt = 0; attempt < 3; attempt++) {
         const candidate = await scrapeOnlineViralVideo(cat, pastSignatures);
         if (candidate && candidate.url) {
+          if (isAudioOnlyUrl(candidate.url)) {
+            console.log(`[Cron Auto-Pilot] Skipping audio-only source: ${candidate.url.slice(0, 60)}... Finding actual video.`);
+            continue;
+          }
           const isDup = isUrlDuplicate(candidate.url, pastSignatures) || pastRawUrls.has(candidate.url.trim());
           if (!isDup) {
             scraped = candidate;
