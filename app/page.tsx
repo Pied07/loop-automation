@@ -1294,21 +1294,68 @@ export default function Home() {
           }
 
           allProducedVideos.push(data);
-          setGeneratedAiVideosList([...allProducedVideos]);
-          if (pIdx === 1) {
-            setGeneratedAiVideo(data);
+          let finalData = data;
+          if ((data.cloudMode === "github" || !data.clip) && data.jobId) {
+            setAiProgressStep(`${partLabel}Job dispatched to GitHub Actions cloud runner...`);
+            const completedClip = await new Promise<any>((resolve, reject) => {
+              const poll = setInterval(async () => {
+                try {
+                  const sRes = await fetch(`/api/viral-clips/status?jobId=${data.jobId}`);
+                  if (sRes.ok) {
+                    const job = await sRes.json();
+                    if (job.step) {
+                      setAiProgressStep(`${partLabel}${job.step}`);
+                    }
+                    if (job.progress) {
+                      const scaledPct = basePct + Math.round(((job.progress / 100) * (nextPct - basePct)));
+                      setAiProgress(scaledPct);
+                    }
+                    if (job.status === "done" && Array.isArray(job.clips) && job.clips.length > 0) {
+                      clearInterval(poll);
+                      resolve(job.clips[0]);
+                    } else if (job.status === "failed") {
+                      clearInterval(poll);
+                      reject(new Error(job.error || `Cloud generation failed for Part ${pIdx}.`));
+                    }
+                  }
+                } catch {
+                  // retry polling
+                }
+              }, 3000);
+            });
+
+            finalData = {
+              success: true,
+              videoUrl: completedClip.videoUrl || completedClip.url || completedClip.clipPath,
+              thumbnailUrl: completedClip.thumbnailUrl,
+              title: completedClip.title,
+              description: completedClip.description,
+              hashtags: completedClip.hashtags,
+              category: completedClip.format || selectedCategory,
+              isAiVideo: true,
+              partNumber: pIdx,
+              totalParts: totalPartsToGen,
+              duration: completedClip.duration || aiDuration,
+              clip: completedClip,
+            };
+            allProducedVideos[allProducedVideos.length - 1] = finalData;
           }
 
-          if (data.clip) {
+          setGeneratedAiVideosList([...allProducedVideos]);
+          if (pIdx === 1) {
+            setGeneratedAiVideo(finalData);
+          }
+
+          if (finalData.clip) {
             const newRecord: VideoRecord = {
-              id: data.clip.id,
-              title: data.clip.title,
-              description: data.clip.description,
-              hashtags: data.clip.hashtags || [],
-              duration: data.clip.duration || aiDuration,
-              videoUrl: data.clip.videoUrl,
-              cloudinaryUrl: data.clip.cloudinaryUrl,
-              thumbnailUrl: data.clip.thumbnailUrl,
+              id: finalData.clip.id,
+              title: finalData.clip.title,
+              description: finalData.clip.description,
+              hashtags: finalData.clip.hashtags || [],
+              duration: finalData.clip.duration || aiDuration,
+              videoUrl: finalData.clip.videoUrl || finalData.videoUrl,
+              cloudinaryUrl: finalData.clip.cloudinaryUrl || finalData.videoUrl,
+              thumbnailUrl: finalData.clip.thumbnailUrl || finalData.thumbnailUrl,
               format: selectedCategory === "Others" ? (customStoryTag || "Custom") : selectedCategory,
               isAiVideo: true,
               createdAt: new Date().toISOString(),

@@ -2128,6 +2128,8 @@ export async function generateAiVideoAction(params: {
   platforms?: { youtube?: boolean; facebook?: boolean; instagram?: boolean };
 }): Promise<{
   success: boolean;
+  cloudMode?: string;
+  jobId?: string;
   videoUrl?: string;
   thumbnailUrl?: string;
   title?: string;
@@ -2152,6 +2154,90 @@ export async function generateAiVideoAction(params: {
     const duration = params.duration ? Math.max(10, Math.min(120, Number(params.duration))) : 20;
     const numParts = params.numParts ? Math.max(1, Math.min(5, Number(params.numParts))) : 1;
     const partNumber = params.partNumber ? Math.max(1, Math.min(numParts, Number(params.partNumber))) : 1;
+
+    // Check if cloud execution via GitHub Actions should be used
+    const githubPat = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
+    const githubRepo = process.env.GITHUB_REPO || "Pied07/loop-automation";
+    const isVercel = process.env.VERCEL === "1" || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+    const isCloudForced = process.env.AI_VIDEO_PROCESSOR === "cloud";
+    const isLocalDev = !isVercel && process.platform === "win32" && !isCloudForced;
+
+    if ((isVercel || isCloudForced || !isLocalDev) && githubPat) {
+      const jobId = `ai_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const appUrl = (
+        process.env.APP_URL ||
+        (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://the-viral-desk.vercel.app"))
+      ).replace(/\/$/, "");
+
+      try {
+        await fetch(`${appUrl}/api/viral-clips/status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jobId,
+            status: "processing",
+            progress: 15,
+            step: `Starting Part ${partNumber}/${numParts} in GitHub Actions cloud runner...`,
+          }),
+        });
+      } catch (stErr) {
+        console.warn("Initial status update notice:", stErr);
+      }
+
+      const dispatchUrl = `https://api.github.com/repos/${githubRepo}/actions/workflows/generate-ai-video.yml/dispatches`;
+      const ghRes = await fetch(dispatchUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${githubPat}`,
+          Accept: "application/vnd.github.v3+json",
+          "Content-Type": "application/json",
+          "User-Agent": "The-Viral-Desk-App",
+        },
+        body: JSON.stringify({
+          ref: "main",
+          inputs: {
+            jobId,
+            category,
+            customTag,
+            prompt,
+            script,
+            voice,
+            numImages: String(numImages),
+            duration: String(duration),
+            numParts: String(numParts),
+            partNumber: String(partNumber),
+            userId: params.userId || "creator",
+            userEmail: params.userEmail || "",
+            appUrl,
+            cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
+            cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || "",
+            cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || "",
+            autoPublish: params.autoPublish ? "true" : "false",
+            platforms: JSON.stringify(params.platforms || {}),
+          },
+        }),
+      });
+
+      if (!ghRes.ok) {
+        const ghErrText = await ghRes.text();
+        throw new Error(`Failed to dispatch GitHub Actions workflow (${ghRes.status}): ${ghErrText.slice(0, 200)}`);
+      }
+
+      return {
+        success: true,
+        cloudMode: "github",
+        jobId,
+        category,
+        isAiVideo: true,
+        partNumber,
+        totalParts: numParts,
+        duration,
+      };
+    }
+
+    if (isVercel && !githubPat) {
+      throw new Error("Live Vercel environment detected. Python and FFmpeg cannot run inside Vercel serverless functions. Please configure GITHUB_PAT in your Vercel Project Settings > Environment Variables so GitHub Actions can generate the video.");
+    }
 
     const pyExe = process.platform === "win32" ? "py" : "python3";
     const scriptPath = path.join(process.cwd(), "scripts", "ai_video_engine.py");

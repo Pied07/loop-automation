@@ -1,0 +1,137 @@
+name: Cloud AI Video Generator Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      jobId:
+        description: 'Job ID for progress tracking'
+        required: true
+        type: string
+      category:
+        description: 'Content Category'
+        required: false
+        default: 'Interesting Facts'
+        type: string
+      customTag:
+        description: 'Custom story tag if Others'
+        required: false
+        default: ''
+        type: string
+      prompt:
+        description: 'Prompt or story hook'
+        required: false
+        default: ''
+        type: string
+      script:
+        description: 'Script narration'
+        required: false
+        default: ''
+        type: string
+      voice:
+        description: 'Neural Voice'
+        required: false
+        default: 'en-US-ChristopherNeural'
+        type: string
+      numImages:
+        description: 'Number of scenes'
+        required: false
+        default: '3'
+        type: string
+      duration:
+        description: 'Target duration in seconds'
+        required: false
+        default: '20'
+        type: string
+      numParts:
+        description: 'Total number of parts'
+        required: false
+        default: '1'
+        type: string
+      partNumber:
+        description: 'Current part number'
+        required: false
+        default: '1'
+        type: string
+      userId:
+        description: 'User ID'
+        required: false
+        default: 'creator'
+        type: string
+      userEmail:
+        description: 'User Email'
+        required: false
+        default: ''
+        type: string
+      appUrl:
+        description: 'App URL for status reporting'
+        required: false
+        default: 'https://the-viral-desk.vercel.app'
+        type: string
+      cloudinaryCloudName:
+        description: 'Cloudinary Cloud Name'
+        required: false
+        type: string
+      cloudinaryApiKey:
+        description: 'Cloudinary API Key'
+        required: false
+        type: string
+      cloudinaryApiSecret:
+        description: 'Cloudinary API Secret'
+        required: false
+        type: string
+      autoPublish:
+        description: 'Auto-publish generated video'
+        required: false
+        default: 'false'
+        type: string
+      platforms:
+        description: 'Platforms to auto-publish to'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  generate-ai-video:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install FFmpeg & Python ML Libraries
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          pip install --upgrade requests onnxruntime numpy pillow edge-tts
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Run Cloud AI Video Generation
+        env:
+          JOB_ID: ${{ inputs.jobId }}
+          CATEGORY: ${{ inputs.category }}
+          CUSTOM_TAG: ${{ inputs.customTag }}
+          PROMPT: ${{ inputs.prompt }}
+          SCRIPT: ${{ inputs.script }}
+          VOICE: ${{ inputs.voice }}
+          NUM_IMAGES: ${{ inputs.numImages }}
+          DURATION: ${{ inputs.duration }}
+          NUM_PARTS: ${{ inputs.numParts }}
+          PART_NUMBER: ${{ inputs.partNumber }}
+          USER_ID: ${{ inputs.userId }}
+          USER_EMAIL: ${{ inputs.userEmail }}
+          APP_URL: ${{ inputs.appUrl != '' && inputs.appUrl || 'https://the-viral-desk.vercel.app' }}
+          CLOUDINARY_CLOUD_NAME: ${{ inputs.cloudinaryCloudName != '' && inputs.cloudinaryCloudName || secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ inputs.cloudinaryApiKey != '' && inputs.cloudinaryApiKey || secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ inputs.cloudinaryApiSecret != '' && inputs.cloudinaryApiSecret || secrets.CLOUDINARY_API_SECRET }}
+          AUTO_PUBLISH: ${{ inputs.autoPublish }}
+          PLATFORMS: ${{ inputs.platforms }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python scripts/cloud_ai_video_generator.py
