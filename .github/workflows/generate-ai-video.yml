@@ -109,7 +109,8 @@ jobs:
       - name: Install FFmpeg & Python ML Libraries
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
-          pip install --upgrade requests onnxruntime numpy pillow edge-tts
+          pip install --upgrade requests onnx onnxruntime numpy pillow gtts
+          pip install --upgrade "edge-tts>=6.1.18" || pip install --upgrade edge-tts
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 
       - name: Run Cloud AI Video Generation
