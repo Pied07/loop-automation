@@ -656,7 +656,28 @@ class AIVideoEngine:
         }
 
     async def _synthesize_voice(self, script: str, voice: str, output_audio: Path) -> List[Dict[str, Any]]:
-        """Synthesize neural voiceover using edge-tts with sentence timestamps, with gTTS fail-safe fallback."""
+        """
+        Synthesize neural voiceover:
+        Priority 1: 100% Local Offline ONNX Neural Voice Model (Lifetime free, zero rate-limits, zero network)
+        Priority 2: edge-tts / gTTS fail-safe fallbacks
+        """
+        # 1. Primary: Local ONNX Neural Voice Engine (Zero network, lifetime free)
+        try:
+            from scripts.local_neural_tts import LocalNeuralTTS
+            timings = LocalNeuralTTS.synthesize(script, output_audio)
+            if output_audio.exists() and output_audio.stat().st_size > 1000 and timings:
+                print(f"✅ Generated voiceover via Local ONNX Neural Voice Model: {output_audio.stat().st_size} bytes")
+                return timings
+        except Exception as onnx_err:
+            try:
+                from local_neural_tts import LocalNeuralTTS
+                timings = LocalNeuralTTS.synthesize(script, output_audio)
+                if output_audio.exists() and output_audio.stat().st_size > 1000 and timings:
+                    print(f"✅ Generated voiceover via Local ONNX Neural Voice Model: {output_audio.stat().st_size} bytes")
+                    return timings
+            except Exception as onnx_err2:
+                print(f"Notice: Local ONNX Neural voice notice ({onnx_err2}), attempting secondary engines...")
+
         sentences_timing = []
         try:
             import edge_tts

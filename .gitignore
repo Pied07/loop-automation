@@ -65,6 +65,7 @@ scratch/
 public/generated-videos/
 *.parquet
 scripts/models/whisper-tiny/*.bin
+scripts/models/neural_tts_voice.onnx
 scripts/models/dataset_real_images/
 __pycache__/
 *.py[cod]

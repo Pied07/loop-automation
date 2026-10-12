@@ -109,9 +109,19 @@ jobs:
       - name: Install FFmpeg & Python ML Libraries
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
-          pip install --upgrade requests onnx onnxruntime numpy pillow gtts
+          pip install --upgrade requests onnx onnxruntime numpy pillow gtts piper-tts
           pip install --upgrade "edge-tts>=6.1.18" || pip install --upgrade edge-tts
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Preload Local Neural Voice ONNX Model
+        run: |
+          mkdir -p scripts/models
+          if [ ! -f "scripts/models/neural_tts_voice.onnx" ]; then
+            echo "📥 Preloading Local Neural Voice ONNX weights..."
+            curl -L -s -o scripts/models/neural_tts_voice.onnx.json "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json"
+            curl -L -s -o scripts/models/neural_tts_voice.onnx "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx"
+          fi
+          ls -lh scripts/models/neural_tts_voice.onnx
 
       - name: Run Cloud AI Video Generation
         env:
