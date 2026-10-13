@@ -14,8 +14,10 @@ import sys
 import time
 import re
 import io
+import json
 import urllib.request
 import urllib.parse
+import urllib.error
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any, List
 
@@ -227,7 +229,9 @@ class StorySceneEngine:
         endpoint = f"{bridge_url.rstrip('/')}/generate"
         payload = json.dumps({
             "prompt": prompt,
-            "aspect": f"{width}:{height}",
+            "aspect": "9:16 (Shorts / Reels)" if height > width else "16:9 (YouTube Standard)",
+            "width": width,
+            "height": height,
             "steps": steps,
             "guidance": guidance,
             "seed": seed,
@@ -261,8 +265,12 @@ class StorySceneEngine:
                     img = Image.open(io.BytesIO(raw_data)).convert("RGB")
                     print("[SCENE ENGINE] ✅ Successfully synthesized scene via GPU Bridge!")
                     return img
+        except urllib.error.HTTPError as he:
+            err_text = he.read().decode("utf-8", errors="replace")[:400]
+            print(f"[SCENE ENGINE] ⚠️ GPU Bridge HTTP {he.code} Error: {err_text}")
+            return None
         except Exception as e:
-            print(f"[SCENE ENGINE] GPU Bridge query notice: {e}")
+            print(f"[SCENE ENGINE] ⚠️ GPU Bridge query error: {e}")
             return None
 
     def generate_local_image(

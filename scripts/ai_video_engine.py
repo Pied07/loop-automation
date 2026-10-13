@@ -369,35 +369,8 @@ class AIVideoEngine:
         except Exception as e:
             print(f"Notice: Local diffusion engine fallback notice: {e}")
 
-        # 1. Condition Local Generative Neural Network with prompt semantics & category
-        cond = np.zeros((1, 64), dtype=np.float32)
-        if cat_clean in CATEGORIES_LIST:
-            cond[0, CATEGORIES_LIST.index(cat_clean)] = 1.0
-
-        tokens = re.findall(r"\b[a-zA-Z]{3,}\b", prompt.lower())
-        for i, t in enumerate(tokens[:23]):
-            cond[0, 9 + i] = float(sum(ord(c) for c in t) % 40) / 40.0
-
-        np.random.seed(seed + scene_idx * 77)
-        cond[0, 32:] = np.random.normal(0, 0.45, 32).astype(np.float32)
-
-        neural_img = None
-        if self.gen_image_model is not None:
-            try:
-                with torch.no_grad():
-                    pred_tensor = self.gen_image_model(torch.tensor(cond))
-                    rgb_arr = ((pred_tensor[0].numpy().transpose(1, 2, 0) + 1.0) * 127.5).clip(0, 255).astype(np.uint8)
-                    neural_raw = Image.fromarray(rgb_arr)
-                    neural_img = neural_raw.resize((target_w, target_h), Image.Resampling.BICUBIC)
-            except Exception as e:
-                print(f"Notice: Local neural inference notice: {e}")
-
         # 2. Standalone Cinematic Scene Generator (Strictly offline, zero third-party scrapers)
-        # Used when GPU Bridge is offline and no pre-generated scene images were uploaded
-        if neural_img is not None:
-            scene_img = ImageEnhance.Contrast(neural_img).enhance(1.15)
-            scene_img.save(str(output_path), quality=96)
-            return True
+        # Used only if GPU Bridge is offline and no pre-generated scene images were uploaded
 
         # Synthesize rich cinematic atmospheric scene visual tailored to this scene's narrative & category
         try:
