@@ -575,6 +575,18 @@ export default function Home() {
   const [aiCurrentPart, setAiCurrentPart] = useState<number>(1);
   const [isGeneratingScript, setIsGeneratingScript] = useState<boolean>(false);
   const [generatedStoryParts, setGeneratedStoryParts] = useState<any[]>([]);
+  const [selectedSceneStyle, setSelectedSceneStyle] = useState<string>("Cinematic Film");
+  const [generatingSceneIdx, setGeneratingSceneIdx] = useState<number | null>(null);
+  const [isGeneratingAllScenes, setIsGeneratingAllScenes] = useState<boolean>(false);
+  const [colabGpuUrl, setColabGpuUrl] = useState<string>("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("colab_gpu_bridge_url");
+      if (saved) setColabGpuUrl(saved);
+    }
+  }, []);
+
   const [lastFactId, setLastFactId] = useState<string>("");
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
   const sampleAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -1218,6 +1230,139 @@ export default function Home() {
     }
   }
 
+  async function handleGenerateSceneImage(sceneIndex: number, customPrompt?: string) {
+    setGeneratingSceneIdx(sceneIndex);
+    try {
+      const targetPart = generatedStoryParts.find((p) => (p.partNumber || p.part_number) === aiCurrentPart);
+      const sceneObj = targetPart?.scenes?.find((s: any) => s.scene_index === sceneIndex);
+      const promptToUse = customPrompt || sceneObj?.visual_prompt || sceneObj?.text || aiPrompt;
+
+      notify(`🎨 Generating AI visual for Scene ${sceneIndex + 1} with local PyTorch model...`);
+
+      const res = await fetch("/api/ai-video/generate-scene-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: promptToUse,
+          style: selectedSceneStyle,
+          aspect: "9:16 (Shorts / Reels)",
+          sceneIndex,
+          partNumber: aiCurrentPart,
+          steps: 4,
+          colabGpuUrl: colabGpuUrl.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to generate scene visual");
+      }
+
+      setGeneratedStoryParts((prevParts) =>
+        prevParts.map((part) => {
+          if ((part.partNumber || part.part_number) !== aiCurrentPart) return part;
+          const updatedScenes = (part.scenes || []).map((scn: any) => {
+            if (scn.scene_index === sceneIndex) {
+              return { ...scn, imageUrl: data.imageUrl };
+            }
+            return scn;
+          });
+          return { ...part, scenes: updatedScenes };
+        })
+      );
+
+      notify(`✨ Scene ${sceneIndex + 1} visual generated successfully!`);
+    } catch (err: any) {
+      notify(`Failed to generate visual: ${err.message}`);
+    } finally {
+      setGeneratingSceneIdx(null);
+    }
+  }
+
+  async function handleUploadSceneImage(sceneIndex: number, file: File) {
+    try {
+      notify(`📁 Uploading visual for Scene ${sceneIndex + 1}...`);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("sceneIndex", String(sceneIndex));
+
+      const res = await fetch("/api/ai-video/upload-scene-image", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to upload scene visual");
+      }
+
+      setGeneratedStoryParts((prevParts) =>
+        prevParts.map((part) => {
+          if ((part.partNumber || part.part_number) !== aiCurrentPart) return part;
+          const updatedScenes = (part.scenes || []).map((scn: any) => {
+            if (scn.scene_index === sceneIndex) {
+              return { ...scn, imageUrl: data.imageUrl };
+            }
+            return scn;
+          });
+          return { ...part, scenes: updatedScenes };
+        })
+      );
+      notify(`✅ Scene ${sceneIndex + 1} visual attached!`);
+    } catch (err: any) {
+      notify(`Upload failed: ${err.message}`);
+    }
+  }
+
+  async function handleGenerateAllScenes() {
+    const targetPart = generatedStoryParts.find((p) => (p.partNumber || p.part_number) === aiCurrentPart);
+    const scenesToGen = targetPart?.scenes || [];
+    if (scenesToGen.length === 0) {
+      notify("⚠️ Please generate a script or scenes first.");
+      return;
+    }
+
+    setIsGeneratingAllScenes(true);
+    try {
+      for (let i = 0; i < scenesToGen.length; i++) {
+        const scn = scenesToGen[i];
+        setGeneratingSceneIdx(scn.scene_index);
+        notify(`🎨 Generating Scene ${i + 1}/${scenesToGen.length} with local PyTorch model...`);
+
+        const res = await fetch("/api/ai-video/generate-scene-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: scn.visual_prompt || scn.text,
+            style: selectedSceneStyle,
+            aspect: "9:16 (Shorts / Reels)",
+            sceneIndex: scn.scene_index,
+            partNumber: aiCurrentPart,
+            steps: 4,
+            colabGpuUrl: colabGpuUrl.trim(),
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success && data.imageUrl) {
+          setGeneratedStoryParts((prevParts) =>
+            prevParts.map((part) => {
+              if ((part.partNumber || part.part_number) !== aiCurrentPart) return part;
+              const updatedScenes = (part.scenes || []).map((s: any) =>
+                s.scene_index === scn.scene_index ? { ...s, imageUrl: data.imageUrl } : s
+              );
+              return { ...part, scenes: updatedScenes };
+            })
+          );
+        }
+      }
+      notify(`✨ All ${scenesToGen.length} scene visuals generated!`);
+    } catch (err: any) {
+      notify(`Error generating all scenes: ${err.message}`);
+    } finally {
+      setIsGeneratingAllScenes(false);
+      setGeneratingSceneIdx(null);
+    }
+  }
+
   async function handleGenerateAiVideo() {
     const errorMsg = validateStudioInputs();
     if (errorMsg) {
@@ -1236,12 +1381,15 @@ export default function Home() {
 
     try {
       for (let pIdx = 1; pIdx <= totalPartsToGen; pIdx++) {
-        // Determine script for this part
+        // Determine script and pre-generated scene images for this part
         let partScript = aiPrompt;
-        const matchingPart = generatedStoryParts.find((gp) => gp.partNumber === pIdx);
+        const matchingPart = generatedStoryParts.find((gp) => (gp.partNumber || gp.part_number) === pIdx);
         if (matchingPart && matchingPart.script) {
           partScript = matchingPart.script;
         }
+        const partSceneImages = (matchingPart?.scenes || [])
+          .map((s: any) => s.imageUrl)
+          .filter(Boolean);
 
         const basePct = Math.round(((pIdx - 1) / totalPartsToGen) * 100);
         const nextPct = Math.round((pIdx / totalPartsToGen) * 100);
@@ -1283,8 +1431,10 @@ export default function Home() {
               duration: aiDuration,
               numParts: totalPartsToGen,
               partNumber: pIdx,
+              sceneImages: partSceneImages,
               userId: auth?.currentUser?.uid || "creator",
               userEmail: auth?.currentUser?.email || "",
+              colabGpuUrl: colabGpuUrl.trim(),
             }),
           });
           clearInterval(partTimer);
@@ -2198,6 +2348,413 @@ export default function Home() {
                     </div>
                   )}
 
+                  {/* Local AI Scene Visuals Gallery (Interactive Scene-by-Scene Display) */}
+                  {(() => {
+                    const activePart = generatedStoryParts.find((p) => (p.partNumber || p.part_number) === aiCurrentPart);
+                    const scenesList = activePart?.scenes || [];
+
+                    if (scenesList.length === 0) {
+                      return (
+                        <div
+                          style={{
+                            marginTop: '12px',
+                            background: '#12151e',
+                            border: '1px dashed #242c3d',
+                            borderRadius: '8px',
+                            padding: '10px 14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '10px',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '14px' }}>🎨</span>
+                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                              <strong style={{ color: '#e2e8f0' }}>Local AI Scene Generator Ready:</strong> Auto-generate a script above to preview and synthesize 9:16 vertical AI scene visuals directly on your PC.
+                            </span>
+                          </div>
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              color: '#10b981',
+                              background: 'rgba(16,185,129,0.12)',
+                              border: '1px solid rgba(16,185,129,0.25)',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            PyTorch Diffusion Warm
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        style={{
+                          marginTop: '16px',
+                          background: 'linear-gradient(180deg, #10131d 0%, #0d0f17 100%)',
+                          border: '1px solid #1e293b',
+                          borderRadius: '12px',
+                          padding: '16px',
+                          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                        }}
+                      >
+                        {/* Header bar */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '12px',
+                            marginBottom: '14px',
+                            paddingBottom: '12px',
+                            borderBottom: '1px solid #1e2230',
+                          }}
+                        >
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '15px' }}>🎨</span>
+                              <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', margin: 0 }}>
+                                AI Story Scene Visuals
+                              </h4>
+                              <span
+                                style={{
+                                  fontSize: '10px',
+                                  fontWeight: 700,
+                                  color: '#10b981',
+                                  background: 'rgba(16,185,129,0.15)',
+                                  border: '1px solid rgba(16,185,129,0.3)',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em',
+                                }}
+                              >
+                                100% Local PyTorch
+                              </span>
+                            </div>
+                            <p style={{ fontSize: '11px', color: '#94a3b8', margin: '4px 0 0 0' }}>
+                              Authentic 9:16 vertical AI scenes generated directly on your PC. No third-party API keys required.
+                            </p>
+                          </div>
+
+                          {/* Controls: Style selector & Generate All button */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>Style:</label>
+                              <select
+                                value={selectedSceneStyle}
+                                onChange={(e) => setSelectedSceneStyle(e.target.value)}
+                                style={{
+                                  padding: '4px 8px',
+                                  borderRadius: '6px',
+                                  background: '#161922',
+                                  border: '1px solid #334155',
+                                  color: '#e2e8f0',
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                {[
+                                  "Cinematic Film",
+                                  "Epic Fantasy",
+                                  "Sci-Fi Cyberpunk",
+                                  "Dark Mystery",
+                                  "Historical Epic",
+                                  "Anime / Storybook",
+                                  "Photorealistic Nature",
+                                ].map((st) => (
+                                  <option key={st} value={st}>
+                                    {st}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={handleGenerateAllScenes}
+                              disabled={isGeneratingAllScenes || generatingSceneIdx !== null}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                border: '1px solid #a855f7',
+                                background: isGeneratingAllScenes
+                                  ? '#581c87'
+                                  : 'linear-gradient(135deg, #9333ea, #c026d3)',
+                                color: '#fff',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                cursor: isGeneratingAllScenes ? 'not-allowed' : 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: '0 2px 8px rgba(168,85,247,0.3)',
+                              }}
+                            >
+                              {isGeneratingAllScenes ? (
+                                <LoaderCircle className="spin" size={12} />
+                              ) : (
+                                <Sparkles size={12} />
+                              )}
+                              {isGeneratingAllScenes ? "Synthesizing All Scenes..." : "🎨 Synthesize All Scene Visuals"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Scenes Grid */}
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: `repeat(auto-fit, minmax(260px, 1fr))`,
+                            gap: '12px',
+                          }}
+                        >
+                          {scenesList.map((scene: any, sIdx: number) => {
+                            const isThisGenerating = generatingSceneIdx === scene.scene_index;
+                            const hasImage = Boolean(scene.imageUrl);
+
+                            return (
+                              <div
+                                key={scene.scene_index ?? sIdx}
+                                style={{
+                                  background: '#141721',
+                                  border: `1px solid ${hasImage ? '#38bdf8' : '#1e293b'}`,
+                                  borderRadius: '8px',
+                                  overflow: 'hidden',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  transition: 'border-color 0.2s',
+                                }}
+                              >
+                                {/* Scene Header */}
+                                <div
+                                  style={{
+                                    padding: '8px 10px',
+                                    background: '#181c28',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    borderBottom: '1px solid #242938',
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span
+                                      style={{
+                                        fontSize: '11px',
+                                        fontWeight: 700,
+                                        color: '#38bdf8',
+                                        background: 'rgba(56,189,248,0.15)',
+                                        padding: '2px 6px',
+                                        borderRadius: '4px',
+                                      }}
+                                    >
+                                      Scene {sIdx + 1}
+                                    </span>
+                                    <span style={{ fontSize: '10px', color: '#64748b' }}>
+                                      (~{Math.round(aiDuration / scenesList.length)}s)
+                                    </span>
+                                  </div>
+                                  {hasImage && (
+                                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#10b981' }}>
+                                      ✓ Ready
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Image Preview Area */}
+                                <div
+                                  style={{
+                                    height: '240px',
+                                    position: 'relative',
+                                    background: '#090b10',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    overflow: 'hidden',
+                                  }}
+                                >
+                                  {hasImage ? (
+                                    <img
+                                      src={scene.imageUrl}
+                                      alt={`Scene ${sIdx + 1}`}
+                                      style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'cover',
+                                        display: 'block',
+                                        cursor: 'pointer',
+                                      }}
+                                      onClick={() => window.open(scene.imageUrl, '_blank')}
+                                      title="Click to view full resolution"
+                                    />
+                                  ) : isThisGenerating ? (
+                                    <div
+                                      style={{
+                                        textAlign: 'center',
+                                        padding: '16px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                      }}
+                                    >
+                                      <LoaderCircle className="spin" size={24} style={{ color: '#38bdf8' }} />
+                                      <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8' }}>
+                                        Synthesizing with PyTorch...
+                                      </span>
+                                      <span style={{ fontSize: '10px', color: '#64748b' }}>
+                                        DPM-Solver 4-step diffusion on CPU
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <div
+                                      style={{
+                                        textAlign: 'center',
+                                        padding: '16px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                      }}
+                                    >
+                                      <span style={{ fontSize: '24px', opacity: 0.7 }}>🖼️</span>
+                                      <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                        No visual synthesized yet
+                                      </span>
+                                      <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleGenerateSceneImage(scene.scene_index)}
+                                          style={{
+                                            padding: '4px 10px',
+                                            borderRadius: '6px',
+                                            background: 'rgba(56,189,248,0.15)',
+                                            border: '1px solid #0284c7',
+                                            color: '#38bdf8',
+                                            fontSize: '11px',
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                          }}
+                                        >
+                                          ✨ Generate Visual
+                                        </button>
+                                        <label
+                                          style={{
+                                            padding: '4px 10px',
+                                            borderRadius: '6px',
+                                            background: 'rgba(99,102,241,0.15)',
+                                            border: '1px solid #6366f1',
+                                            color: '#a5b4fc',
+                                            fontSize: '11px',
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                          }}
+                                          title="Upload scene image generated in Google Colab (e.g. scene_1.png)"
+                                        >
+                                          📁 Upload Colab Scene
+                                          <input
+                                            type="file"
+                                            accept="image/*"
+                                            style={{ display: 'none' }}
+                                            onChange={(e) => {
+                                              const file = e.target.files?.[0];
+                                              if (file) handleUploadSceneImage(scene.scene_index, file);
+                                            }}
+                                          />
+                                        </label>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {hasImage && (
+                                    <div
+                                      style={{
+                                        position: 'absolute',
+                                        bottom: '8px',
+                                        right: '8px',
+                                        display: 'flex',
+                                        gap: '4px',
+                                      }}
+                                    >
+                                      <label
+                                        style={{
+                                          padding: '4px 8px',
+                                          borderRadius: '4px',
+                                          background: 'rgba(15,23,42,0.85)',
+                                          border: '1px solid #334155',
+                                          color: '#e2e8f0',
+                                          fontSize: '10px',
+                                          fontWeight: 600,
+                                          cursor: 'pointer',
+                                          backdropFilter: 'blur(4px)',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                        }}
+                                        title="Upload replacement image from Colab"
+                                      >
+                                        📁 Upload
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          style={{ display: 'none' }}
+                                          onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) handleUploadSceneImage(scene.scene_index, file);
+                                          }}
+                                        />
+                                      </label>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleGenerateSceneImage(scene.scene_index)}
+                                        disabled={isThisGenerating}
+                                        style={{
+                                          padding: '4px 8px',
+                                          borderRadius: '4px',
+                                          background: 'rgba(15,23,42,0.85)',
+                                          border: '1px solid #334155',
+                                          color: '#e2e8f0',
+                                          fontSize: '10px',
+                                          fontWeight: 600,
+                                          cursor: 'pointer',
+                                          backdropFilter: 'blur(4px)',
+                                        }}
+                                        title="Regenerate this visual"
+                                      >
+                                        🔄 Re-roll
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Script excerpt & visual prompt */}
+                                <div style={{ padding: '10px', flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  <div style={{ fontSize: '11px', color: '#cbd5e1', lineHeight: '1.4' }}>
+                                    <strong style={{ color: '#94a3b8' }}>Script: </strong>
+                                    {scene.text || "Scene narration segment."}
+                                  </div>
+                                  <div style={{ fontSize: '10px', color: '#64748b', fontStyle: 'italic', lineHeight: '1.3' }}>
+                                    <strong style={{ color: '#475569', fontStyle: 'normal' }}>Prompt: </strong>
+                                    {scene.visual_prompt || "Vertical cinematic atmospheric scene."}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* AI Narrator Selection with Sample Voice Audio Preview */}
                   <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <span style={{ fontSize: '12px', fontWeight: 600, color: '#9ca3af' }}>AI Narrator Voice:</span>
@@ -2362,6 +2919,43 @@ export default function Home() {
                         <span>60 sec (1 min)</span>
                         <span>120 sec (2 mins)</span>
                       </div>
+                    </div>
+
+                    {/* Live Colab GPU Bridge URL for Custom SDXL Model */}
+                    <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid #1e2230', width: '100%' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          ⚡ Custom Image Model (Colab GPU Bridge):
+                        </span>
+                        <span style={{ fontSize: '11px', color: colabGpuUrl ? '#10b981' : '#94a3b8', fontWeight: 600 }}>
+                          {colabGpuUrl ? '🟢 GPU Connected' : '⚪ Standalone / Local'}
+                        </span>
+                      </div>
+                      <input
+                        type="url"
+                        placeholder="https://...trycloudflare.com (Optional: Run Cell 9 in Google Colab for 2s Tesla T4 synthesis)"
+                        value={colabGpuUrl}
+                        onChange={(e) => {
+                          const val = e.target.value.trim();
+                          setColabGpuUrl(val);
+                          if (typeof window !== "undefined") {
+                            localStorage.setItem("colab_gpu_bridge_url", val);
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          background: '#0d1117',
+                          border: `1px solid ${colabGpuUrl ? 'rgba(16,185,129,0.5)' : '#2a2e3d'}`,
+                          borderRadius: '6px',
+                          padding: '7px 10px',
+                          fontSize: '12px',
+                          color: '#f8fafc',
+                          fontFamily: 'monospace',
+                        }}
+                      />
+                      <p style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                        Connects directly to your custom trained SDXL LoRA model running in Google Colab GPU (₹0, ~2-3s per scene).
+                      </p>
                     </div>
                   </div>
 

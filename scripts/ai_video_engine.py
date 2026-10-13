@@ -345,6 +345,30 @@ class AIVideoEngine:
         theme = THEMES.get(cat_clean, THEMES["Interesting Facts"])
         target_w, target_h = 1080, 1920
 
+        # Tier 0: Direct Local Generative AI Story Scene Engine (Genuine AI image synthesized from scene script)
+        try:
+            import sys
+            img_gen_dir = str(Path(__file__).parent.parent / "image_gen_model")
+            if img_gen_dir not in sys.path:
+                sys.path.insert(0, img_gen_dir)
+            from scene_engine import generate_scene_for_script
+
+            scene_ai_img = generate_scene_for_script(
+                scene_idx=scene_idx,
+                scene_text=scene_text or prompt,
+                topic=topic or prompt,
+                category=category,
+                output_path=str(output_path),
+                aspect_ratio="9:16 (Shorts / Reels)",
+                target_wh=(target_w, target_h),
+                colab_gpu_url=getattr(self, "colab_gpu_url", ""),
+            )
+            if scene_ai_img is not None:
+                print(f"🎨 Synthesized genuine AI Scene {scene_idx + 1} with local generative engine for: {(scene_text or prompt)[:50]}...")
+                return True
+        except Exception as e:
+            print(f"Notice: Local diffusion engine fallback notice: {e}")
+
         # 1. Condition Local Generative Neural Network with prompt semantics & category
         cond = np.zeros((1, 64), dtype=np.float32)
         if cat_clean in CATEGORIES_LIST:
@@ -377,20 +401,7 @@ class AIVideoEngine:
             headers = {"User-Agent": "AIVideoEngine/3.0 (MediaResearch; contact@youtubeautomation.local)"}
             candidate_images = []
 
-            # Tier 1: Wikipedia Page Summary REST API (Official hero portrait / subject photo)
-            if clean_topic:
-                try:
-                    summary_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(clean_topic)}"
-                    req = urllib.request.Request(summary_url, headers=headers)
-                    with urllib.request.urlopen(req, timeout=5) as r:
-                        sdata = json.loads(r.read().decode("utf-8"))
-                        img_u = sdata.get("originalimage", {}).get("source") or sdata.get("thumbnail", {}).get("source")
-                        if img_u:
-                            candidate_images.append({"title": sdata.get("title", clean_topic), "url": img_u})
-                except Exception:
-                    pass
-
-            # Tier 2: Candidate search queries in order of contextual relevance
+            # Candidate search queries in order of contextual relevance
             search_queries = []
             if clean_topic and kws:
                 search_queries.append(f"{clean_topic} {' '.join(kws[:2])}")
@@ -984,8 +995,11 @@ class AIVideoEngine:
         num_parts: int = 1,
         part_number: int = 1,
         output_dir: str = "",
+        scene_images: str = "",
+        colab_gpu_url: str = "",
     ) -> Dict[str, Any]:
         """Main entry point: Generate complete AI animated video with custom scenes, timer, and voice."""
+        self.colab_gpu_url = colab_gpu_url.strip() if colab_gpu_url else ""
         num_images = max(1, min(5, int(num_images)))
         duration = max(10, min(120, int(duration)))
         num_parts = max(1, min(5, int(num_parts)))
@@ -1104,22 +1118,43 @@ class AIVideoEngine:
         concat_txt = work_dir / "scenes_concat.txt"
         concat_lines = []
         used_image_urls = set()
+        pre_images = [p.strip() for p in scene_images.split(",") if p.strip()] if scene_images else []
 
         for idx, scn in enumerate(meta["scenes"]):
             img_file = work_dir / f"scene_{idx}.jpg"
             clip_file = work_dir / f"scene_{idx}.mp4"
 
-            # 1. Generate real AI scene image using local Neural Generative Model trained on real dataset (zero watermarks, zero API)
-            self._generate_ml_scene_image(
-                category=meta["category"],
-                scene_idx=idx,
-                prompt=scn["visual_prompt"],
-                output_path=img_file,
-                seed=42 + idx * 101,
-                scene_text=scn["text"],
-                topic=meta["title"],
-                used_urls=used_image_urls,
-            )
+            pre_img = pre_images[idx] if idx < len(pre_images) else None
+            used_pre = False
+            if pre_img and Path(pre_img).exists():
+                try:
+                    from PIL import Image
+                    src = Image.open(pre_img).convert("RGB")
+                    tw, th = 1080, 1920
+                    scale = max(tw / src.width, th / src.height)
+                    rw, rh = int(src.width * scale), int(src.height * scale)
+                    resized = src.resize((rw, rh), Image.Resampling.LANCZOS)
+                    cx = (rw - tw) // 2
+                    cy = (rh - th) // 2
+                    cropped = resized.crop((cx, cy, cx + tw, cy + th))
+                    cropped.save(str(img_file), "JPEG", quality=95)
+                    print(f"🎬 Reusing website pre-generated AI scene visual {idx + 1}: {pre_img}")
+                    used_pre = True
+                except Exception as e:
+                    print(f"Notice: Failed to adapt pre-generated image {pre_img}: {e}")
+
+            if not used_pre:
+                # 1. Generate real AI scene image using local Neural Generative Model trained on real dataset (zero watermarks, zero API)
+                self._generate_ml_scene_image(
+                    category=meta["category"],
+                    scene_idx=idx,
+                    prompt=scn["visual_prompt"],
+                    output_path=img_file,
+                    seed=42 + idx * 101,
+                    scene_text=scn["text"],
+                    topic=meta["title"],
+                    used_urls=used_image_urls,
+                )
 
             # Render Ken Burns motion clip
             self._render_scene_clip(img_file, scene_duration, clip_file, motion_type=idx)
@@ -1199,6 +1234,8 @@ def main():
     parser.add_argument("--num-parts", type=int, default=1, help="Number of parts (1-5)")
     parser.add_argument("--part-number", type=int, default=1, help="Current part number")
     parser.add_argument("--output-dir", default="", help="Output directory")
+    parser.add_argument("--scene-images", default="", help="Optional pre-generated AI scene images comma-separated")
+    parser.add_argument("--colab-gpu-url", default="", help="Optional Google Colab GPU bridge tunnel URL")
 
     args = parser.parse_args()
     engine = AIVideoEngine()
@@ -1213,6 +1250,8 @@ def main():
         num_parts=args.num_parts,
         part_number=args.part_number,
         output_dir=args.output_dir,
+        scene_images=args.scene_images,
+        colab_gpu_url=args.colab_gpu_url,
     )
     print(json.dumps(result, indent=2))
 

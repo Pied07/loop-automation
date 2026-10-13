@@ -2126,6 +2126,8 @@ export async function generateAiVideoAction(params: {
   userEmail?: string;
   autoPublish?: boolean;
   platforms?: { youtube?: boolean; facebook?: boolean; instagram?: boolean };
+  sceneImages?: string[];
+  colabGpuUrl?: string;
 }): Promise<{
   success: boolean;
   cloudMode?: string;
@@ -2214,6 +2216,8 @@ export async function generateAiVideoAction(params: {
             cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || "",
             autoPublish: params.autoPublish ? "true" : "false",
             platforms: JSON.stringify(params.platforms || {}),
+            sceneImages: params.sceneImages && params.sceneImages.length > 0 ? JSON.stringify(params.sceneImages) : "",
+            colabGpuUrl: params.colabGpuUrl || "",
           },
         }),
       });
@@ -2251,12 +2255,32 @@ export async function generateAiVideoAction(params: {
       scriptArg = `--script "${script.replace(/["\r\n]/g, " ")}"`;
     }
 
+    let sceneImagesArg = "";
+    if (Array.isArray(params.sceneImages) && params.sceneImages.length > 0) {
+      const resolvedPaths = params.sceneImages
+        .map((imgUrl) => {
+          if (imgUrl.startsWith("/generated_scenes/")) {
+            return path.join(process.cwd(), "public", imgUrl.replace(/^\//, ""));
+          }
+          if (fs.existsSync(imgUrl)) return imgUrl;
+          return "";
+        })
+        .filter(Boolean);
+      if (resolvedPaths.length > 0) {
+        sceneImagesArg = `--scene-images "${resolvedPaths.join(",")}"`;
+      }
+    }
+
+    const colabGpuArg = params.colabGpuUrl ? `--colab-gpu-url "${params.colabGpuUrl.replace(/"/g, "")}"` : "";
+
     const args = [
       `"${scriptPath}"`,
       `--category "${category.replace(/"/g, "")}"`,
       `--custom-tag "${customTag.replace(/"/g, "")}"`,
       `--prompt "${prompt.replace(/"/g, "")}"`,
       scriptArg,
+      sceneImagesArg,
+      colabGpuArg,
       `--voice "${voice.replace(/"/g, "")}"`,
       `--num-images ${numImages}`,
       `--duration ${duration}`,

@@ -35,6 +35,8 @@ CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY", "").strip()
 CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET", "").strip()
 AUTO_PUBLISH = os.environ.get("AUTO_PUBLISH", "false").strip().lower() in ("true", "1", "yes")
 PLATFORMS_RAW = os.environ.get("PLATFORMS", "").strip()
+SCENE_IMAGES = os.environ.get("SCENE_IMAGES", "").strip()
+COLAB_GPU_URL = os.environ.get("COLAB_GPU_URL", "").strip()
 
 WORK_DIR = Path("/tmp/ai_video_work")
 WORK_DIR.mkdir(parents=True, exist_ok=True)
@@ -151,6 +153,8 @@ def run():
             num_parts=NUM_PARTS,
             part_number=PART_NUMBER,
             output_dir=str(WORK_DIR),
+            scene_images=SCENE_IMAGES,
+            colab_gpu_url=COLAB_GPU_URL,
         )
 
         if not result.get("success") or not result.get("videoPath"):

@@ -106,10 +106,11 @@ class LocalNeuralTTS:
                     voice.synthesize_wav(clean_text, wav_file)
 
                 # 2. Convert to final destination format (AAC or MP3) using FFmpeg
+                codec = "libmp3lame" if str(output_audio_path).lower().endswith(".mp3") else "aac"
                 conv_cmd = [
                     str(FFMPEG_BIN), "-y",
                     "-i", str(temp_wav),
-                    "-c:a", "aac",
+                    "-c:a", codec,
                     "-b:a", "192k",
                     str(output_audio_path),
                 ]

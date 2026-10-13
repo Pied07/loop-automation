@@ -20,6 +20,8 @@ export async function POST(req: NextRequest) {
     const userEmail = typeof body.userEmail === "string" ? body.userEmail.trim() : "";
     const autoPublish = Boolean(body.autoPublish);
     const platforms = body.platforms || { youtube: false, facebook: false, instagram: false };
+    const sceneImages = Array.isArray(body.sceneImages) ? body.sceneImages : [];
+    const colabGpuUrl = typeof body.colabGpuUrl === "string" ? body.colabGpuUrl.trim() : "";
 
     const result = await generateAiVideoAction({
       category,
@@ -35,6 +37,8 @@ export async function POST(req: NextRequest) {
       userEmail,
       autoPublish,
       platforms,
+      sceneImages,
+      colabGpuUrl,
     });
 
     return NextResponse.json(result);

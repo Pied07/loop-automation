@@ -1,0 +1,26 @@
+# ─────────────────────────────────────────────────────────────
+# Local Story Scene Generator Requirements (SDXL + Diffusers)
+# ─────────────────────────────────────────────────────────────
+# Install with: pip install -r requirements_local.txt
+
+# PyTorch
+torch>=2.0.0
+torchvision
+
+# Diffusers & Transformers (for SDXL & SDXL-Turbo/Lightning)
+diffusers>=0.28.0
+transformers>=4.38.0
+accelerate>=0.28.0
+safetensors>=0.4.0
+peft>=0.9.0
+
+# Image & Data
+Pillow>=9.0.0
+numpy>=1.23.0
+tqdm>=4.65.0
+
+# Optional ONNX Runtime
+onnxruntime>=1.15.0
+
+# Web UI
+gradio>=4.0.0

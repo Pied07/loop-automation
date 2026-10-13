@@ -1,0 +1,17 @@
+# ─────────────────────────────────────────────────────────────
+# Google Colab Training Requirements
+# ─────────────────────────────────────────────────────────────
+# Run this in Colab: !pip install -r requirements_colab.txt
+
+torch>=2.0.0
+torchvision>=0.15.0
+torchaudio>=2.0.0
+git+https://github.com/openai/CLIP.git
+Pillow>=9.0.0
+numpy>=1.23.0
+tqdm>=4.65.0
+matplotlib>=3.6.0
+onnx>=1.14.0
+onnxruntime>=1.15.0
+accelerate>=0.20.0
+pycocotools>=2.0.6

@@ -69,3 +69,15 @@ scripts/models/neural_tts_voice.onnx
 scripts/models/dataset_real_images/
 __pycache__/
 *.py[cod]
+
+# Temporary AI test runs & generated scenes
+test_lora_out/
+test_sdxl_lora/
+public/test_4steps.png
+public/generated_scenes/*
+!public/generated_scenes/.gitkeep
+image_gen_model/generated_scenes/*
+!image_gen_model/generated_scenes/.gitkeep
+image_gen_model/test_output/*
+!image_gen_model/test_output/.gitkeep
+image_gen_model/test_pollinations.png

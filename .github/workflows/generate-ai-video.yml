@@ -89,11 +89,21 @@ on:
         required: false
         default: ''
         type: string
+      sceneImages:
+        description: 'Optional pre-generated AI scene images'
+        required: false
+        default: ''
+        type: string
+      colabGpuUrl:
+        description: 'Optional Google Colab GPU Bridge URL'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   generate-ai-video:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     permissions:
       contents: write
 
@@ -112,6 +122,7 @@ jobs:
           pip install --upgrade requests onnx onnxruntime numpy pillow gtts piper-tts
           pip install --upgrade "edge-tts>=6.1.18" || pip install --upgrade edge-tts
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install --upgrade diffusers transformers accelerate safetensors
 
       - name: Preload Local Neural Voice ONNX Model
         run: |
@@ -137,6 +148,8 @@ jobs:
           PART_NUMBER: ${{ inputs.partNumber }}
           USER_ID: ${{ inputs.userId }}
           USER_EMAIL: ${{ inputs.userEmail }}
+          SCENE_IMAGES: ${{ inputs.sceneImages }}
+          COLAB_GPU_URL: ${{ inputs.colabGpuUrl }}
           APP_URL: ${{ inputs.appUrl != '' && inputs.appUrl || 'https://the-viral-desk.vercel.app' }}
           CLOUDINARY_CLOUD_NAME: ${{ inputs.cloudinaryCloudName != '' && inputs.cloudinaryCloudName || secrets.CLOUDINARY_CLOUD_NAME }}
           CLOUDINARY_API_KEY: ${{ inputs.cloudinaryApiKey != '' && inputs.cloudinaryApiKey || secrets.CLOUDINARY_API_KEY }}

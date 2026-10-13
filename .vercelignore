@@ -1,0 +1,30 @@
+# Vercel deployment ignore file
+# Avoid bundling heavy Python ML weights, model checkpoints, and binaries into Vercel serverless functions
+
+# Heavy AI model weights & training files (Handled on GitHub Actions / Colab)
+image_gen_model/weights/
+image_gen_model/dataset/
+image_gen_model/generated_scenes/
+image_gen_model/test_output/
+scripts/models/
+*.safetensors
+*.bin
+*.onnx
+*.pt
+*.pth
+
+# Python virtualenvs & test dirs
+venv/
+.venv/
+test_lora_out/
+test_sdxl_lora/
+__pycache__/
+
+# Local binaries & media
+*.exe
+ffmpeg.exe
+yt-dlp.exe
+public/clips/
+public/generated_scenes/
+public/generated-videos/
+scratch/
