@@ -2925,15 +2925,15 @@ export default function Home() {
                     <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid #1e2230', width: '100%' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                         <span style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          ⚡ Custom Image Model (Colab GPU Bridge):
+                          ⚡ Custom SDXL Model (Google Colab GPU Bridge):
                         </span>
-                        <span style={{ fontSize: '11px', color: colabGpuUrl ? '#10b981' : '#94a3b8', fontWeight: 600 }}>
-                          {colabGpuUrl ? '🟢 GPU Connected' : '⚪ Standalone / Local'}
+                        <span style={{ fontSize: '11px', color: colabGpuUrl ? '#10b981' : '#f59e0b', fontWeight: 600, background: colabGpuUrl ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', padding: '2px 8px', borderRadius: '4px' }}>
+                          {colabGpuUrl ? '🟢 Colab Tesla T4 GPU Connected' : '🟡 Colab GPU Disconnected'}
                         </span>
                       </div>
                       <input
                         type="url"
-                        placeholder="https://...trycloudflare.com (Optional: Run Cell 9 in Google Colab for 2s Tesla T4 synthesis)"
+                        placeholder="https://...trycloudflare.com (Paste URL from Cell 9 in Google Colab)"
                         value={colabGpuUrl}
                         onChange={(e) => {
                           const val = e.target.value.trim();
@@ -2945,16 +2945,18 @@ export default function Home() {
                         style={{
                           width: '100%',
                           background: '#0d1117',
-                          border: `1px solid ${colabGpuUrl ? 'rgba(16,185,129,0.5)' : '#2a2e3d'}`,
+                          border: `1px solid ${colabGpuUrl ? 'rgba(16,185,129,0.6)' : 'rgba(245,158,11,0.4)'}`,
                           borderRadius: '6px',
-                          padding: '7px 10px',
+                          padding: '8px 10px',
                           fontSize: '12px',
                           color: '#f8fafc',
                           fontFamily: 'monospace',
                         }}
                       />
-                      <p style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-                        Connects directly to your custom trained SDXL LoRA model running in Google Colab GPU (₹0, ~2-3s per scene).
+                      <p style={{ fontSize: '11px', color: colabGpuUrl ? '#10b981' : '#94a3b8', marginTop: '5px', lineHeight: 1.4 }}>
+                        {colabGpuUrl
+                          ? "✅ Active! Your live website will now synthesize all scenes in 2–3s using your custom trained SDXL LoRA on Google Colab."
+                          : "💡 Your ML model is trained on SDXL (6.6 GB), which runs on Google Colab's Tesla T4 GPU. Run Cell 9 in your Colab notebook and paste the trycloudflare.com URL above, or use '📁 Upload Colab Scene' on the scene cards below."}
                       </p>
                     </div>
                   </div>

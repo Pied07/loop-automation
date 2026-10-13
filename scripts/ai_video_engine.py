@@ -392,158 +392,75 @@ class AIVideoEngine:
             except Exception as e:
                 print(f"Notice: Local neural inference notice: {e}")
 
-        # 2. Dynamic Script-Driven Visual Retrieval (Wikipedia Summary + PageImages + Wikimedia Commons)
-        dynamic_img = None
-        try:
-            clean_topic = extract_topic_from_text(topic or prompt, cat_clean)
-            kws = extract_scene_keywords(scene_text or prompt)
-
-            headers = {"User-Agent": "AIVideoEngine/3.0 (MediaResearch; contact@youtubeautomation.local)"}
-            candidate_images = []
-
-            # Candidate search queries in order of contextual relevance
-            search_queries = []
-            if clean_topic and kws:
-                search_queries.append(f"{clean_topic} {' '.join(kws[:2])}")
-            if clean_topic:
-                search_queries.append(clean_topic)
-            if len(kws) >= 2:
-                search_queries.append(" ".join(kws[:3]))
-            elif kws:
-                search_queries.append(kws[0])
-            if clean_topic:
-                search_queries.append(f"{clean_topic} {cat_clean}")
-
-            # Strict negative blacklist: never include maps, diagrams, flags, or pets (unless topic asks for them)
-            allow_pets = any(pet in (clean_topic + " " + scene_text).lower() for pet in ["dog", "puppy", "cat", "kitten", "pet"])
-
-            def is_clean_image(title_str: str, url_str: str) -> bool:
-                t_low = title_str.lower()
-                u_low = url_str.lower()
-                if any(bad in t_low or bad in u_low for bad in [
-                    ".svg", ".ogg", ".ogv", ".webm", ".pdf", ".gif",
-                    "icon", "logo", "flag", "map", "diagram", "coat of arms",
-                    "symbol", "sign", "stamp", "signature", "seal", "chart", "graph", "sketch"
-                ]):
-                    return False
-                if not allow_pets and any(bad in t_low or bad in u_low for bad in [
-                    "dog", "puppy", "hound", "canine", "cat", "kitten", "feline"
-                ]):
-                    return False
-                return True
-
-            # Search Wikipedia Article & PageImages
-            for q in search_queries:
-                if not q.strip():
-                    continue
-                try:
-                    enc_q = urllib.parse.quote(q.strip())
-                    wiki_url = f"https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch={enc_q}&gsrlimit=6&prop=pageimages&pithumbsize=1280&format=json"
-                    req = urllib.request.Request(wiki_url, headers=headers)
-                    with urllib.request.urlopen(req, timeout=5) as resp:
-                        data = json.loads(resp.read().decode("utf-8"))
-                    pages = list(data.get("query", {}).get("pages", {}).values())
-                    for pg in pages:
-                        thumb_info = pg.get("thumbnail")
-                        if thumb_info and thumb_info.get("source"):
-                            u = thumb_info["source"]
-                            if is_clean_image(pg.get("title", ""), u) and u not in [c["url"] for c in candidate_images]:
-                                candidate_images.append({"title": pg.get("title"), "url": u})
-                except Exception:
-                    pass
-
-                # Search Wikimedia Commons Media Library
-                try:
-                    enc_q = urllib.parse.quote(q.strip())
-                    api_url = (
-                        f"https://commons.wikimedia.org/w/api.php?action=query&generator=search"
-                        f"&gsrnamespace=6&gsrsearch={enc_q}&gsrlimit=10&prop=imageinfo"
-                        f"&iiprop=url|mime|size&iiurlwidth=1280&format=json"
-                    )
-                    req = urllib.request.Request(api_url, headers=headers)
-                    with urllib.request.urlopen(req, timeout=5) as resp:
-                        data = json.loads(resp.read().decode("utf-8"))
-                    pages = list(data.get("query", {}).get("pages", {}).values())
-                    for pg in pages:
-                        ii = pg.get("imageinfo", [{}])[0]
-                        if "image" not in ii.get("mime", ""):
-                            continue
-                        u = ii.get("thumburl") or ii.get("url")
-                        if u and is_clean_image(pg.get("title", ""), u) and u not in [c["url"] for c in candidate_images]:
-                            candidate_images.append({"title": pg.get("title"), "url": u})
-                except Exception:
-                    pass
-
-                if len(candidate_images) > (scene_idx + 2):
-                    break
-
-            # Pick unique image matching this scene so scenes don't duplicate
-            if candidate_images:
-                chosen_candidate = None
-                for cand in candidate_images:
-                    if used_urls is not None and cand["url"] in used_urls:
-                        continue
-                    chosen_candidate = cand
-                    break
-                if chosen_candidate is None:
-                    chosen_candidate = candidate_images[scene_idx % len(candidate_images)]
-
-                if used_urls is not None:
-                    used_urls.add(chosen_candidate["url"])
-
-                img_req = urllib.request.Request(chosen_candidate["url"], headers=headers)
-                with urllib.request.urlopen(img_req, timeout=10) as img_resp:
-                    raw_bytes = img_resp.read()
-                    if len(raw_bytes) > 5000:
-                        import io
-                        loaded = Image.open(io.BytesIO(raw_bytes)).convert("RGB")
-                        if loaded.width >= 200 and loaded.height >= 200:
-                            dynamic_img = loaded
-                            print(f"📸 Retrieved contextual visual for Scene {scene_idx + 1} ({clean_topic}): {chosen_candidate.get('title', '')}")
-        except Exception as e:
-            print(f"Notice: Dynamic script visual retrieval notice: {e}")
-
-        # 3. Candidate image processing (Contextual dynamic image or Local neural image)
-        chosen_img = dynamic_img
-        if chosen_img is None and neural_img is not None:
-            chosen_img = neural_img
-
-        if chosen_img is not None:
-            try:
-                # Frame & upscale to full-bleed vertical 9:16 (1080x1920)
-                scale = max(target_w / chosen_img.width, target_h / chosen_img.height)
-                rw, rh = int(chosen_img.width * scale), int(chosen_img.height * scale)
-                resized = chosen_img.resize((rw, rh), Image.Resampling.LANCZOS)
-                cx = (rw - target_w) // 2
-                cy = (rh - target_h) // 2
-                cropped = resized.crop((cx, cy, cx + target_w, cy + target_h))
-
-                # Keep real scraped/photographic image clean and pristine
-                # Only blend if image was from local fallback and neural model exists
-                if dynamic_img is None and neural_img is not None:
-                    scene_img = Image.blend(cropped, neural_img, alpha=0.08)
-                else:
-                    scene_img = cropped
-
-                # Cinematic post-processing: rich contrast, vibrance, sharpness
-                scene_img = ImageEnhance.Contrast(scene_img).enhance(1.08)
-                scene_img = ImageEnhance.Color(scene_img).enhance(1.06)
-                scene_img = ImageEnhance.Sharpness(scene_img).enhance(1.15)
-                scene_img.save(str(output_path), quality=96)
-                return True
-            except Exception as e:
-                print(f"Notice: Image compositing notice: {e}")
-
+        # 2. Standalone Cinematic Scene Generator (Strictly offline, zero third-party scrapers)
+        # Used when GPU Bridge is offline and no pre-generated scene images were uploaded
         if neural_img is not None:
-            scene_img = ImageEnhance.Contrast(neural_img).enhance(1.20)
+            scene_img = ImageEnhance.Contrast(neural_img).enhance(1.15)
             scene_img.save(str(output_path), quality=96)
             return True
 
-        # Synthesize fallback atmospheric gradient
-        base_arr = np.zeros((target_h, target_w, 3), dtype=np.uint8)
-        base_arr[:, :] = [18, 14, 28]
-        Image.fromarray(base_arr).save(str(output_path), quality=95)
-        return True
+        # Synthesize rich cinematic atmospheric scene visual tailored to this scene's narrative & category
+        try:
+            from PIL import ImageDraw
+            img = Image.new("RGB", (target_w, target_h), (12, 10, 22))
+            draw = ImageDraw.Draw(img)
+
+            # Palette based on theme
+            hex_accent = theme.get("accent", "#8b5cf6").lstrip("#")
+            r_acc, g_acc, b_acc = tuple(int(hex_accent[i:i+2], 16) for i in (0, 2, 4))
+            bg_hex = theme.get("bg_color", "0x0f0b1e").replace("0x", "#").lstrip("#")
+            if len(bg_hex) == 6:
+                r_bg, g_bg, b_bg = tuple(int(bg_hex[i:i+2], 16) for i in (0, 2, 4))
+            else:
+                r_bg, g_bg, b_bg = 15, 11, 30
+
+            # Vertical cinematic gradient
+            for y in range(target_h):
+                ratio = y / target_h
+                r = int(r_bg * (1.0 - ratio * 0.4) + r_acc * (ratio * 0.35))
+                g = int(g_bg * (1.0 - ratio * 0.4) + g_acc * (ratio * 0.25))
+                b = int(b_bg * (1.0 - ratio * 0.3) + b_acc * (ratio * 0.45))
+                draw.line([(0, y), (target_w, y)], fill=(min(255, r), min(255, g), min(255, b)))
+
+            # Radial atmospheric lighting glow (lens flare / ambient illumination)
+            glow_img = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
+            glow_draw = ImageDraw.Draw(glow_img)
+            cx, cy = target_w // 2, int(target_h * 0.42)
+            glow_radius = int(target_w * 0.65)
+            for rad in range(glow_radius, 0, -18):
+                alpha = int(45 * (1.0 - rad / glow_radius))
+                glow_draw.ellipse(
+                    [(cx - rad, cy - rad), (cx + rad, cy + rad)],
+                    fill=(r_acc, g_acc, b_acc, alpha),
+                )
+            glow_img = glow_img.filter(ImageFilter.GaussianBlur(35))
+            img.paste(glow_img, (0, 0), glow_img)
+
+            # Vignette overlay for cinematic depth
+            vig_img = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
+            vig_draw = ImageDraw.Draw(vig_img)
+            for border in range(0, 160, 8):
+                alpha = int(180 * (1.0 - border / 160))
+                vig_draw.rectangle(
+                    [(border, border), (target_w - border, target_h - border)],
+                    outline=(0, 0, 0, alpha),
+                    width=8,
+                )
+            vig_img = vig_img.filter(ImageFilter.GaussianBlur(25))
+            img.paste(vig_img, (0, 0), vig_img)
+
+            # Enhance tone & contrast
+            final_scene = ImageEnhance.Contrast(img).enhance(1.12)
+            final_scene = ImageEnhance.Sharpness(final_scene).enhance(1.10)
+            final_scene.save(str(output_path), quality=96)
+            print(f"🎬 Synthesized cinematic atmospheric background for Scene {scene_idx + 1}")
+            return True
+        except Exception as e:
+            print(f"Notice: Scene rendering notice: {e}")
+            base_arr = np.zeros((target_h, target_w, 3), dtype=np.uint8)
+            base_arr[:, :] = [18, 14, 28]
+            Image.fromarray(base_arr).save(str(output_path), quality=95)
+            return True
 
     def _vectorize_text(self, text: str) -> np.ndarray:
         vocab = self.config["vocabulary"]
@@ -755,37 +672,6 @@ class AIVideoEngine:
             )
 
         return sentences_timing
-
-    def _fetch_ai_image(self, prompt: str, output_path: Path, seed: int = 42) -> bool:
-        """Fetch and format clean AI image from Pollinations with watermark completely removed."""
-        import io
-        clean_prompt = prompt.replace("\n", " ").strip()
-        encoded_prompt = urllib.parse.quote(clean_prompt[:220])
-        # Note: calling without custom width/height/nologo parameters avoids HTTP 402 Payment Required
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?seed={seed}&model=flux"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
-        try:
-            with urllib.request.urlopen(req, timeout=25) as resp:
-                data = resp.read()
-                if len(data) > 1000:
-                    raw_img = Image.open(io.BytesIO(data)).convert("RGB")
-                    w, h = raw_img.size
-                    # 1. Clean watermark: Crop bottom 55 pixels where the 'pollinations.ai' watermark logo is placed
-                    clean_img = raw_img.crop((0, 0, w, h - 55))
-
-                    # 2. Seamlessly frame to full-bleed vertical 9:16 (1080x1920) for cinematic vertical shorts/reels
-                    target_w, target_h = 1080, 1920
-                    scale = max(target_w / clean_img.width, target_h / clean_img.height)
-                    nw, nh = int(clean_img.width * scale), int(clean_img.height * scale)
-                    scaled = clean_img.resize((nw, nh), Image.Resampling.LANCZOS)
-                    left = (nw - target_w) // 2
-                    top = (nh - target_h) // 2
-                    final_scene = scaled.crop((left, top, left + target_w, top + target_h))
-                    final_scene.save(str(output_path), quality=95)
-                    return True
-        except Exception as e:
-            print(f"Notice: Pollinations image fetch notice for '{prompt[:40]}': {e}")
-        return False
 
     def _render_scene_clip(self, img_path: Path, duration: float, output_clip: Path, motion_type: int = 0) -> None:
         """Render a single scene with dynamic Ken Burns cinematic camera motion (zoompan)."""
