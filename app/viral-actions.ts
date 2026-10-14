@@ -2181,9 +2181,13 @@ export async function generateAiVideoAction(params: {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             jobId,
+            userId: params.userId || "creator",
+            partNumber,
+            totalParts: numParts,
             status: "processing",
             progress: 15,
             step: `Starting Part ${partNumber}/${numParts} in GitHub Actions cloud runner...`,
+            sourceTitle: prompt ? prompt.slice(0, 60) : undefined,
           }),
         });
       } catch (stErr) {

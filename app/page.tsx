@@ -1462,9 +1462,12 @@ export default function Home() {
           if ((data.cloudMode === "github" || !data.clip) && data.jobId) {
             setAiProgressStep(`${partLabel}Job dispatched to GitHub Actions cloud runner...`);
             const completedClip = await new Promise<any>((resolve, reject) => {
+              let pollAttempts = 0;
               const poll = setInterval(async () => {
+                pollAttempts++;
                 try {
-                  const sRes = await fetch(`/api/viral-clips/status?jobId=${data.jobId}`);
+                  const uid = auth?.currentUser?.uid || "creator";
+                  const sRes = await fetch(`/api/viral-clips/status?jobId=${data.jobId}&userId=${encodeURIComponent(uid)}`);
                   if (sRes.ok) {
                     const job = await sRes.json();
                     if (job.step) {
@@ -1477,10 +1480,47 @@ export default function Home() {
                     if (job.status === "done" && Array.isArray(job.clips) && job.clips.length > 0) {
                       clearInterval(poll);
                       resolve(job.clips[0]);
+                      return;
                     } else if (job.status === "failed") {
                       clearInterval(poll);
                       reject(new Error(job.error || `Cloud generation failed for Part ${pIdx}.`));
+                      return;
                     }
+                  }
+
+                  // Direct Cloudinary CDN fallback after 24s if the video has already finished uploading
+                  if (pollAttempts >= 8 && data.jobId) {
+                    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dbgvwyhdr";
+                    const safeUid = uid.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "creator";
+                    const safeJid = data.jobId.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "job";
+                    const directVideoUrl = `https://res.cloudinary.com/${cloudName}/video/upload/ai_videos/${safeUid}/${safeJid}.mp4`;
+                    const directThumbUrl = `https://res.cloudinary.com/${cloudName}/image/upload/ai_thumbs/${safeUid}/${safeJid}.jpg`;
+
+                    try {
+                      const headRes = await fetch(directVideoUrl, { method: "HEAD" });
+                      if (headRes.ok) {
+                        clearInterval(poll);
+                        resolve({
+                          id: data.jobId,
+                          partNumber: pIdx,
+                          totalParts: totalPartsToGen,
+                          title: partScript ? partScript.slice(0, 50) : `Part ${pIdx}`,
+                          description: partScript,
+                          hashtags: ["viral", "ai", "shorts", "reels"],
+                          duration: aiDuration,
+                          url: directVideoUrl,
+                          clipPath: directVideoUrl,
+                          publicUrl: directVideoUrl,
+                          videoUrl: directVideoUrl,
+                          cloudinaryUrl: directVideoUrl,
+                          thumbnailUrl: directThumbUrl,
+                          cloudinaryPublicId: `ai_videos/${safeUid}/${safeJid}`,
+                          format: selectedCategory,
+                          isAiVideo: true,
+                        });
+                        return;
+                      }
+                    } catch {}
                   }
                 } catch {
                   // retry polling

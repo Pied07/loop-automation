@@ -2,14 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { database } from "@/app/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
+interface CachedJob {
+  status: string;
+  progress: number;
+  step: string;
+  clips?: any[];
+  sourceTitle?: string;
+  totalDuration?: number;
+  error?: string;
+  userId?: string;
+  partNumber?: number;
+  totalParts?: number;
+  updatedAt: number;
+}
+
 // In-memory job state cache (with 1 hour TTL)
-const jobCache = new Map<string, { status: string; progress: number; step: string; clips?: any[]; sourceTitle?: string; totalDuration?: number; error?: string; updatedAt: number }>();
+const jobCache = new Map<string, CachedJob>();
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const jobId = searchParams.get("jobId");
+  const userId = searchParams.get("userId");
 
   if (!jobId) {
     return NextResponse.json({ error: "jobId is required" }, { status: 400 });
@@ -33,6 +48,68 @@ export async function GET(req: NextRequest) {
       }
     } catch (err: any) {
       console.warn("Firestore status check notice:", err.message);
+    }
+  }
+
+  // Direct Cloudinary asset probe for AI video jobs (or any job with uploaded video)
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dbgvwyhdr";
+  if (cloudName && (jobId.startsWith("ai_") || job?.step?.toLowerCase().includes("cloudinary"))) {
+    const candidateUserIds = Array.from(new Set([
+      userId,
+      job?.userId,
+      "okWQqztlltfKTzJ2ATYDwnqCdo52",
+      "creator",
+    ].filter(Boolean) as string[]));
+
+    for (const candidateUid of candidateUserIds) {
+      const safeUid = candidateUid.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "creator";
+      const safeJid = jobId.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "job";
+      const candidateVideoUrl = `https://res.cloudinary.com/${cloudName}/video/upload/ai_videos/${safeUid}/${safeJid}.mp4`;
+      const candidateThumbUrl = `https://res.cloudinary.com/${cloudName}/image/upload/ai_thumbs/${safeUid}/${safeJid}.jpg`;
+
+      try {
+        const headRes = await fetch(candidateVideoUrl, {
+          method: "HEAD",
+          signal: AbortSignal.timeout(3000),
+        });
+        if (headRes.ok) {
+          const completedClip = {
+            id: jobId,
+            partNumber: job?.partNumber || 1,
+            totalParts: job?.totalParts || 1,
+            title: job?.sourceTitle || "AI Generated Video",
+            description: job?.sourceTitle ? `✨ ${job.sourceTitle}` : "✨ AI Generated Video",
+            hashtags: ["viral", "ai", "shorts", "reels"],
+            duration: job?.totalDuration || 20,
+            url: candidateVideoUrl,
+            clipPath: candidateVideoUrl,
+            publicUrl: candidateVideoUrl,
+            videoUrl: candidateVideoUrl,
+            cloudinaryUrl: candidateVideoUrl,
+            thumbnailUrl: candidateThumbUrl,
+            cloudinaryPublicId: `ai_videos/${safeUid}/${safeJid}`,
+            format: "AI Video",
+            isAiVideo: true,
+            createdAt: new Date().toISOString(),
+          };
+          const resolvedPayload: CachedJob = {
+            status: "done",
+            progress: 100,
+            step: `✅ Part ${job?.partNumber || 1} generated successfully!`,
+            clips: [completedClip],
+            sourceTitle: completedClip.title,
+            userId: safeUid,
+            updatedAt: Date.now(),
+          };
+          jobCache.set(jobId, resolvedPayload);
+          if (database) {
+            try {
+              await setDoc(doc(database, "jobs", jobId), resolvedPayload, { merge: true });
+            } catch {}
+          }
+          return NextResponse.json(resolvedPayload);
+        }
+      } catch {}
     }
   }
 
@@ -94,6 +171,13 @@ export async function GET(req: NextRequest) {
               error: "GitHub Actions workflow run failed. Check your GitHub Actions logs.",
             });
           }
+          if (latestRun.status === "completed" && latestRun.conclusion === "success") {
+            if (job && Array.isArray(job.clips) && job.clips.length > 0) {
+              const donePayload: CachedJob = { ...job, status: "done", progress: 100, step: "✅ Video generated successfully!", updatedAt: Date.now() };
+              jobCache.set(jobId, donePayload);
+              return NextResponse.json(donePayload);
+            }
+          }
         }
       }
     } catch {}
@@ -113,13 +197,13 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { jobId, status, progress, step, clips, sourceTitle, totalDuration, error } = body;
+    const { jobId, status, progress, step, clips, sourceTitle, totalDuration, error, userId, partNumber, totalParts } = body;
 
     if (!jobId) {
       return NextResponse.json({ error: "jobId is required" }, { status: 400 });
     }
 
-    const payload = {
+    const payload: CachedJob = {
       status: status || "processing",
       progress: progress || 0,
       step: step || "",
@@ -127,6 +211,9 @@ export async function POST(req: NextRequest) {
       sourceTitle: sourceTitle || undefined,
       totalDuration: totalDuration || undefined,
       error: error || undefined,
+      userId: userId || undefined,
+      partNumber: partNumber || undefined,
+      totalParts: totalParts || undefined,
       updatedAt: Date.now(),
     };
 

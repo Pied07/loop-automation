@@ -180,5 +180,6 @@ jobs:
           AUTO_PUBLISH: ${{ inputs.autoPublish }}
           PLATFORMS: ${{ inputs.platforms }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           python scripts/cloud_ai_video_generator.py

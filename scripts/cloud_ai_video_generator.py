@@ -4,6 +4,7 @@ import json
 import time
 import hashlib
 import re
+import subprocess
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -39,35 +40,103 @@ SCENE_IMAGES = os.environ.get("SCENE_IMAGES", "").strip()
 COLAB_GPU_URL = os.environ.get("COLAB_GPU_URL", "").strip()
 STYLE_PRESET = os.environ.get("STYLE_PRESET", "Realism").strip()
 CAPTION_STYLE = os.environ.get("CAPTION_STYLE", "viral_yellow").strip()
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_PAT", "").strip()
+GITHUB_REPO = os.environ.get("GITHUB_REPOSITORY", "Pied07/loop-automation").strip()
 
 WORK_DIR = Path("/tmp/ai_video_work")
 WORK_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def update_status(status="processing", progress=0, step="", clips=None, source_title="", error=""):
-    """Reports progress to Next.js /api/viral-clips/status."""
+    """Reports progress to Next.js /api/viral-clips/status with retries and exponential backoff."""
     if not APP_URL:
         return
+    payload = {
+        "jobId": JOB_ID,
+        "userId": USER_ID,
+        "partNumber": PART_NUMBER,
+        "totalParts": NUM_PARTS,
+        "status": status,
+        "progress": int(progress),
+        "step": step,
+        "clips": clips,
+        "sourceTitle": source_title or None,
+        "error": error or None,
+    }
+    max_retries = 4 if status in ("done", "failed") else 2
+    for attempt in range(max_retries):
+        try:
+            req = urllib.request.Request(
+                f"{APP_URL}/api/viral-clips/status",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json", "User-Agent": "The-Viral-Desk-Runner"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                print(f"✅ Status reported successfully: {step} ({progress}%)")
+                return
+        except Exception as e:
+            wait_sec = 2 ** attempt
+            print(f"Notice: Status reporting attempt {attempt + 1}/{max_retries} ({step}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(wait_sec)
+
+
+def publish_github_release(job_id: str, title: str, clips: list):
+    """Publishes a GitHub Release tagged clips-{JOB_ID} with the completed clips payload."""
+    if not GITHUB_TOKEN:
+        print("Notice: GITHUB_TOKEN not provided, skipping GitHub release creation.")
+        return
+    tag_name = f"clips-{job_id}"
+    release_payload = {
+        "jobId": job_id,
+        "userId": USER_ID,
+        "partNumber": PART_NUMBER,
+        "totalParts": NUM_PARTS,
+        "status": "done",
+        "progress": 100,
+        "step": f"✅ Part {PART_NUMBER} generated successfully!",
+        "clips": clips,
+        "sourceTitle": title,
+        "updatedAt": int(time.time() * 1000),
+    }
+    body_str = json.dumps(release_payload)
+    print(f"Creating GitHub Release {tag_name} in {GITHUB_REPO}...")
+
+    # 1. Try using GitHub CLI (gh is preinstalled on GitHub Actions runner)
     try:
-        payload = {
-            "jobId": JOB_ID,
-            "status": status,
-            "progress": int(progress),
-            "step": step,
-            "clips": clips,
-            "sourceTitle": source_title or None,
-            "error": error or None,
-        }
+        cmd = [
+            "gh", "release", "create", tag_name,
+            "--title", f"AI Video: {title[:40]}",
+            "--notes", body_str,
+        ]
+        res = subprocess.run(cmd, env={**os.environ, "GH_TOKEN": GITHUB_TOKEN}, capture_output=True, text=True)
+        if res.returncode == 0:
+            print(f"✅ GitHub CLI release {tag_name} created successfully!")
+            return
+        else:
+            print(f"gh CLI release notice: {res.stderr[:200]}")
+    except Exception as e:
+        print(f"Notice: gh command failed: {e}")
+
+    # 2. Fallback to GitHub REST API directly
+    try:
+        create_url = f"https://api.github.com/repos/{GITHUB_REPO}/releases"
         req = urllib.request.Request(
-            f"{APP_URL}/api/viral-clips/status",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json", "User-Agent": "The-Viral-Desk-Runner"},
+            create_url,
+            data=json.dumps({"tag_name": tag_name, "name": f"AI Video: {title[:40]}", "body": body_str}).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {GITHUB_TOKEN}",
+                "Accept": "application/vnd.github.v3+json",
+                "Content-Type": "application/json",
+                "User-Agent": "The-Viral-Desk-Runner",
+            },
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=12) as resp:
-            pass
+        with urllib.request.urlopen(req, timeout=20) as r:
+            print(f"✅ Published GitHub Release {tag_name} via REST API")
     except Exception as e:
-        print(f"Notice: Status reporting notice ({step}): {e}")
+        print(f"Notice: Release publication notice: {e}")
 
 
 def upload_file_to_cloudinary(file_path: Path, public_id: str, resource_type: str = "video") -> str:
@@ -248,7 +317,8 @@ def run():
             except Exception as pe:
                 print(f"Notice: Auto-publish notice: {pe}")
 
-        # 4. Mark Job Complete
+        # 4. Mark Job Complete & Publish Release
+        publish_github_release(JOB_ID, result["title"], [clip_item])
         update_status(
             status="done",
             progress=100,
