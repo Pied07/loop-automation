@@ -2500,7 +2500,7 @@ export default function Home() {
                                 id: "Realism",
                                 name: "Realism",
                                 character: "Photoreal Human",
-                                emoji: "🧔",
+                                image: "/assets/styles/realism.jpg",
                                 badge: "8K Photoreal",
                                 desc: "Cinematic human portrait, lifelike skin & eyes, 35mm lens.",
                                 accent: "#f97316",
@@ -2510,7 +2510,7 @@ export default function Home() {
                                 id: "Anime",
                                 name: "Anime",
                                 character: "Anime Hero",
-                                emoji: "🌸",
+                                image: "/assets/styles/anime.jpg",
                                 badge: "Ghibli / Shinkai",
                                 desc: "Expressive Japanese anime features, rich glow, crisp lines.",
                                 accent: "#ec4899",
@@ -2520,7 +2520,7 @@ export default function Home() {
                                 id: "Disney 3D",
                                 name: "Disney 3D",
                                 character: "Pixar 3D Person",
-                                emoji: "✨",
+                                image: "/assets/styles/disney3d.jpg",
                                 badge: "Pixar 3D",
                                 desc: "Charming animated face, warm 3D studio subsurface glow.",
                                 accent: "#a855f7",
@@ -2530,7 +2530,7 @@ export default function Home() {
                                 id: "Mecha",
                                 name: "Mecha",
                                 character: "Cyber Warrior",
-                                emoji: "🤖",
+                                image: "/assets/styles/mecha.jpg",
                                 badge: "Sci-Fi Cyborg",
                                 desc: "Glowing exoskeleton armor, cyber helmet, neon reflections.",
                                 accent: "#06b6d4",
@@ -2540,7 +2540,7 @@ export default function Home() {
                                 id: "Dark Fantasy",
                                 name: "Dark Fantasy",
                                 character: "Armored Knight",
-                                emoji: "⚔️",
+                                image: "/assets/styles/darkfantasy.jpg",
                                 badge: "Elden / Witcher",
                                 desc: "Steel plate armor, mystical runes, atmospheric mist.",
                                 accent: "#ef4444",
@@ -2550,7 +2550,7 @@ export default function Home() {
                                 id: "Retro Comic",
                                 name: "Retro Comic",
                                 character: "Comic Superhero",
-                                emoji: "💥",
+                                image: "/assets/styles/retrocomic.jpg",
                                 badge: "Pop-Art Ink",
                                 desc: "Bold ink contours, pop-art halftone dots, vintage cover.",
                                 accent: "#eab308",
@@ -2565,81 +2565,112 @@ export default function Home() {
                                   style={{
                                     background: isSelected ? styleCard.bg : '#141722',
                                     border: `1.5px solid ${isSelected ? styleCard.accent : '#25293a'}`,
-                                    borderRadius: '10px',
-                                    padding: '10px 12px',
+                                    borderRadius: '12px',
+                                    padding: '10px',
                                     cursor: 'pointer',
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    gap: '6px',
+                                    gap: '8px',
                                     transition: 'all 0.2s ease',
-                                    boxShadow: isSelected ? `0 0 14px ${styleCard.accent}33` : 'none',
+                                    boxShadow: isSelected ? `0 0 16px ${styleCard.accent}44` : 'none',
                                     position: 'relative',
+                                    overflow: 'hidden',
                                   }}
                                 >
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                      <div
-                                        style={{
-                                          width: '32px',
-                                          height: '32px',
-                                          borderRadius: '8px',
-                                          background: isSelected ? `${styleCard.accent}22` : '#1e2230',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          fontSize: '18px',
-                                          border: `1px solid ${isSelected ? styleCard.accent : '#33384c'}`,
-                                        }}
-                                      >
-                                        {styleCard.emoji}
-                                      </div>
-                                      <div>
-                                        <div style={{ fontSize: '13px', fontWeight: 700, color: isSelected ? '#ffffff' : '#e2e8f0' }}>
-                                          {styleCard.name}
-                                        </div>
-                                        <div style={{ fontSize: '10px', color: styleCard.accent, fontWeight: 600 }}>
-                                          {styleCard.character}
-                                        </div>
-                                      </div>
-                                    </div>
+                                  {/* Real AI Generated Character Image Preview */}
+                                  <div
+                                    style={{
+                                      width: '100%',
+                                      height: '110px',
+                                      borderRadius: '8px',
+                                      overflow: 'hidden',
+                                      position: 'relative',
+                                      border: `1px solid ${isSelected ? styleCard.accent : '#25293a'}`,
+                                      background: '#0d0f17',
+                                    }}
+                                  >
+                                    <img
+                                      src={styleCard.image}
+                                      alt={styleCard.character}
+                                      style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'cover',
+                                        display: 'block',
+                                        transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+                                        transition: 'transform 0.3s ease',
+                                      }}
+                                    />
                                     {isSelected && (
                                       <div
                                         style={{
-                                          width: '18px',
-                                          height: '18px',
+                                          position: 'absolute',
+                                          top: '6px',
+                                          right: '6px',
+                                          width: '20px',
+                                          height: '20px',
                                           borderRadius: '50%',
                                           background: styleCard.accent,
                                           color: '#000',
                                           display: 'flex',
                                           alignItems: 'center',
                                           justifyContent: 'center',
-                                          fontSize: '10px',
+                                          fontSize: '11px',
                                           fontWeight: 800,
+                                          boxShadow: '0 2px 6px rgba(0,0,0,0.6)',
                                         }}
                                       >
                                         ✓
                                       </div>
                                     )}
-                                  </div>
-                                  <p style={{ fontSize: '10px', color: '#94a3b8', margin: '2px 0 0', lineHeight: '1.3' }}>
-                                    {styleCard.desc}
-                                  </p>
-                                  <div style={{ marginTop: 'auto', paddingTop: '4px' }}>
-                                    <span
+                                    <div
                                       style={{
-                                        fontSize: '9px',
-                                        fontWeight: 700,
-                                        color: isSelected ? '#ffffff' : '#64748b',
-                                        background: isSelected ? `${styleCard.accent}33` : '#181b26',
+                                        position: 'absolute',
+                                        bottom: '4px',
+                                        left: '6px',
+                                        background: 'rgba(0,0,0,0.75)',
+                                        backdropFilter: 'blur(4px)',
                                         padding: '2px 6px',
                                         borderRadius: '4px',
-                                        textTransform: 'uppercase',
-                                        letterSpacing: '0.04em',
+                                        fontSize: '9px',
+                                        fontWeight: 700,
+                                        color: styleCard.accent,
+                                        border: `1px solid ${styleCard.accent}55`,
                                       }}
                                     >
-                                      {styleCard.badge}
-                                    </span>
+                                      AI SAMPLE
+                                    </div>
                                   </div>
+
+                                  {/* Style Details */}
+                                  <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                      <div style={{ fontSize: '13px', fontWeight: 700, color: isSelected ? '#ffffff' : '#e2e8f0' }}>
+                                        {styleCard.name}
+                                      </div>
+                                      <span
+                                        style={{
+                                          fontSize: '9px',
+                                          fontWeight: 700,
+                                          color: isSelected ? '#ffffff' : '#64748b',
+                                          background: isSelected ? `${styleCard.accent}33` : '#181b26',
+                                          padding: '2px 6px',
+                                          borderRadius: '4px',
+                                          textTransform: 'uppercase',
+                                          letterSpacing: '0.04em',
+                                        }}
+                                      >
+                                        {styleCard.badge}
+                                      </span>
+                                    </div>
+                                    <div style={{ fontSize: '10px', color: styleCard.accent, fontWeight: 600, marginTop: '2px' }}>
+                                      {styleCard.character}
+                                    </div>
+                                  </div>
+
+                                  <p style={{ fontSize: '10px', color: '#94a3b8', margin: '0', lineHeight: '1.3' }}>
+                                    {styleCard.desc}
+                                  </p>
                                 </div>
                               );
                             })}
