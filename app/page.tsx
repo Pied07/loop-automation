@@ -41,6 +41,7 @@ import {
   RefreshCw,
   Volume2,
   VolumeX,
+  Swords,
 } from "lucide-react";
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { useEffect, useState, useRef, type FormEvent } from "react";
@@ -81,7 +82,7 @@ const formats = [
   { name: "Educational", icon: Lightbulb, tone: "blue", detail: "Learn something new" },
   { name: "Romance", icon: Flower2, tone: "pink", detail: "Love & emotion" },
   { name: "Adventure", icon: Mountain, tone: "sky", detail: "Action & outdoors" },
-  { name: "Music", icon: Music2, tone: "lilac", detail: "Music & performance" },
+  { name: "Action", icon: Swords, tone: "coral", detail: "High-octane battles & thrilling stunts" },
   { name: "Others", icon: WandSparkles, tone: "gold", detail: "Custom story tag & theme" },
 ];
 
@@ -2236,10 +2237,6 @@ export default function Home() {
                     key={name}
                     onClick={() => {
                       setSelectedCategory(name);
-                      if (name === "Music") {
-                        setAiNumParts(1);
-                        setAiCurrentPart(1);
-                      }
                     }}
                     className={`format-option ${selectedCategory === name ? "selected" : ""}`}
                   >
@@ -2287,7 +2284,7 @@ export default function Home() {
                   {/* Script Textarea & Auto-Generate Button Header */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
                     <span style={{ fontSize: '12px', fontWeight: 600, color: '#9ca3af' }}>
-                      {selectedCategory === "Music" ? "Song Title & Musical Theme:" : `Script & Scene Prompts ${aiNumParts > 1 ? `(Part ${aiCurrentPart} of ${aiNumParts})` : ''}:`}
+                      {`Script & Scene Prompts ${aiNumParts > 1 ? `(Part ${aiCurrentPart} of ${aiNumParts})` : ''}:`}
                     </span>
                     <button
                       type="button"
@@ -2316,23 +2313,21 @@ export default function Home() {
                         <Sparkles size={13} />
                       )}
                       {isGeneratingScript
-                        ? (selectedCategory === "Music" ? 'Composing music with ML...' : 'Writing suspenseful script with ML...')
+                        ? 'Writing suspenseful script with ML...'
                         : generatedStoryParts.length > 0
-                        ? (selectedCategory === "Music" ? '🔄 Regenerate Song & Scenes' : '🔄 Regenerate Another Script & Scenes')
-                        : (selectedCategory === "Music" ? '🎵 Auto-Compose Music Track & Scenes' : '✨ Auto-Generate Script & Scenes')}
+                        ? '🔄 Regenerate Another Script & Scenes'
+                        : '✨ Auto-Generate Script & Scenes'}
                     </button>
                   </div>
 
                   <textarea
                     value={aiPrompt}
                     onChange={(e) => setAiPrompt(e.target.value)}
-                    rows={selectedCategory === "Music" ? 3 : 5}
+                    rows={5}
                     placeholder={
                       selectedCategory === "Interesting Facts"
                         ? "Click '✨ Auto-Generate Script & Scenes' to fetch untold real-world historical and marketing facts (e.g. Tobacco PR revolution, Graham Bell's Hello origin, De Beers diamond monopoly)... or enter your custom fact."
-                        : (selectedCategory === "Music"
-                            ? "Enter a song style / vibe / title (e.g. 'Cyberpunk Synthwave Dance', 'Romantic Acoustic Pop Ballad', 'Euphoric Upbeat Vocal Hit')... The ML engine will compose the song with vocals and all instruments from scratch!"
-                            : `Enter your custom script & scenes, or click '✨ Auto-Generate Script & Scenes' for an AI suspense story customized for ${selectedCategory === "Others" ? (customStoryTag || "your theme") : selectedCategory}...`)
+                        : `Enter your custom script & scenes, or click '✨ Auto-Generate Script & Scenes' for an AI suspense story customized for ${selectedCategory === "Others" ? (customStoryTag || "your theme") : selectedCategory}...`
                     }
                     className="video-url-input"
                     style={{
@@ -3308,43 +3303,37 @@ export default function Home() {
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                           <span style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0' }}>Number of Parts:</span>
-                          <span style={{ fontSize: '12px', fontWeight: 700, color: selectedCategory === "Music" ? '#a78bfa' : '#ec4899', background: selectedCategory === "Music" ? 'rgba(167,139,250,0.15)' : 'rgba(236,72,153,0.15)', padding: '2px 8px', borderRadius: '4px' }}>
-                            {selectedCategory === "Music" ? '1 Part (Single Song Track)' : (aiNumParts === 1 ? '1 Part (Standalone)' : `${aiNumParts} Parts (Series)`)}
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: '#ec4899', background: 'rgba(236,72,153,0.15)', padding: '2px 8px', borderRadius: '4px' }}>
+                            {aiNumParts === 1 ? '1 Part (Standalone)' : `${aiNumParts} Parts (Series)`}
                           </span>
                         </div>
-                        {selectedCategory === "Music" ? (
-                          <div style={{ padding: '8px 12px', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '6px', fontSize: '11px', color: '#c4b5fd' }}>
-                            🎵 Music category generates a single complete song track with singing vocals and instruments that plays for the full song duration.
-                          </div>
-                        ) : (
-                          <div style={{ display: 'flex', gap: '6px' }}>
-                            {[1, 2, 3, 4, 5].map((n) => (
-                              <button
-                                key={n}
-                                type="button"
-                                onClick={() => {
-                                  setAiNumParts(n);
-                                  if (aiCurrentPart > n) setAiCurrentPart(1);
-                                }}
-                                style={{
-                                  flex: 1,
-                                  padding: '6px 0',
-                                  borderRadius: '6px',
-                                  border: `1px solid ${aiNumParts === n ? '#ec4899' : '#2a2e3d'}`,
-                                  background: aiNumParts === n ? '#db2777' : '#181b24',
-                                  color: '#fff',
-                                  fontSize: '12px',
-                                  fontWeight: 700,
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                {n}
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          {[1, 2, 3, 4, 5].map((n) => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => {
+                                setAiNumParts(n);
+                                if (aiCurrentPart > n) setAiCurrentPart(1);
+                              }}
+                              style={{
+                                flex: 1,
+                                padding: '6px 0',
+                                borderRadius: '6px',
+                                border: `1px solid ${aiNumParts === n ? '#ec4899' : '#2a2e3d'}`,
+                                background: aiNumParts === n ? '#db2777' : '#181b24',
+                                color: '#fff',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {n}
+                            </button>
+                          ))}
+                        </div>
                         <p style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-                          {selectedCategory === "Music" ? "Runs for the full duration of the synthesized music track." : (aiNumParts === 1 ? "1 part = standalone video (no 'Part 1' in title/description)." : "Cliffhangers on each part; resolved only at final part.")}
+                          {aiNumParts === 1 ? "1 part = standalone video (no 'Part 1' in title/description)." : "Cliffhangers on each part; resolved only at final part."}
                         </p>
                       </div>
 

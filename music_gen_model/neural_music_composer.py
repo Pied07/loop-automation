@@ -7,6 +7,7 @@
 """
 
 import math
+import time
 import numpy as np
 import torch
 import torch.nn as nn
@@ -296,6 +297,22 @@ class NeuralMusicComposer(nn.Module):
             },
         }
         self.genre_profiles["Adventure"] = self.genre_profiles["Motivational"]
+        self.genre_profiles["Action"] = {
+            "base_bpm": 128,
+            "scale": [110.00, 123.47, 130.81, 146.83, 164.81, 174.61, 196.00],
+            "chords": [
+                [110.00, 164.81, 220.00, 261.63],
+                [174.61, 220.00, 261.63, 349.23],
+                [130.81, 164.81, 196.00, 261.63],
+                [196.00, 246.94, 293.66, 392.00],
+            ],
+            "lead_decay": 2.2,
+            "timbre": torch.tensor([1.0, 0.9, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.15, 0.1]),
+            "has_drums": True,
+            "drum_style": "driving",
+            "has_vocals": False,
+            "mood": "high-octane adrenaline cinematic pulse with driving bass and heavy percussion",
+        }
         self.genre_profiles["Educational"] = self.genre_profiles["Interesting Facts"]
         self.genre_profiles["Sci-Fi"] = self.genre_profiles["Interesting Facts"]
         self.genre_profiles["Others"] = self.genre_profiles["Interesting Facts"]

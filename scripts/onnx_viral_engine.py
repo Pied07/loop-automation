@@ -48,6 +48,9 @@ CATEGORY_EXCLUSIONS = {
     "Sports": {
         "romance", "horror", "cooking", "recipe", "food", "makeup", "prank",
     },
+    "Action": {
+        "romance", "lovequotes", "recipe", "cooking", "makeup", "beauty", "food",
+    },
 }
 
 CATEGORY_VIRAL_BANK = {
@@ -57,6 +60,7 @@ CATEGORY_VIRAL_BANK = {
     "Horror": ["scarystories", "creepyfacts", "paranormal", "horrorstories", "spookyseason", "unexplained", "mystery", "chilling", "ghoststories"],
     "Educational": ["didyouknow", "sciencefacts", "curiosity", "mindblowingfacts", "learnsomethingnew", "interestingfacts", "historybuff", "education", "knowledge"],
     "Adventure": ["adventurous", "wanderlust", "naturelovers", "exploremore", "wildlifephotography", "earthoutdoors", "thrillseeker", "travelgram", "nature"],
+    "Action": ["actionmovie", "stuntman", "blockbuster", "adrenaline", "epicfight", "martialarts", "highoctane", "chasescene", "explosive", "thrilling"],
     "Music": ["viralmusic", "trendingaudio", "beatdrop", "banger", "musiciansoftiktok", "livemusic", "soundtrack", "goodvibes", "musiclover"],
     "Food": ["foodiegram", "streetfood", "deliciousfood", "easyrecipe", "foodlovers", "chefskills", "mouthwatering", "tasty", "yummy"],
     "Sports": ["sportsmoments", "highlightreel", "athlete", "championsleague", "gamewinner", "insaneplay", "buzzerbeater", "sports", "football"],
@@ -101,6 +105,10 @@ CATEGORY_HOOKS = {
     "Adventure": [
         "Breathtaking view from around the world! 🌍 Would you visit this place? 👇",
         "Life is either a daring adventure or nothing at all! 🌲 Tag your travel buddy!",
+    ],
+    "Action": [
+        "Unbelievable high-octane stunt sequence! ⚔️ Rate this action 1-10! 👇",
+        "Edge of your seat adrenaline rush! 💥 Did you see that move coming? Tell us below!",
     ],
     "Music": [
         "This sound hits completely different! 🎵 Drop your favorite song below! 👇",

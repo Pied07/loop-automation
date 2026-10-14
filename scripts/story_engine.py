@@ -44,8 +44,8 @@ def build_clean_visual_prompt(scene_text: str, fallback_subject: str, style_desc
         if len(clean) > 120:
             clean = clean[:120].rsplit(" ", 1)[0]
 
-    quality_anchors = "symmetrical facial features, natural detailed eyes, sharp focused gaze, anatomically correct"
-    return f"{clean}, {quality_anchors}, {style_descriptor}, vertical 9:16 framing, photorealistic cinematic lighting"
+    scene_composition = "cinematic wide-angle environmental establishing shot, dynamic action in full scene, deep background architecture and scenery, atmospheric environmental storytelling, natural anatomy"
+    return f"Cinematic scene of {clean}, {scene_composition}, {style_descriptor}, vertical 9:16 framing, photorealistic 8k"
 
 # Curated, verified, real-world mind-blowing origin facts (No news, real history & psychological marketing anomalies)
 UNTOLD_INTERESTING_FACTS = [
@@ -593,9 +593,9 @@ GENRE_CTA = {
         "Moral of the story: always read the room before making your move. Save this for a laugh and follow for more hilarious chaos!",
         "If you didn't laugh, check your pulse! Hit save, send this to your funniest friend, and follow for daily comedy!",
     ],
-    "Music": [
-        "Music speaks directly to the soul where words fail. Save this track, turn up the volume, and follow for more original beats!",
-        "Every beat tells a story that echoes through time. Save this song and follow for daily acoustic journeys!",
+    "Action": [
+        "Adrenaline is fuel. Double tap if you felt the rush, save this video, and follow for more extreme stunts!",
+        "That was pure cinematic adrenaline. Hit the like button, save this video right now, and follow for daily high-octane thrillers!",
     ],
     "Interesting Facts": [
         "History is stranger than fiction when you uncover the untold truth. Save this fact to blow your friends' minds, and follow for more daily discoveries!",
@@ -769,32 +769,33 @@ SUSPENSE_PATTERNS = {
         ],
         "visual_style": "vibrant colorful lively expressive high energy 3d animated style 8k cheerful comedic scene",
     },
-    "Music": {
+    "Action": {
         "hooks": [
-            "In 1978, a mysterious pirate radio station in London broadcasted a 3-minute melody that vanished forever.",
-            "Musicians in Berlin discovered an underground acoustic chamber where a single guitar chord reverberates for 40 seconds.",
-            "Legend says this vinyl record contains an inaudible frequency that makes listeners experience vivid dreams.",
-            "An anonymous producer uploaded an electronic beat at 3:00 AM that went viral across twenty countries by sunrise.",
-            "A vintage upright piano found in an abandoned church cellar produced harmonics that synced with local radio waves.",
+            "Trapped on the roof of a runaway high-speed train in the pouring rain, he had 30 seconds to defuse the charge.",
+            "When the extraction chopper was shot down behind enemy lines, the lone operative had only one extraction route.",
+            "Sprinting across the crumbling rooftops of Monaco while being hunted by elite mercenaries, one misstep meant a 400-foot drop.",
+            "A rogue stealth unit hijacked the subterranean missile silo, and only one retired tactical agent was already inside.",
+            "Cornered in an industrial shipping container yard with searchlights cutting through the smoke, the ambush was sprung.",
         ],
         "developments": [
-            "Sound engineers analyzing the waveform discovered an embedded mathematical spiral inside the harmony.",
-            "When the analog synthesizers hit 432 Hz, the vintage vacuum tubes began glowing in perfect unison.",
-            "Cables hummed with resonant energy as the bass frequency resonated through the subterranean concrete floor.",
-            "The melody wove through vintage polyphonic synths, creating an immersive soundscape that defied ordinary acoustic physics.",
-            "Microphones in the acoustic chamber captured overtones that sounded unmistakably like a human choir.",
+            "He leaped across the four-meter chasm between the shipping containers as sparks rained from incoming fire.",
+            "Grappling onto the landing skid of the ascending helicopter, the rotor wash threw him into a violent spin.",
+            "The armored vehicle breached the iron security gates at eighty miles per hour, tires smoking across the wet pavement.",
+            "Shattering the skylight glass in a controlled tactical descent, he breached the command room in seconds.",
+            "Debris rained down as the support beam gave way, turning the entire subterranean hangar into a collapsing warzone.",
+            "Ducking beneath high-caliber crossfire, he rigged the emergency hydraulic door release with a single knife slash.",
         ],
         "cliffhangers": [
-            "When they dropped the needle on the unlabelled B-side, the sound did something nobody expected. Follow for Part {next_part} to hear it!",
-            "The recording suddenly stopped and a voice spoke through the monitor. To uncover what it said, follow for Part {next_part}!",
-            "The acoustic vibration shattered three antique glassware bottles on the studio shelf. Watch Part {next_part} to hear the climax!",
+            "Just as the countdown timer hit zero, he pulled the manual override cable. See the explosive outcome in Part {next_part}!",
+            "He dove through the shattering plate-glass window as the fireball erupted behind him. Follow for Part {next_part}!",
+            "Surrounded by twelve laser sights in the dark, he activated the emergency countermeasures. Watch Part {next_part} right now!",
         ],
         "resolutions": [
-            "The lost frequency was finally mastered and released, proving that music is the true universal language of human consciousness.",
-            "The resonance faded into pure harmonic stillness, leaving behind a timeless acoustic masterpiece.",
-            "The melody was adopted as a cultural anthem, uniting listeners across continents through pure sonic frequency.",
+            "He cleared the blast zone with milliseconds to spare, neutralizing the syndicate and securing the package.",
+            "The dust settled over the battleground, leaving the lone operative standing victorious against impossible odds.",
+            "He escaped into the night as sirens echoed in the distance, proving that precision and courage always triumph.",
         ],
-        "visual_style": "neon cyberpunk stage lights futuristic music concert visual audio waves 8k",
+        "visual_style": "cinematic wide-angle Hollywood blockbuster action sequence, explosive debris and sparks, dynamic motion blur, high-octane battle scene, dramatic rim lighting, 8k octane render",
     },
     "Others": {
         "hooks": [
@@ -1318,7 +1319,7 @@ def generate_story_parts(
             "source": "motivational_generator",
         }
 
-    # 3. CREATIVE SUSPENSE STORIES (Horror, Adventure, Romance, Educational, Comedy, Music, Others)
+    # 3. CREATIVE SUSPENSE STORIES (Horror, Adventure, Romance, Action, Educational, Comedy, Others)
     genre_data = SUSPENSE_PATTERNS.get(cat_clean, SUSPENSE_PATTERNS["Others"])
     hooks = genre_data.get("hooks", SUSPENSE_PATTERNS["Others"]["hooks"])
     developments = genre_data.get("developments", SUSPENSE_PATTERNS["Others"]["developments"])

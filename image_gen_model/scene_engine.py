@@ -65,15 +65,19 @@ ASPECT_RATIOS = {
     "4:3 (Classic)": (1024, 768),
 }
 
-# Industry standard anti-distortion negative prompt targeting face, eyes, and anatomy mutations
+# Industry standard anti-distortion negative prompt targeting face, eyes, anatomy mutations, and static portrait headshots
 COMPREHENSIVE_NEGATIVE_PROMPT = (
     "extra eyes, multi eyes, mutated eyes, duplicate eyes, crossed eyes, fused eyes, deformed iris, deformed pupils, "
     "asymmetrical face, deformed face, bad face anatomy, distorted facial features, cloned face, morbid, mutilated, "
     "extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, extra fingers, missing fingers, "
     "fused fingers, too many fingers, deformed hands, poorly drawn hands, poorly drawn face, mutation, deformed, "
-    "blurry, bad proportions, gross proportions, unnatural body, text, watermark, signature, username, error, "
+    "blurry, bad proportions, gross proportions, unnatural body, "
+    "close-up, headshot, portrait, passport photo, mugshot, ID photo, centered face, static pose, "
+    "blank background, solid color background, plain background, studio backdrop, cropped head, "
+    "text, watermark, signature, username, error, "
     "low quality, worst quality, normal quality, jpeg artifacts, overexposed, underexposed, bad lighting"
 )
+
 
 
 def find_gpu_bridge_url(explicit_url: Optional[str] = None) -> Optional[str]:

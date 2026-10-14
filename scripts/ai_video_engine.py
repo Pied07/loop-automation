@@ -43,6 +43,14 @@ except ModuleNotFoundError:
     except Exception:
         music_engine = None
 
+try:
+    from scripts.story_engine import build_clean_visual_prompt
+except ModuleNotFoundError:
+    try:
+        from story_engine import build_clean_visual_prompt
+    except Exception:
+        build_clean_visual_prompt = None
+
 THEMES = {
     "Motivational": {
         "badge": "🔥 MOTIVATIONAL",
@@ -98,14 +106,14 @@ THEMES = {
         "tone_freq": 293,
         "style_prompt": "epic landscape extreme nature wilderness exploration 8k national geographic cinematography",
     },
-    "Music": {
-        "badge": "🎵 VIRAL SOUND",
-        "bg_color": "0x1e1b4b",
-        "accent": "#8b5cf6",
-        "text_highlight": "#a78bfa",
-        "voice": "en-US-JennyNeural",
-        "tone_freq": 392,
-        "style_prompt": "neon cyberpunk stage lights futuristic music concert visual audio waves 8k",
+    "Action": {
+        "badge": "⚔️ HIGH OCTANE",
+        "bg_color": "0x1c0c00",
+        "accent": "#f97316",
+        "text_highlight": "#fb923c",
+        "voice": "en-US-ChristopherNeural",
+        "tone_freq": 220,
+        "style_prompt": "cinematic wide-angle Hollywood blockbuster action sequence, explosive debris and sparks, dynamic motion blur, high-octane battle scene, dramatic rim lighting, 8k octane render",
     },
     "Interesting Facts": {
         "badge": "🧠 MIND BLOWN",
@@ -1114,159 +1122,72 @@ class AIVideoEngine:
         final_video_path = work_dir / "ai_video.mp4"
         thumb_path = work_dir / "ai_thumbnail.jpg"
 
-        is_music_category = (cat_clean == "Music")
+        # 1. Script & scenes formulation for spoken narrative categories
+        final_script = script.strip() if script else ""
+        title = prompt.strip() if prompt.strip() else f"{cat_clean} Mystery"
 
-        if is_music_category:
-            # User rule: "for music type it should nt be a story just a music with vocals and all required instruments and for music it will have no part or time it will be one prt only and time as lonmg as the music last thats it"
-            num_parts = 1
-            part_number = 1
-            song_title = prompt.strip() if prompt.strip() else "Electric Pulse - Viral Vocal Track"
-            song_title = re.sub(r"\s*\(Part\s*\d+[/]?\d*\)", "", song_title, flags=re.IGNORECASE).strip()
-            song_title = re.sub(r"\s*-\s*Part\s*\d+", "", song_title, flags=re.IGNORECASE).strip()
-            title = song_title
-            final_script = f"🎵 {song_title} — Full Vocal Music Track"
-
-            # Synthesize complete song with singing vocals and full instruments from scratch with ML!
-            song_wav = work_dir / "narration.wav"
+        if not final_script:
+            # Generate script using story_engine
             try:
-                if music_engine is not None:
-                    music_engine.generate(
-                        category="Music",
-                        duration_seconds=float(duration),
-                        output_wav_path=str(song_wav),
-                        seed=42 + int(time.time()) % 1000,
-                        is_full_song=True,
-                    )
-                # Convert to clean 192k MP3 track
-                subprocess.run(
-                    [str(FFMPEG_BIN), "-y", "-i", str(song_wav), "-c:a", "libmp3lame", "-b:a", "192k", str(audio_path)],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-                )
-            except Exception as e:
-                print(f"Notice: Music synthesis notice: {e}")
-
-            # Probe duration of synthesized music track (exact length the music lasts!)
-            probe = subprocess.run(
-                [str(FFMPEG_BIN), "-i", str(audio_path)],
-                stderr=subprocess.PIPE,
-                stdout=subprocess.DEVNULL,
-                text=True,
-            )
-            dur_match = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", probe.stderr)
-            if dur_match:
-                total_dur = int(dur_match.group(1)) * 3600 + int(dur_match.group(2)) * 60 + float(dur_match.group(3))
-            else:
-                total_dur = float(duration)
-
-            # Subtitle timing chunks for the music video (distributed across the music track)
-            song_chunks = [
-                f"🎵 {title}",
-                "✨ Melodic Singing Vocals",
-                "🔥 Full Stereo Production",
-                "🎧 Synth Bass & Drums",
-                f"🎵 {title}",
-            ]
-            chunk_step = total_dur / len(song_chunks)
-            timing = []
-            for i, chunk_txt in enumerate(song_chunks):
-                timing.append({
-                    "text": chunk_txt,
-                    "start": i * chunk_step,
-                    "end": min(total_dur, (i + 1) * chunk_step),
-                })
-
-            # Musical visual prompts
-            scenes = []
-            scene_themes = [
-                f"cinematic high-energy music performance stage, neon concert lighting, glowing synthwave atmosphere",
-                f"expressive singer singing with emotional microphone close-up, dramatic atmospheric stage lighting",
-                f"dynamic visual music wave pulses, cyberpunk club crowd silhouette, laser beams",
-                f"melodic synth keys playing under glowing spotlights, cinematic bokeh depth of field",
-                f"epic finale climax on concert stage, dazzling strobe lights and smoke fog effects",
-            ]
-            for s_idx in range(num_images):
-                vis_prompt = f"{scene_themes[s_idx % len(scene_themes)]}, {theme['style_prompt']}, vertical 9:16 framing, 8k"
-                scenes.append({
-                    "scene_index": s_idx,
-                    "text": title,
-                    "visual_prompt": vis_prompt,
-                })
-
-            meta = {
-                "title": title,
-                "script": final_script,
-                "sentences": [title],
-                "scenes": scenes,
-                "category": cat_clean,
-                "hashtags": ["music", "newsong", "viralsound", "synthwave", "vocaltrack", "beats", "fyp", "trending"],
-                "theme": theme,
-                "style_preset": style_preset,
-                "caption_style": caption_style,
-            }
-        else:
-            # 1. Script & scenes formulation for spoken narrative categories
-            final_script = script.strip() if script else ""
-            title = prompt.strip() if prompt.strip() else f"{cat_clean} Mystery"
-
-            if not final_script:
-                # Generate script using story_engine
                 try:
-                    try:
-                        from scripts.story_engine import generate_story_parts
-                    except ModuleNotFoundError:
-                        from story_engine import generate_story_parts
-                    story_res = generate_story_parts(
-                        category=cat_clean,
-                        custom_tag=custom_tag,
-                        prompt=prompt,
-                        duration_per_part=duration,
-                        num_images_per_part=num_images,
-                        num_parts=num_parts,
-                    )
-                    part_data = story_res["parts"][part_number - 1]
-                    final_script = part_data["script"]
-                    title = part_data["title"]
-                except Exception as e:
-                    print(f"Notice: Story engine fallback: {e}")
-                    meta_onnx = self.generate_script_from_model(cat_clean, prompt, target_duration=duration, num_scenes=num_images)
-                    final_script = meta_onnx["script"]
-                    title = meta_onnx["title"]
+                    from scripts.story_engine import generate_story_parts
+                except ModuleNotFoundError:
+                    from story_engine import generate_story_parts
+                story_res = generate_story_parts(
+                    category=cat_clean,
+                    custom_tag=custom_tag,
+                    prompt=prompt,
+                    duration_per_part=duration,
+                    num_images_per_part=num_images,
+                    num_parts=num_parts,
+                )
+                part_data = story_res["parts"][part_number - 1]
+                final_script = part_data["script"]
+                title = part_data["title"]
+            except Exception as e:
+                print(f"Notice: Story engine fallback: {e}")
+                meta_onnx = self.generate_script_from_model(cat_clean, prompt, target_duration=duration, num_scenes=num_images)
+                final_script = meta_onnx["script"]
+                title = meta_onnx["title"]
 
-            # Ensure title is concise, punchy, and under 65 chars so Instagram and YouTube API captions never fail
-            if len(title) > 65 or "\n" in title or "." in title:
-                extracted_subj = extract_topic_from_text(title, cat_clean)
-                if num_parts > 1:
-                    title = f"{extracted_subj} (Part {part_number}/{num_parts})"
-                else:
-                    title = f"{extracted_subj}: The Untold Truth"
+        # Ensure title is concise, punchy, and under 65 chars so Instagram and YouTube API captions never fail
+        if len(title) > 65 or "\n" in title or "." in title:
+            extracted_subj = extract_topic_from_text(title, cat_clean)
+            if num_parts > 1:
+                title = f"{extracted_subj} (Part {part_number}/{num_parts})"
+            else:
+                title = f"{extracted_subj}: The Untold Truth"
 
-            # If num_parts == 1, guarantee no "Part 1" appears anywhere in title
-            if num_parts == 1:
-                title = re.sub(r"\s*\(Part\s*\d+[/]?\d*\)", "", title, flags=re.IGNORECASE).strip()
-                title = re.sub(r"\s*-\s*Part\s*\d+", "", title, flags=re.IGNORECASE).strip()
+        # If num_parts == 1, guarantee no "Part 1" appears anywhere in title
+        if num_parts == 1:
+            title = re.sub(r"\s*\(Part\s*\d+[/]?\d*\)", "", title, flags=re.IGNORECASE).strip()
+            title = re.sub(r"\s*-\s*Part\s*\d+", "", title, flags=re.IGNORECASE).strip()
 
-            # Build scene breakdowns
-            sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", final_script) if len(s.strip()) > 3]
-            if not sentences:
-                sentences = [final_script]
+        # Build scene breakdowns
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", final_script) if len(s.strip()) > 3]
+        if not sentences:
+            sentences = [final_script]
 
-            scenes = []
-            sentences_per_scene = max(1, len(sentences) // num_images)
-            for s_idx in range(num_images):
-                sub_sent = sentences[s_idx * sentences_per_scene : (s_idx + 1) * sentences_per_scene]
-                if not sub_sent:
-                    sub_sent = [sentences[-1]]
-                scene_text = " ".join(sub_sent)
+        scenes = []
+        sentences_per_scene = max(1, len(sentences) // num_images)
+        for s_idx in range(num_images):
+            sub_sent = sentences[s_idx * sentences_per_scene : (s_idx + 1) * sentences_per_scene]
+            if not sub_sent:
+                sub_sent = [sentences[-1]]
+            scene_text = " ".join(sub_sent)
 
+            if build_clean_visual_prompt is not None:
+                visual_prompt = build_clean_visual_prompt(scene_text, cat_clean.lower(), theme["style_prompt"])
+            else:
                 key_tokens = extract_scene_keywords(scene_text)
                 scene_subject = " ".join(key_tokens[:4]) if key_tokens else cat_clean.lower()
-                visual_prompt = f"{scene_subject}, {theme['style_prompt']}, vertical 9:16 framing, photorealistic cinematic lighting"
+                visual_prompt = f"Cinematic scene of {scene_subject}, cinematic wide-angle environmental establishing shot, dynamic action in full scene, {theme['style_prompt']}, vertical 9:16 framing, photorealistic 8k"
 
-                scenes.append({
-                    "scene_index": s_idx,
-                    "text": scene_text,
-                    "visual_prompt": visual_prompt,
-                })
+            scenes.append({
+                "scene_index": s_idx,
+                "text": scene_text,
+                "visual_prompt": visual_prompt,
+            })
 
             meta = {
                 "title": title,

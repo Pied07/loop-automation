@@ -27,6 +27,12 @@ FILLER_PATTERNS = [
 ]
 
 GENRE_VISUAL_STYLES: Dict[str, Dict[str, str]] = {
+    "Action": {
+        "lighting": "explosive dynamic rim lighting, flying orange sparks, intense cinematic contrast, atmospheric battle haze",
+        "camera": "wide-angle dynamic action shot, sweeping cinematic perspective, high-speed tracking camera",
+        "keywords": ["action", "battle", "fight", "chase", "combat", "explosion", "warzone", "infiltrate", "rooftop"],
+        "suffix": "Hollywood blockbuster action cinematography, high-octane scene, dynamic motion, debris and sparks, 8k octane render",
+    },
     "Horror": {
         "lighting": "dim flickering amber candlelight, volumetric ominous mist, cold moonlight filtering through cracks, dramatic deep shadows",
         "camera": "creepy Dutch angle, wide atmospheric shot, 35mm horror film still",
@@ -94,6 +100,8 @@ def clean_narration(text: str) -> str:
 def infer_genre(category: str, topic: str, text: str) -> str:
     """Identifies the dominant storytelling genre from context."""
     combined = f"{category} {topic} {text}".lower()
+    if any(w in combined for w in ["action", "combat", "fight", "battle", "chase", "warzone", "tactical", "stunt", "explosion", "gun", "operative", "infiltrat"]):
+        return "Action"
     if any(w in combined for w in ["horror", "scary", "ghost", "creepy", "haunted", "blood", "monster", "demon", "abandoned"]):
         return "Horror"
     if any(w in combined for w in ["detective", "mystery", "crime", "secret", "clue", "murder", "unsolved"]):
@@ -113,34 +121,40 @@ def infer_genre(category: str, topic: str, text: str) -> str:
 
 CHARACTER_STYLE_PRESETS: Dict[str, Dict[str, str]] = {
     "Realism": {
-        "char_prompt": "highly detailed realistic person with symmetrical facial features, authentic human skin texture, natural detailed eyes, sharp focused gaze, anatomically correct human face",
-        "lighting": "cinematic film still, 35mm photograph, dramatic natural rim lighting, shallow depth of field",
-        "suffix": "photorealistic 8k UHD, award-winning cinematography, photoreal human character, natural facial symmetry, flawless face anatomy, masterpiece",
+        "character_in_action": "expressive person in dynamic motion and authentic stance with natural anatomy",
+        "environment_vibe": "richly detailed cinematic living world, deep atmospheric background architecture, authentic environmental depth of field",
+        "lighting": "cinematic film still, 35mm photograph, dramatic natural rim lighting, volumetric depth",
+        "suffix": "photorealistic 8k UHD, award-winning cinematic storytelling, wide establishing environmental composition, photoreal scene, masterpiece",
     },
     "Anime": {
-        "char_prompt": "masterpiece anime character with symmetrical detailed expressive eyes, crisp line art, beautiful facial symmetry, dynamic hair",
-        "lighting": "Studio Ghibli aesthetic, vibrant anime lighting, lush hand-painted scenery, atmospheric glow",
-        "suffix": "Makoto Shinkai anime style, crisp line art, beautiful high quality Japanese animation, 8k",
+        "character_in_action": "anime hero protagonist in dynamic motion and action pose",
+        "environment_vibe": "lush hand-painted anime landscape, Studio Ghibli and Makoto Shinkai aesthetic, gorgeous environmental scenery, deep sky vistas and floating particles",
+        "lighting": "vibrant anime lighting, atmospheric god rays, glowing embers, dynamic wind",
+        "suffix": "Makoto Shinkai aesthetic, crisp line art, beautiful high quality Japanese animation scenery, 8k anime movie still",
     },
     "Disney 3D": {
-        "char_prompt": "adorable Disney Pixar 3D animated character, charming symmetrical facial features, cute stylized person, natural expressive eyes",
-        "lighting": "subsurface scattering, warm studio 3d lighting, soft cinematic rim light",
-        "suffix": "Pixar 3D animation movie still, Unreal Engine 5 render, Octane render 8k, adorable character",
+        "character_in_action": "expressive stylized 3D animated character in lively active motion",
+        "environment_vibe": "lush Pixar 3D animated world, detailed storybook architecture, rich environmental scenery, immersive background world",
+        "lighting": "subsurface scattering, warm studio 3d lighting, soft cinematic volumetric rim light",
+        "suffix": "Pixar 3D animation movie still, Unreal Engine 5 render, Octane render 8k, full wide animated scene",
     },
     "Mecha": {
-        "char_prompt": "futuristic cyberpunk hero wearing glowing high-tech mecha exoskeleton armor, sharp symmetrical cybernetic helmet",
-        "lighting": "neon reflections in the rain, atmospheric cyan and magenta haze, dramatic sci-fi lighting",
-        "suffix": "cinematic sci-fi mecha aesthetic, intricate mechanical armor, sharp focus, 8k",
+        "character_in_action": "cyberpunk operative in glowing high-tech mecha exoskeleton armor in dynamic combat action",
+        "environment_vibe": "neon-lit rainy futuristic cyberpunk metropolis, towering holographic skyscrapers, wet reflective asphalt, cybernetic industrial machinery in background",
+        "lighting": "neon reflections in the rain, atmospheric cyan and magenta haze, dramatic volumetric sci-fi lighting",
+        "suffix": "cinematic sci-fi mecha aesthetic, intricate mechanical armor, sharp focus, 8k wide angle scene",
     },
     "Dark Fantasy": {
-        "char_prompt": "epic medieval fantasy warrior knight with symmetrical facial structure, intricately engraved steel armor and flowing cape",
-        "lighting": "volumetric dark mist, glowing magical runes, dramatic torchlight and deep shadows",
-        "suffix": "dark fantasy concept art, Elden Ring and Witcher aesthetic, ArtStation trending, 8k masterpiece",
+        "character_in_action": "epic medieval dark fantasy knight in dynamic battle stance with flowing cape and engraved armor",
+        "environment_vibe": "crumbling gothic stone fortress ruins, burning torchlight, dark volumetric mist, swirling ember fog, towering ancient castle spires in deep background",
+        "lighting": "volumetric dark mist, glowing magical runes, dramatic torchlight and moonlit deep shadows",
+        "suffix": "dark fantasy cinematic concept art, Elden Ring and Witcher aesthetic, ArtStation trending, 8k wide angle masterpiece",
     },
     "Retro Comic": {
-        "char_prompt": "vintage graphic novel comic book character, heroic pose, symmetrical bold ink illustration",
+        "character_in_action": "vintage graphic novel superhero in heroic dynamic action stance",
+        "environment_vibe": "dramatic retro comic book cityscape background, stylized noir architecture, graphic halftone skyline, dynamic perspective lines",
         "lighting": "retro pop-art halftone colors, bold black contour lines, dramatic comic noir shadows",
-        "suffix": "classic superhero comic book cover, detailed cross-hatching, vintage comic art, 8k",
+        "suffix": "classic superhero comic book action panel, detailed cross-hatching, vintage comic art, 8k wide action scene",
     },
 }
 
@@ -154,20 +168,20 @@ def synthesize_scene_prompt(
 ) -> str:
     """
     Transforms any story script sentence into a rich, photorealistic,
-    scene-specific prompt that image generators will faithfully render,
-    centered around expressive characters and the user's chosen art style.
+    scene-specific prompt that image generators will faithfully render as a
+    full environmental cinematic scene with dynamic action (never a flat portrait).
     """
     clean = clean_narration(script_sentence)
     genre = infer_genre(category, topic, script_sentence)
-    genre_style = GENRE_VISUAL_STYLES.get(genre, GENRE_VISUAL_STYLES["Horror"])
+    genre_style = GENRE_VISUAL_STYLES.get(genre, GENRE_VISUAL_STYLES["Action"] if genre == "Action" else GENRE_VISUAL_STYLES["Horror"])
 
     # Fallback to topic if script sentence was mostly filler
     visual_core = clean if len(clean) > 8 else clean_narration(topic)
     if not visual_core or len(visual_core) < 4:
         visual_core = f"{category} scene, {topic}"
 
-    # Aspect framing
-    framing = "vertical 9:16 framing, full height composition" if "9:16" in aspect_ratio else "cinematic 16:9 widescreen composition"
+    # Aspect framing with wide environmental establishing instruction
+    framing = "cinematic wide-angle vertical 9:16 establishing shot, deep environmental background, dynamic action in full scene" if "9:16" in aspect_ratio else "cinematic 16:9 widescreen environmental establishing composition, deep background, dynamic action in full scene"
 
     matched_preset = None
     if style_preset:
@@ -176,22 +190,25 @@ def synthesize_scene_prompt(
                 matched_preset = v
                 break
 
-    quality_anchor = "flawless facial symmetry, perfectly centered natural eyes, detailed iris and pupils, anatomically correct features"
+    quality_anchor = "flawless anatomical symmetry, natural detailed eyes, sharp focused gaze, anatomically correct"
+
     if matched_preset:
         prompt_parts = [
-            f"{matched_preset['char_prompt']} in {visual_core}",
+            f"Cinematic wide establishing scene of {visual_core}",
+            f"featuring {matched_preset['character_in_action']}",
+            matched_preset["environment_vibe"],
+            framing,
             quality_anchor,
             matched_preset["lighting"],
-            framing,
             matched_preset["suffix"],
         ]
     else:
         prompt_parts = [
-            visual_core,
-            quality_anchor,
+            f"Cinematic wide establishing scene of {visual_core}",
             genre_style["lighting"],
             genre_style["camera"],
             framing,
+            quality_anchor,
             genre_style["suffix"],
         ]
 

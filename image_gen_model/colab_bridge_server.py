@@ -23,9 +23,13 @@ COMPREHENSIVE_NEGATIVE_PROMPT = (
     "asymmetrical face, deformed face, bad face anatomy, distorted facial features, cloned face, morbid, mutilated, "
     "extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, extra fingers, missing fingers, "
     "fused fingers, too many fingers, deformed hands, poorly drawn hands, poorly drawn face, mutation, deformed, "
-    "blurry, bad proportions, gross proportions, unnatural body, text, watermark, signature, username, error, "
+    "blurry, bad proportions, gross proportions, unnatural body, "
+    "close-up, headshot, portrait, passport photo, mugshot, ID photo, centered face, static pose, "
+    "blank background, solid color background, plain background, studio backdrop, cropped head, "
+    "text, watermark, signature, username, error, "
     "low quality, worst quality, normal quality, jpeg artifacts, overexposed, underexposed, bad lighting"
 )
+
 
 def start_bridge(pipe=None, port=5055):
     import torch
