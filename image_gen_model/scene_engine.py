@@ -164,37 +164,43 @@ class StorySceneEngine:
         self._initialized = True
 
     def _init_local_pipeline(self):
-        """Lazy loads local PyTorch diffusers pipeline only if weights are cached or GPU is available."""
+        """Lazy loads local PyTorch diffusers pipeline (SDXL on GPU or 1-Step SD-Turbo on CPU)."""
         if self.pipe is not None:
             return
         try:
             import torch
 
             dev = self.device or ("cuda" if torch.cuda.is_available() else "cpu")
-            dtype = torch.float16 if dev == "cuda" else torch.float32
 
-            # Guard: do not block thread downloading 13.5 GB on CPU during web request
-            if dev == "cpu" and not is_model_cached(self.model_id):
-                print(f"[SCENE ENGINE] Notice: Base SDXL weights (~6.5GB) are not yet cached on local PC.")
-                print(f"👉 Recommended: Run Cell 9 in StorySceneGenerator_Train.ipynb to connect your free Colab T4 GPU bridge!")
-                return
+            from diffusers import AutoPipelineForText2Image
 
-            from diffusers import AutoPipelineForText2Image, DPMSolverMultistepScheduler
-
-            print(f"[SCENE ENGINE] Initializing local diffusers pipeline on {dev}...")
-            t0 = time.time()
-            self.pipe = AutoPipelineForText2Image.from_pretrained(
-                self.model_id,
-                torch_dtype=dtype,
-            )
-            try:
-                self.pipe.scheduler = DPMSolverMultistepScheduler.from_config(self.pipe.scheduler.config)
-            except Exception:
-                pass
-            self.pipe.to(dev)
-            if self.active_lora and os.path.exists(self.active_lora):
-                self.load_lora(self.active_lora)
-            print(f"[SCENE ENGINE] Local pipeline ready in {time.time() - t0:.1f}s")
+            if dev == "cuda":
+                # High-speed GPU pipeline with SDXL Base 1.0 + LoRA
+                print(f"[SCENE ENGINE] 🚀 Initializing SDXL pipeline on CUDA GPU...")
+                t0 = time.time()
+                self.pipe = AutoPipelineForText2Image.from_pretrained(
+                    self.model_id,
+                    torch_dtype=torch.float16,
+                    variant="fp16",
+                    use_safetensors=True,
+                )
+                self.pipe.to("cuda")
+                self.current_model_id = self.model_id
+                if self.active_lora and os.path.exists(self.active_lora):
+                    self.load_lora(self.active_lora)
+                print(f"[SCENE ENGINE] CUDA SDXL pipeline ready in {time.time() - t0:.1f}s")
+            else:
+                # 1-Step Fast Turbo CPU Pipeline for unattended GitHub Actions / CPU runner
+                turbo_model = "stabilityai/sd-turbo"
+                print(f"[SCENE ENGINE] ⚡ Initializing 1-Step Fast Turbo Diffusion on CPU ({turbo_model})...")
+                t0 = time.time()
+                self.pipe = AutoPipelineForText2Image.from_pretrained(
+                    turbo_model,
+                    torch_dtype=torch.float32,
+                )
+                self.pipe.to("cpu")
+                self.current_model_id = turbo_model
+                print(f"[SCENE ENGINE] ✅ 1-Step Turbo CPU pipeline ready in {time.time() - t0:.1f}s (1 step = ~15s per scene)")
         except Exception as e:
             print(f"[SCENE ENGINE] Local diffusers init notice: {e}")
             self.pipe = None
@@ -282,24 +288,42 @@ class StorySceneEngine:
         guidance_scale: float = 7.0,
         seed: Optional[int] = None,
     ) -> Optional[Image.Image]:
-        """Runs local PyTorch diffusion inference."""
+        """Runs local PyTorch diffusion inference (1-Step Fast Turbo on CPU or LoRA on GPU)."""
         self._init_local_pipeline()
         if self.pipe is None:
             return None
 
         import torch
         gen = torch.Generator(device=self.pipe.device).manual_seed(seed) if seed is not None else None
+        is_turbo = "turbo" in getattr(self, "current_model_id", "").lower()
+        inf_steps = 1 if is_turbo else steps
+        inf_guidance = 0.0 if is_turbo else guidance_scale
+        inf_w = 512 if is_turbo else (width // 8) * 8
+        inf_h = 512 if is_turbo else (height // 8) * 8
+
         try:
             with torch.inference_mode():
                 result = self.pipe(
                     prompt=prompt,
-                    num_inference_steps=steps,
-                    guidance_scale=guidance_scale,
-                    height=(height // 8) * 8,
-                    width=(width // 8) * 8,
+                    num_inference_steps=inf_steps,
+                    guidance_scale=inf_guidance,
+                    height=inf_h,
+                    width=inf_w,
                     generator=gen,
                 )
-                return result.images[0]
+                img = result.images[0]
+
+                # If turbo 512x512, adapt to requested aspect ratio (e.g. 9:16 vertical)
+                if is_turbo and (width != 512 or height != 512):
+                    tw, th = width, height
+                    scale = max(tw / img.width, th / img.height)
+                    nw, nh = int(img.width * scale), int(img.height * scale)
+                    resized = img.resize((nw, nh), Image.Resampling.LANCZOS)
+                    cx = (nw - tw) // 2
+                    cy = (nh - th) // 2
+                    img = resized.crop((cx, cy, cx + tw, cy + th))
+
+                return img
         except Exception as e:
             print(f"[SCENE ENGINE] Local inference error: {e}")
             return None
@@ -349,22 +373,24 @@ class StorySceneEngine:
                 seed=seed,
             )
 
-        # Priority 2: Local PyTorch Pipeline (Runs Custom Model if local weights cached)
-        if raw_img is None and self.pipe is not None:
-            print(f"[SCENE ENGINE] 🎯 Synthesizing with Local Custom Model: {self.active_lora}")
-            raw_img = self.generate_local_image(
-                prompt=rich_prompt,
-                width=w,
-                height=h,
-                steps=15,
-                guidance_scale=7.0,
-                seed=seed,
-            )
-
-        # If neither GPU bridge nor local pipeline produced an image, return None so
-        # the video engine can use authentic script topic imagery (NEVER third-party polluters).
+        # Priority 2: Local PyTorch Pipeline (Fast 1-Step SD-Turbo on CPU or SDXL on GPU)
         if raw_img is None:
-            print("[SCENE ENGINE] Custom model not active on GPU bridge or local pipeline.")
+            self._init_local_pipeline()
+            if self.pipe is not None:
+                model_name = getattr(self, "current_model_id", "local diffusion")
+                print(f"[SCENE ENGINE] 🎯 Synthesizing with Local Diffusion Pipeline ({model_name})...")
+                raw_img = self.generate_local_image(
+                    prompt=rich_prompt,
+                    width=w,
+                    height=h,
+                    steps=15,
+                    guidance_scale=7.0,
+                    seed=seed,
+                )
+
+        # If neither GPU bridge nor local pipeline produced an image, return None
+        if raw_img is None:
+            print("[SCENE ENGINE] Notice: Diffusion engine unavailable on this runner.")
             return None
 
         elapsed = time.time() - t0
