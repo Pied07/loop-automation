@@ -1190,13 +1190,18 @@ export default function Home() {
     const catLabel = selectedCategory === "Others" ? (customStoryTag || "Custom") : selectedCategory;
     notify(`🧠 Running from-scratch ML model to generate suspenseful story & scenes for ${catLabel}...`);
     try {
+      // If aiPrompt matches any previously generated part script, treat it as a fresh regeneration request
+      const isPriorGeneratedScript = generatedStoryParts.length > 0 &&
+        generatedStoryParts.some((p) => p.script.trim() === aiPrompt.trim());
+      const promptToSend = isPriorGeneratedScript ? "" : aiPrompt;
+
       const res = await fetch("/api/ai-video/generate-script", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           category: selectedCategory,
           customTag: customStoryTag,
-          prompt: aiPrompt,
+          prompt: promptToSend,
           excludeId: lastFactId,
           duration: aiDuration,
           numImages: aiNumImages,
@@ -1217,8 +1222,8 @@ export default function Home() {
       if (parts.length > 0) {
         setAiPrompt(parts[0].script);
       }
-      const partNotice = data.numParts > 1 ? `${data.numParts} cliffhanger parts` : '1 complete story';
-      notify(`✨ Generated ${partNotice} with ${aiNumImages} scenes calibrated to ${aiDuration}s!`);
+      const titleInfo = data.overallTitle ? `"${data.overallTitle}"` : (data.numParts > 1 ? `${data.numParts} cliffhanger parts` : '1 complete story');
+      notify(`✨ Generated ${titleInfo} with ${aiNumImages} scenes calibrated to ${aiDuration}s!`);
     } catch (err: any) {
       notify("Failed to generate script: " + err.message);
     } finally {
