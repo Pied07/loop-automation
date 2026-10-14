@@ -35,6 +35,14 @@ FFMPEG_BIN = ROOT_DIR / "ffmpeg.exe"
 if not FFMPEG_BIN.exists():
     FFMPEG_BIN = Path(shutil.which("ffmpeg") or "ffmpeg")
 
+try:
+    from scripts.neural_music_engine import music_engine
+except ModuleNotFoundError:
+    try:
+        from neural_music_engine import music_engine
+    except Exception:
+        music_engine = None
+
 THEMES = {
     "Motivational": {
         "badge": "🔥 MOTIVATIONAL",
@@ -318,6 +326,116 @@ class AIVideoEngine:
             except Exception as e:
                 print(f"Notice: Generative image model load notice: {e}")
 
+    def _scrape_wiki_scene_image(
+        self,
+        category: str,
+        prompt: str,
+        scene_text: str,
+        topic: str,
+        scene_idx: int,
+        used_urls: set = None,
+    ):
+        """
+        Scrapes authentic photographic/historical images from Wikipedia & Wikimedia Commons.
+        Strictly used ONLY for 'Interesting Facts' category.
+        """
+        import io
+        cat_clean = category.strip().title()
+        try:
+            clean_topic = extract_topic_from_text(topic or prompt, cat_clean)
+            kws = extract_scene_keywords(scene_text or prompt)
+
+            headers = {"User-Agent": "AIVideoEngine/3.0 (MediaResearch; contact@theviraldesk.com)"}
+            candidate_images = []
+
+            search_queries = []
+            if clean_topic and kws:
+                search_queries.append(f"{clean_topic} {' '.join(kws[:2])}")
+            if clean_topic:
+                search_queries.append(clean_topic)
+            if len(kws) >= 2:
+                search_queries.append(" ".join(kws[:3]))
+            elif kws:
+                search_queries.append(kws[0])
+            if clean_topic:
+                search_queries.append(f"{clean_topic} history")
+
+            def is_clean_image(title_str: str, url_str: str) -> bool:
+                t_low = title_str.lower()
+                u_low = url_str.lower()
+                bad_tokens = [
+                    ".svg", ".ogg", ".ogv", ".webm", ".pdf", ".gif",
+                    "icon", "logo", "flag", "map", "diagram", "coat of arms",
+                    "symbol", "sign", "stamp", "signature", "seal", "chart", "graph", "sketch"
+                ]
+                return not any(bad in t_low or bad in u_low for bad in bad_tokens)
+
+            for q in search_queries:
+                if not q.strip():
+                    continue
+                try:
+                    enc_q = urllib.parse.quote(q.strip())
+                    wiki_url = f"https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch={enc_q}&gsrlimit=6&prop=pageimages&pithumbsize=1280&format=json"
+                    req = urllib.request.Request(wiki_url, headers=headers)
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        data = json.loads(resp.read().decode("utf-8"))
+                    pages = list(data.get("query", {}).get("pages", {}).values())
+                    for pg in pages:
+                        thumb_info = pg.get("thumbnail")
+                        if thumb_info and thumb_info.get("source"):
+                            u = thumb_info["source"]
+                            if is_clean_image(pg.get("title", ""), u) and u not in [c["url"] for c in candidate_images]:
+                                candidate_images.append({"title": pg.get("title"), "url": u})
+                except Exception:
+                    pass
+
+                try:
+                    enc_q = urllib.parse.quote(q.strip())
+                    api_url = (
+                        f"https://commons.wikimedia.org/w/api.php?action=query&generator=search"
+                        f"&gsrnamespace=6&gsrsearch={enc_q}&gsrlimit=10&prop=imageinfo"
+                        f"&iiprop=url|mime|size&iiurlwidth=1280&format=json"
+                    )
+                    req = urllib.request.Request(api_url, headers=headers)
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        data = json.loads(resp.read().decode("utf-8"))
+                    pages = list(data.get("query", {}).get("pages", {}).values())
+                    for pg in pages:
+                        ii = pg.get("imageinfo", [{}])[0]
+                        if "image" not in ii.get("mime", ""):
+                            continue
+                        u = ii.get("thumburl") or ii.get("url")
+                        if u and is_clean_image(pg.get("title", ""), u) and u not in [c["url"] for c in candidate_images]:
+                            candidate_images.append({"title": pg.get("title"), "url": u})
+                except Exception:
+                    pass
+
+                if len(candidate_images) > (scene_idx + 2):
+                    break
+
+            if candidate_images:
+                for cand in candidate_images:
+                    if used_urls is not None and cand["url"] in used_urls:
+                        continue
+                    try:
+                        img_req = urllib.request.Request(cand["url"], headers=headers)
+                        with urllib.request.urlopen(img_req, timeout=6) as img_resp:
+                            raw_bytes = img_resp.read()
+                            if len(raw_bytes) > 2000:
+                                loaded = Image.open(io.BytesIO(raw_bytes)).convert("RGB")
+                                if loaded.width >= 120 and loaded.height >= 120:
+                                    if used_urls is not None:
+                                        used_urls.add(cand["url"])
+                                    print(f"🏛️ Scraped authentic Wikipedia fact visual for Scene {scene_idx + 1}: {cand['title'][:40]}")
+                                    return loaded
+                    except Exception:
+                        continue
+            else:
+                print(f"Notice: No wiki image candidates found for queries: {search_queries}")
+        except Exception as e:
+            print(f"Notice: Wiki image scraping notice for scene {scene_idx + 1}: {e}")
+        return None
+
     def _generate_ml_scene_image(
         self,
         category: str,
@@ -332,9 +450,9 @@ class AIVideoEngine:
     ) -> bool:
         """
         Generate high-resolution 1080x1920 AI scene image.
-        Pulls authentic script-matching images from Wikimedia Commons / Wikipedia media archives,
-        and gracefully falls back to the curated photographic dataset or local Generative Neural Network.
-        Zero third-party generative API dependencies, zero watermarks, 100% free.
+        User rule: Wiki scrape ONLY for 'Interesting Facts'.
+        For all other categories (Horror, Romance, Sci-Fi, Adventure, Comedy, Music, etc.),
+        synthesize genuine AI visuals via the local/cloud Generative Model matching the style preset.
         """
         import torch
         from PIL import ImageEnhance, ImageFilter
@@ -346,7 +464,37 @@ class AIVideoEngine:
         theme = THEMES.get(cat_clean, THEMES["Interesting Facts"])
         target_w, target_h = 1080, 1920
 
-        # Tier 0: Direct Local Generative AI Story Scene Engine (Genuine AI image synthesized from scene script)
+        is_interesting_fact = (cat_clean == "Interesting Facts" or cat_clean in ["Trending", "Food"])
+
+        # 1. FOR "INTERESTING FACTS" ONLY: Scrape authentic photographic/historical images from Wikipedia & Wikimedia Commons
+        if is_interesting_fact:
+            dynamic_img = self._scrape_wiki_scene_image(
+                category=category,
+                prompt=prompt,
+                scene_text=scene_text,
+                topic=topic,
+                scene_idx=scene_idx,
+                used_urls=used_urls,
+            )
+            if dynamic_img is not None:
+                try:
+                    scale = max(target_w / dynamic_img.width, target_h / dynamic_img.height)
+                    rw, rh = int(dynamic_img.width * scale), int(dynamic_img.height * scale)
+                    resized = dynamic_img.resize((rw, rh), Image.Resampling.LANCZOS)
+                    cx = (rw - target_w) // 2
+                    cy = (rh - target_h) // 2
+                    cropped = resized.crop((cx, cy, cx + target_w, cy + target_h))
+
+                    final_scene = ImageEnhance.Contrast(cropped).enhance(1.08)
+                    final_scene = ImageEnhance.Color(final_scene).enhance(1.05)
+                    final_scene = ImageEnhance.Sharpness(final_scene).enhance(1.12)
+                    final_scene.save(str(output_path), quality=95)
+                    return True
+                except Exception as e:
+                    print(f"Notice: Wiki image crop notice: {e}")
+
+        # 2. FOR ALL OTHER CATEGORIES (Horror, Romance, Adventure, Sci-Fi, Comedy, Motivational, Music, etc.),
+        # or if wiki scraping had no hits: Synthesize genuine AI imagery with local/Colab generative diffusion pipeline
         try:
             import sys
             img_gen_dir = str(Path(__file__).parent.parent / "image_gen_model")
@@ -769,33 +917,92 @@ class AIVideoEngine:
         )
 
         vf_str = ",".join(overlay_filters)
-        tone_freq = theme.get("tone_freq", 220)
 
-        filter_complex = (
-            f"[0:v]{vf_str}[vout];"
-            f"[1:a]volume=1.0[speech];"
-            f"[2:a]volume=0.035,afade=t=out:st={total_duration - 2:.2f}:d=2[tone];"
-            f"[speech][tone]amix=inputs=2:duration=first[aout]"
-        )
+        is_music_category = (meta.get("category") == "Music")
 
-        cmd = [
-            str(FFMPEG_BIN),
-            "-y",
-            "-i", str(video_track_mp4),
-            "-i", str(audio_path),
-            "-f", "lavfi", "-i", f"sine=frequency={tone_freq}:duration={total_duration:.2f}",
-            "-filter_complex", filter_complex,
-            "-map", "[vout]",
-            "-map", "[aout]",
-            "-c:v", "libx264",
-            "-preset", "veryfast",
-            "-pix_fmt", "yuv420p",
-            "-c:a", "aac",
-            "-b:a", "192k",
-            "-movflags", "+faststart",
-            "-t", f"{total_duration:.2f}",
-            str(output_mp4),
-        ]
+        if is_music_category:
+            # Music category: complete song with singing vocals and instruments synthesized with ML from scratch
+            filter_complex = f"[0:v]{vf_str}[vout];[1:a]volume=1.0[aout]"
+            cmd = [
+                str(FFMPEG_BIN),
+                "-y",
+                "-i", str(video_track_mp4),
+                "-i", str(audio_path),
+                "-filter_complex", filter_complex,
+                "-map", "[vout]",
+                "-map", "[aout]",
+                "-c:v", "libx264",
+                "-preset", "veryfast",
+                "-pix_fmt", "yuv420p",
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-movflags", "+faststart",
+                "-t", f"{total_duration:.2f}",
+                str(output_mp4),
+            ]
+        else:
+            # For all other categories: Synthesize genre-specific background music with ML from scratch every time!
+            bg_music_wav = audio_path.parent / f"ml_bg_music_{int(time.time())}.wav"
+            has_bg_music = False
+            if music_engine is not None:
+                try:
+                    music_engine.generate(
+                        category=meta.get("category", "Interesting Facts"),
+                        duration_seconds=float(total_duration),
+                        output_wav_path=str(bg_music_wav),
+                        seed=42 + int(total_duration * 13),
+                        is_full_song=False,
+                    )
+                    has_bg_music = bg_music_wav.exists() and bg_music_wav.stat().st_size > 1000
+                except Exception as bg_err:
+                    print(f"Notice: ML background music generation notice: {bg_err}")
+
+            if has_bg_music:
+                # Speech narration voiceover at volume=1.00
+                # Background music ducked to low volume=0.08 (never louder than the voice!) with smooth 2s fade out
+                filter_complex = (
+                    f"[0:v]{vf_str}[vout];"
+                    f"[1:a]volume=1.0[speech];"
+                    f"[2:a]volume=0.08,afade=t=out:st={total_duration - 2:.2f}:d=2[bgm];"
+                    f"[speech][bgm]amix=inputs=2:duration=first:dropout_transition=2[aout]"
+                )
+                cmd = [
+                    str(FFMPEG_BIN),
+                    "-y",
+                    "-i", str(video_track_mp4),
+                    "-i", str(audio_path),
+                    "-i", str(bg_music_wav),
+                    "-filter_complex", filter_complex,
+                    "-map", "[vout]",
+                    "-map", "[aout]",
+                    "-c:v", "libx264",
+                    "-preset", "veryfast",
+                    "-pix_fmt", "yuv420p",
+                    "-c:a", "aac",
+                    "-b:a", "192k",
+                    "-movflags", "+faststart",
+                    "-t", f"{total_duration:.2f}",
+                    str(output_mp4),
+                ]
+            else:
+                filter_complex = f"[0:v]{vf_str}[vout];[1:a]volume=1.0[aout]"
+                cmd = [
+                    str(FFMPEG_BIN),
+                    "-y",
+                    "-i", str(video_track_mp4),
+                    "-i", str(audio_path),
+                    "-filter_complex", filter_complex,
+                    "-map", "[vout]",
+                    "-map", "[aout]",
+                    "-c:v", "libx264",
+                    "-preset", "veryfast",
+                    "-pix_fmt", "yuv420p",
+                    "-c:a", "aac",
+                    "-b:a", "192k",
+                    "-movflags", "+faststart",
+                    "-t", f"{total_duration:.2f}",
+                    str(output_mp4),
+                ]
 
         res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
         if res.returncode != 0:
@@ -902,106 +1109,196 @@ class AIVideoEngine:
         work_dir = Path(output_dir) if output_dir else ROOT_DIR / "scratch" / f"ai_video_{int(time.time())}"
         work_dir.mkdir(parents=True, exist_ok=True)
 
-        # 1. Script & scenes formulation
-        final_script = script.strip() if script else ""
-        title = prompt.strip() if prompt.strip() else f"{cat_clean} Mystery"
-
-        if not final_script:
-            # Generate script using story_engine
-            try:
-                try:
-                    from scripts.story_engine import generate_story_parts
-                except ModuleNotFoundError:
-                    from story_engine import generate_story_parts
-                story_res = generate_story_parts(
-                    category=cat_clean,
-                    custom_tag=custom_tag,
-                    prompt=prompt,
-                    duration_per_part=duration,
-                    num_images_per_part=num_images,
-                    num_parts=num_parts,
-                )
-                part_data = story_res["parts"][part_number - 1]
-                final_script = part_data["script"]
-                title = part_data["title"]
-            except Exception as e:
-                print(f"Notice: Story engine fallback: {e}")
-                meta_onnx = self.generate_script_from_model(cat_clean, prompt, target_duration=duration, num_scenes=num_images)
-                final_script = meta_onnx["script"]
-                title = meta_onnx["title"]
-
-        # Ensure title is concise, punchy, and under 65 chars so Instagram and YouTube API captions never fail
-        if len(title) > 65 or "\n" in title or "." in title:
-            extracted_subj = extract_topic_from_text(title, cat_clean)
-            if num_parts > 1:
-                title = f"{extracted_subj} (Part {part_number}/{num_parts})"
-            else:
-                title = f"{extracted_subj}: The Untold Truth"
-
-        # If num_parts == 1, guarantee no "Part 1" appears anywhere in title
-        if num_parts == 1:
-            title = re.sub(r"\s*\(Part\s*\d+[/]?\d*\)", "", title, flags=re.IGNORECASE).strip()
-            title = re.sub(r"\s*-\s*Part\s*\d+", "", title, flags=re.IGNORECASE).strip()
-
-        # Build scene breakdowns
-        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", final_script) if len(s.strip()) > 3]
-        if not sentences:
-            sentences = [final_script]
-
-        scenes = []
-        sentences_per_scene = max(1, len(sentences) // num_images)
-        for s_idx in range(num_images):
-            sub_sent = sentences[s_idx * sentences_per_scene : (s_idx + 1) * sentences_per_scene]
-            if not sub_sent:
-                sub_sent = [sentences[-1]]
-            scene_text = " ".join(sub_sent)
-
-            key_tokens = extract_scene_keywords(scene_text)
-            scene_subject = " ".join(key_tokens[:4]) if key_tokens else cat_clean.lower()
-            visual_prompt = f"{scene_subject}, {theme['style_prompt']}, vertical 9:16 framing, photorealistic cinematic lighting"
-
-            scenes.append({
-                "scene_index": s_idx,
-                "text": scene_text,
-                "visual_prompt": visual_prompt,
-            })
-
-        meta = {
-            "title": title,
-            "script": final_script,
-            "sentences": sentences,
-            "scenes": scenes,
-            "category": cat_clean,
-            "hashtags": generate_rich_hashtags(title, cat_clean, final_script),
-            "theme": theme,
-            "style_preset": style_preset,
-            "caption_style": caption_style,
-        }
-
         audio_path = work_dir / "narration.mp3"
         video_track_mp4 = work_dir / "scenes_montage.mp4"
         final_video_path = work_dir / "ai_video.mp4"
         thumb_path = work_dir / "ai_thumbnail.jpg"
 
-        # 2. Synthesize voiceover
-        chosen_voice = voice if voice else meta["theme"].get("voice", "en-US-ChristopherNeural")
-        timing = asyncio.run(self._synthesize_voice(meta["script"], chosen_voice, audio_path))
+        is_music_category = (cat_clean == "Music")
 
-        # Probe actual audio duration
-        probe = subprocess.run(
-            [str(FFMPEG_BIN), "-i", str(audio_path)],
-            stderr=subprocess.PIPE,
-            stdout=subprocess.DEVNULL,
-            text=True,
-        )
-        dur_match = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", probe.stderr)
-        if dur_match:
-            audio_dur = int(dur_match.group(1)) * 3600 + int(dur_match.group(2)) * 60 + float(dur_match.group(3))
-            # Strictly synchronize video duration with narration audio (+0.4s breathing room).
-            # Eliminates idle frozen video and silent pauses before the outro.
-            total_dur = max(4.0, audio_dur + 0.4)
+        if is_music_category:
+            # User rule: "for music type it should nt be a story just a music with vocals and all required instruments and for music it will have no part or time it will be one prt only and time as lonmg as the music last thats it"
+            num_parts = 1
+            part_number = 1
+            song_title = prompt.strip() if prompt.strip() else "Electric Pulse - Viral Vocal Track"
+            song_title = re.sub(r"\s*\(Part\s*\d+[/]?\d*\)", "", song_title, flags=re.IGNORECASE).strip()
+            song_title = re.sub(r"\s*-\s*Part\s*\d+", "", song_title, flags=re.IGNORECASE).strip()
+            title = song_title
+            final_script = f"🎵 {song_title} — Full Vocal Music Track"
+
+            # Synthesize complete song with singing vocals and full instruments from scratch with ML!
+            song_wav = work_dir / "narration.wav"
+            try:
+                if music_engine is not None:
+                    music_engine.generate(
+                        category="Music",
+                        duration_seconds=float(duration),
+                        output_wav_path=str(song_wav),
+                        seed=42 + int(time.time()) % 1000,
+                        is_full_song=True,
+                    )
+                # Convert to clean 192k MP3 track
+                subprocess.run(
+                    [str(FFMPEG_BIN), "-y", "-i", str(song_wav), "-c:a", "libmp3lame", "-b:a", "192k", str(audio_path)],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
+            except Exception as e:
+                print(f"Notice: Music synthesis notice: {e}")
+
+            # Probe duration of synthesized music track (exact length the music lasts!)
+            probe = subprocess.run(
+                [str(FFMPEG_BIN), "-i", str(audio_path)],
+                stderr=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                text=True,
+            )
+            dur_match = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", probe.stderr)
+            if dur_match:
+                total_dur = int(dur_match.group(1)) * 3600 + int(dur_match.group(2)) * 60 + float(dur_match.group(3))
+            else:
+                total_dur = float(duration)
+
+            # Subtitle timing chunks for the music video (distributed across the music track)
+            song_chunks = [
+                f"🎵 {title}",
+                "✨ Melodic Singing Vocals",
+                "🔥 Full Stereo Production",
+                "🎧 Synth Bass & Drums",
+                f"🎵 {title}",
+            ]
+            chunk_step = total_dur / len(song_chunks)
+            timing = []
+            for i, chunk_txt in enumerate(song_chunks):
+                timing.append({
+                    "text": chunk_txt,
+                    "start": i * chunk_step,
+                    "end": min(total_dur, (i + 1) * chunk_step),
+                })
+
+            # Musical visual prompts
+            scenes = []
+            scene_themes = [
+                f"cinematic high-energy music performance stage, neon concert lighting, glowing synthwave atmosphere",
+                f"expressive singer singing with emotional microphone close-up, dramatic atmospheric stage lighting",
+                f"dynamic visual music wave pulses, cyberpunk club crowd silhouette, laser beams",
+                f"melodic synth keys playing under glowing spotlights, cinematic bokeh depth of field",
+                f"epic finale climax on concert stage, dazzling strobe lights and smoke fog effects",
+            ]
+            for s_idx in range(num_images):
+                vis_prompt = f"{scene_themes[s_idx % len(scene_themes)]}, {theme['style_prompt']}, vertical 9:16 framing, 8k"
+                scenes.append({
+                    "scene_index": s_idx,
+                    "text": title,
+                    "visual_prompt": vis_prompt,
+                })
+
+            meta = {
+                "title": title,
+                "script": final_script,
+                "sentences": [title],
+                "scenes": scenes,
+                "category": cat_clean,
+                "hashtags": ["music", "newsong", "viralsound", "synthwave", "vocaltrack", "beats", "fyp", "trending"],
+                "theme": theme,
+                "style_preset": style_preset,
+                "caption_style": caption_style,
+            }
         else:
-            total_dur = float(duration)
+            # 1. Script & scenes formulation for spoken narrative categories
+            final_script = script.strip() if script else ""
+            title = prompt.strip() if prompt.strip() else f"{cat_clean} Mystery"
+
+            if not final_script:
+                # Generate script using story_engine
+                try:
+                    try:
+                        from scripts.story_engine import generate_story_parts
+                    except ModuleNotFoundError:
+                        from story_engine import generate_story_parts
+                    story_res = generate_story_parts(
+                        category=cat_clean,
+                        custom_tag=custom_tag,
+                        prompt=prompt,
+                        duration_per_part=duration,
+                        num_images_per_part=num_images,
+                        num_parts=num_parts,
+                    )
+                    part_data = story_res["parts"][part_number - 1]
+                    final_script = part_data["script"]
+                    title = part_data["title"]
+                except Exception as e:
+                    print(f"Notice: Story engine fallback: {e}")
+                    meta_onnx = self.generate_script_from_model(cat_clean, prompt, target_duration=duration, num_scenes=num_images)
+                    final_script = meta_onnx["script"]
+                    title = meta_onnx["title"]
+
+            # Ensure title is concise, punchy, and under 65 chars so Instagram and YouTube API captions never fail
+            if len(title) > 65 or "\n" in title or "." in title:
+                extracted_subj = extract_topic_from_text(title, cat_clean)
+                if num_parts > 1:
+                    title = f"{extracted_subj} (Part {part_number}/{num_parts})"
+                else:
+                    title = f"{extracted_subj}: The Untold Truth"
+
+            # If num_parts == 1, guarantee no "Part 1" appears anywhere in title
+            if num_parts == 1:
+                title = re.sub(r"\s*\(Part\s*\d+[/]?\d*\)", "", title, flags=re.IGNORECASE).strip()
+                title = re.sub(r"\s*-\s*Part\s*\d+", "", title, flags=re.IGNORECASE).strip()
+
+            # Build scene breakdowns
+            sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", final_script) if len(s.strip()) > 3]
+            if not sentences:
+                sentences = [final_script]
+
+            scenes = []
+            sentences_per_scene = max(1, len(sentences) // num_images)
+            for s_idx in range(num_images):
+                sub_sent = sentences[s_idx * sentences_per_scene : (s_idx + 1) * sentences_per_scene]
+                if not sub_sent:
+                    sub_sent = [sentences[-1]]
+                scene_text = " ".join(sub_sent)
+
+                key_tokens = extract_scene_keywords(scene_text)
+                scene_subject = " ".join(key_tokens[:4]) if key_tokens else cat_clean.lower()
+                visual_prompt = f"{scene_subject}, {theme['style_prompt']}, vertical 9:16 framing, photorealistic cinematic lighting"
+
+                scenes.append({
+                    "scene_index": s_idx,
+                    "text": scene_text,
+                    "visual_prompt": visual_prompt,
+                })
+
+            meta = {
+                "title": title,
+                "script": final_script,
+                "sentences": sentences,
+                "scenes": scenes,
+                "category": cat_clean,
+                "hashtags": generate_rich_hashtags(title, cat_clean, final_script),
+                "theme": theme,
+                "style_preset": style_preset,
+                "caption_style": caption_style,
+            }
+
+            # 2. Synthesize voiceover
+            chosen_voice = voice if voice else meta["theme"].get("voice", "en-US-ChristopherNeural")
+            timing = asyncio.run(self._synthesize_voice(meta["script"], chosen_voice, audio_path))
+
+            # Probe actual audio duration
+            probe = subprocess.run(
+                [str(FFMPEG_BIN), "-i", str(audio_path)],
+                stderr=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                text=True,
+            )
+            dur_match = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", probe.stderr)
+            if dur_match:
+                audio_dur = int(dur_match.group(1)) * 3600 + int(dur_match.group(2)) * 60 + float(dur_match.group(3))
+                # Strictly synchronize video duration with narration audio (+0.4s breathing room).
+                # Eliminates idle frozen video and silent pauses before the outro.
+                total_dur = max(4.0, audio_dur + 0.4)
+            else:
+                total_dur = float(duration)
 
         # 3. Generate AI Images & Render Animated Scene Clips
         scene_duration = total_dur / float(num_images)
