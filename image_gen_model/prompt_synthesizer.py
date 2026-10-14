@@ -109,19 +109,55 @@ def infer_genre(category: str, topic: str, text: str) -> str:
     return "Educational"
 
 
+CHARACTER_STYLE_PRESETS: Dict[str, Dict[str, str]] = {
+    "Realism": {
+        "char_prompt": "highly detailed realistic person with authentic human skin texture and expressive eyes",
+        "lighting": "cinematic film still, 35mm photograph, dramatic natural rim lighting, shallow depth of field",
+        "suffix": "photorealistic 8k UHD, award-winning cinematography, photoreal human character, masterpiece",
+    },
+    "Anime": {
+        "char_prompt": "masterpiece anime character with detailed expressive eyes and dynamic hair",
+        "lighting": "Studio Ghibli aesthetic, vibrant anime lighting, lush hand-painted scenery, atmospheric glow",
+        "suffix": "Makoto Shinkai anime style, crisp line art, beautiful high quality Japanese animation, 8k",
+    },
+    "Disney 3D": {
+        "char_prompt": "adorable Disney Pixar 3D animated character, charming expressive facial features, cute stylized person",
+        "lighting": "subsurface scattering, warm studio 3d lighting, soft cinematic rim light",
+        "suffix": "Pixar 3D animation movie still, Unreal Engine 5 render, Octane render 8k, adorable character",
+    },
+    "Mecha": {
+        "char_prompt": "futuristic cyberpunk hero wearing glowing high-tech mecha exoskeleton armor and cybernetic helmet",
+        "lighting": "neon reflections in the rain, atmospheric cyan and magenta haze, dramatic sci-fi lighting",
+        "suffix": "cinematic sci-fi mecha aesthetic, intricate mechanical armor, sharp focus, 8k",
+    },
+    "Dark Fantasy": {
+        "char_prompt": "epic medieval fantasy warrior knight with intricately engraved steel armor and flowing cape",
+        "lighting": "volumetric dark mist, glowing magical runes, dramatic torchlight and deep shadows",
+        "suffix": "dark fantasy concept art, Elden Ring and Witcher aesthetic, ArtStation trending, 8k masterpiece",
+    },
+    "Retro Comic": {
+        "char_prompt": "vintage graphic novel comic book character, heroic pose, dynamic bold ink illustration",
+        "lighting": "retro pop-art halftone colors, bold black contour lines, dramatic comic noir shadows",
+        "suffix": "classic superhero comic book cover, detailed cross-hatching, vintage comic art, 8k",
+    },
+}
+
+
 def synthesize_scene_prompt(
     script_sentence: str,
     topic: str = "",
     category: str = "Interesting Facts",
     aspect_ratio: str = "9:16",
+    style_preset: Optional[str] = "Realism",
 ) -> str:
     """
     Transforms any story script sentence into a rich, photorealistic,
-    scene-specific prompt that image generators will faithfully render.
+    scene-specific prompt that image generators will faithfully render,
+    centered around expressive characters and the user's chosen art style.
     """
     clean = clean_narration(script_sentence)
     genre = infer_genre(category, topic, script_sentence)
-    style = GENRE_VISUAL_STYLES.get(genre, GENRE_VISUAL_STYLES["Horror"])
+    genre_style = GENRE_VISUAL_STYLES.get(genre, GENRE_VISUAL_STYLES["Horror"])
 
     # Fallback to topic if script sentence was mostly filler
     visual_core = clean if len(clean) > 8 else clean_narration(topic)
@@ -131,12 +167,28 @@ def synthesize_scene_prompt(
     # Aspect framing
     framing = "vertical 9:16 framing, full height composition" if "9:16" in aspect_ratio else "cinematic 16:9 widescreen composition"
 
-    prompt_parts = [
-        visual_core,
-        style["lighting"],
-        style["camera"],
-        framing,
-        style["suffix"],
-    ]
+    matched_preset = None
+    if style_preset:
+        for k, v in CHARACTER_STYLE_PRESETS.items():
+            if k.lower() in style_preset.lower() or style_preset.lower() in k.lower():
+                matched_preset = v
+                break
+
+    if matched_preset:
+        prompt_parts = [
+            f"{matched_preset['char_prompt']} in {visual_core}",
+            matched_preset["lighting"],
+            framing,
+            matched_preset["suffix"],
+        ]
+    else:
+        prompt_parts = [
+            visual_core,
+            genre_style["lighting"],
+            genre_style["camera"],
+            framing,
+            genre_style["suffix"],
+        ]
 
     return ", ".join(p for p in prompt_parts if p)
+

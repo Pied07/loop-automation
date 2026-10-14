@@ -2128,6 +2128,8 @@ export async function generateAiVideoAction(params: {
   platforms?: { youtube?: boolean; facebook?: boolean; instagram?: boolean };
   sceneImages?: string[];
   colabGpuUrl?: string;
+  stylePreset?: string;
+  captionStyle?: string;
 }): Promise<{
   success: boolean;
   cloudMode?: string;
@@ -2152,6 +2154,8 @@ export async function generateAiVideoAction(params: {
     const prompt = params.prompt?.trim() || "";
     const script = params.script?.trim() || "";
     const voice = params.voice?.trim() || "en-US-ChristopherNeural";
+    const stylePreset = params.stylePreset?.trim() || "Realism";
+    const captionStyle = params.captionStyle?.trim() || "viral_yellow";
     const numImages = params.numImages ? Math.max(1, Math.min(5, Number(params.numImages))) : 3;
     const duration = params.duration ? Math.max(10, Math.min(120, Number(params.duration))) : 20;
     const numParts = params.numParts ? Math.max(1, Math.min(5, Number(params.numParts))) : 1;
@@ -2218,6 +2222,8 @@ export async function generateAiVideoAction(params: {
             platforms: JSON.stringify(params.platforms || {}),
             sceneImages: params.sceneImages && params.sceneImages.length > 0 ? JSON.stringify(params.sceneImages) : "",
             colabGpuUrl: params.colabGpuUrl || "",
+            stylePreset,
+            captionStyle,
           },
         }),
       });
@@ -2282,6 +2288,8 @@ export async function generateAiVideoAction(params: {
       sceneImagesArg,
       colabGpuArg,
       `--voice "${voice.replace(/"/g, "")}"`,
+      `--style-preset "${stylePreset.replace(/"/g, "")}"`,
+      `--caption-style "${captionStyle.replace(/"/g, "")}"`,
       `--num-images ${numImages}`,
       `--duration ${duration}`,
       `--num-parts ${numParts}`,

@@ -328,6 +328,7 @@ class AIVideoEngine:
         scene_text: str = "",
         topic: str = "",
         used_urls: set = None,
+        style_preset: str = "Realism",
     ) -> bool:
         """
         Generate high-resolution 1080x1920 AI scene image.
@@ -362,9 +363,10 @@ class AIVideoEngine:
                 aspect_ratio="9:16 (Shorts / Reels)",
                 target_wh=(target_w, target_h),
                 colab_gpu_url=getattr(self, "colab_gpu_url", ""),
+                style_preset=style_preset,
             )
             if scene_ai_img is not None:
-                print(f"🎨 Synthesized genuine AI Scene {scene_idx + 1} with local generative engine for: {(scene_text or prompt)[:50]}...")
+                print(f"🎨 Synthesized genuine AI Scene {scene_idx + 1} ({style_preset}) with local generative engine for: {(scene_text or prompt)[:50]}...")
                 return True
         except Exception as e:
             print(f"Notice: Local diffusion engine fallback notice: {e}")
@@ -709,13 +711,12 @@ class AIVideoEngine:
         accent_color = theme.get("accent", "#e11d48").replace("#", "0x")
         highlight_color = theme.get("text_highlight", "yellow")
 
-        # Clean, cinematic video overlays: Zero watermarks, zero distracting badge banners
-        overlay_filters = [
-            # Soft subtle lower-third vignette for maximum subtitle contrast and readability
-            "drawbox=x=0:y=1220:w=1080:h=700:color=black@0.45:t=fill",
-        ]
+        caption_style = meta.get("caption_style", "viral_yellow") if isinstance(meta, dict) else "viral_yellow"
 
-        # Timed Subtitles (dynamic high-contrast chunks centered in lower third)
+        # Clean, cinematic video overlays: Zero giant screen darkeners, 100% full screen brightness
+        overlay_filters = []
+
+        # Timed Subtitles (dynamic high-contrast chunks centered in lower third, never cut off by width)
         for sent in timing:
             st = sent["start"]
             en = sent["end"]
@@ -724,20 +725,42 @@ class AIVideoEngine:
                 continue
 
             words = raw_text.split()
-            chunk_size = 4
             chunks = []
-            for w_idx in range(0, len(words), chunk_size):
-                chunks.append(" ".join(words[w_idx : w_idx + chunk_size]))
+            cur_words = []
+            cur_len = 0
+            for w in words:
+                would_len = cur_len + (1 if cur_words else 0) + len(w)
+                if cur_words and (len(cur_words) >= 3 or would_len > 22):
+                    chunks.append(" ".join(cur_words))
+                    cur_words = [w]
+                    cur_len = len(w)
+                else:
+                    cur_words.append(w)
+                    cur_len = would_len
+            if cur_words:
+                chunks.append(" ".join(cur_words))
 
             c_dur = (en - st) / len(chunks)
             for c_idx, c_text in enumerate(chunks):
                 c_st = st + c_idx * c_dur
                 c_en = c_st + c_dur
                 clean_line = c_text.replace("'", "\\'").replace(":", "\\:")
+
+                # Selectable caption styles (tight snug text box or clean outline, NEVER covering half the screen)
+                if caption_style == "clean_pill":
+                    style_params = "fontcolor=white:fontsize=48:box=1:boxcolor=black@0.80:boxborderw=14:shadowcolor=black@0.6:shadowx=1:shadowy=1"
+                elif caption_style == "cinematic":
+                    style_params = "fontcolor=white:fontsize=46:box=0:borderw=3:bordercolor=black:shadowcolor=black@0.9:shadowx=2:shadowy=2"
+                elif caption_style == "neon_glow":
+                    style_params = "fontcolor=0x00F5FF:fontsize=48:box=0:borderw=4:bordercolor=black:shadowcolor=black@0.95:shadowx=3:shadowy=3"
+                elif caption_style == "soft_shadow_bar":
+                    style_params = "fontcolor=white:fontsize=48:box=1:boxcolor=black@0.55:boxborderw=18:borderw=2:bordercolor=black"
+                else:  # viral_yellow (default)
+                    style_params = "fontcolor=yellow:fontsize=50:box=0:borderw=4:bordercolor=black:shadowcolor=black@0.9:shadowx=3:shadowy=3"
+
                 overlay_filters.append(
-                    f"drawtext=text='{clean_line}':fontcolor=white:fontsize=52:"
-                    f"x=(w-text_w)/2:y=1420:box=1:boxcolor=black@0.75:boxborderw=10:"
-                    f"shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,{c_st:.2f},{c_en:.2f})'"
+                    f"drawtext=text='{clean_line}':{style_params}:"
+                    f"x=(w-text_w)/2:y=1440:enable='between(t,{c_st:.2f},{c_en:.2f})'"
                 )
 
         # Progress bar
@@ -861,6 +884,8 @@ class AIVideoEngine:
         output_dir: str = "",
         scene_images: str = "",
         colab_gpu_url: str = "",
+        style_preset: str = "Realism",
+        caption_style: str = "viral_yellow",
     ) -> Dict[str, Any]:
         """Main entry point: Generate complete AI animated video with custom scenes, timer, and voice."""
         self.colab_gpu_url = colab_gpu_url.strip() if colab_gpu_url else ""
@@ -949,6 +974,8 @@ class AIVideoEngine:
             "category": cat_clean,
             "hashtags": generate_rich_hashtags(title, cat_clean, final_script),
             "theme": theme,
+            "style_preset": style_preset,
+            "caption_style": caption_style,
         }
 
         audio_path = work_dir / "narration.mp3"
@@ -1018,6 +1045,7 @@ class AIVideoEngine:
                     scene_text=scn["text"],
                     topic=meta["title"],
                     used_urls=used_image_urls,
+                    style_preset=style_preset,
                 )
 
             # Render Ken Burns motion clip
@@ -1100,6 +1128,8 @@ def main():
     parser.add_argument("--output-dir", default="", help="Output directory")
     parser.add_argument("--scene-images", default="", help="Optional pre-generated AI scene images comma-separated")
     parser.add_argument("--colab-gpu-url", default="", help="Optional Google Colab GPU bridge tunnel URL")
+    parser.add_argument("--style-preset", default="Realism", help="Visual art style preset (Realism, Anime, Disney 3D, Mecha, Dark Fantasy, Retro Comic)")
+    parser.add_argument("--caption-style", default="viral_yellow", help="Caption style (viral_yellow, clean_pill, cinematic, neon_glow, soft_shadow_bar)")
 
     args = parser.parse_args()
     engine = AIVideoEngine()
@@ -1116,6 +1146,8 @@ def main():
         output_dir=args.output_dir,
         scene_images=args.scene_images,
         colab_gpu_url=args.colab_gpu_url,
+        style_preset=args.style_preset,
+        caption_style=args.caption_style,
     )
     print(json.dumps(result, indent=2))
 

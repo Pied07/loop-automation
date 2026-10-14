@@ -37,6 +37,8 @@ AUTO_PUBLISH = os.environ.get("AUTO_PUBLISH", "false").strip().lower() in ("true
 PLATFORMS_RAW = os.environ.get("PLATFORMS", "").strip()
 SCENE_IMAGES = os.environ.get("SCENE_IMAGES", "").strip()
 COLAB_GPU_URL = os.environ.get("COLAB_GPU_URL", "").strip()
+STYLE_PRESET = os.environ.get("STYLE_PRESET", "Realism").strip()
+CAPTION_STYLE = os.environ.get("CAPTION_STYLE", "viral_yellow").strip()
 
 WORK_DIR = Path("/tmp/ai_video_work")
 WORK_DIR.mkdir(parents=True, exist_ok=True)
@@ -155,6 +157,8 @@ def run():
             output_dir=str(WORK_DIR),
             scene_images=SCENE_IMAGES,
             colab_gpu_url=COLAB_GPU_URL,
+            style_preset=STYLE_PRESET,
+            caption_style=CAPTION_STYLE,
         )
 
         if not result.get("success") or not result.get("videoPath"):

@@ -99,6 +99,16 @@ on:
         required: false
         default: ''
         type: string
+      stylePreset:
+        description: 'Visual art style preset'
+        required: false
+        default: 'Realism'
+        type: string
+      captionStyle:
+        description: 'Caption style'
+        required: false
+        default: 'viral_yellow'
+        type: string
 
 jobs:
   generate-ai-video:
@@ -161,6 +171,8 @@ jobs:
           USER_EMAIL: ${{ inputs.userEmail }}
           SCENE_IMAGES: ${{ inputs.sceneImages }}
           COLAB_GPU_URL: ${{ inputs.colabGpuUrl }}
+          STYLE_PRESET: ${{ inputs.stylePreset }}
+          CAPTION_STYLE: ${{ inputs.captionStyle }}
           APP_URL: ${{ inputs.appUrl != '' && inputs.appUrl || 'https://the-viral-desk.vercel.app' }}
           CLOUDINARY_CLOUD_NAME: ${{ inputs.cloudinaryCloudName != '' && inputs.cloudinaryCloudName || secrets.CLOUDINARY_CLOUD_NAME }}
           CLOUDINARY_API_KEY: ${{ inputs.cloudinaryApiKey != '' && inputs.cloudinaryApiKey || secrets.CLOUDINARY_API_KEY }}

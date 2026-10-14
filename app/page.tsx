@@ -575,7 +575,8 @@ export default function Home() {
   const [aiCurrentPart, setAiCurrentPart] = useState<number>(1);
   const [isGeneratingScript, setIsGeneratingScript] = useState<boolean>(false);
   const [generatedStoryParts, setGeneratedStoryParts] = useState<any[]>([]);
-  const [selectedSceneStyle, setSelectedSceneStyle] = useState<string>("Cinematic Film");
+  const [selectedSceneStyle, setSelectedSceneStyle] = useState<string>("Realism");
+  const [selectedCaptionStyle, setSelectedCaptionStyle] = useState<string>("viral_yellow");
   const [generatingSceneIdx, setGeneratingSceneIdx] = useState<number | null>(null);
   const [isGeneratingAllScenes, setIsGeneratingAllScenes] = useState<boolean>(false);
   const [colabGpuUrl, setColabGpuUrl] = useState<string>("");
@@ -1140,6 +1141,9 @@ export default function Home() {
       "en-US-ChristopherNeural": "/voice_sample_christopher.mp3",
       "en-US-JennyNeural": "/voice_sample_jenny.mp3",
       "en-US-GuyNeural": "/voice_sample_guy.mp3",
+      "en-US-AriaNeural": "/voice_sample_aria.mp3",
+      "en-US-BrianNeural": "/voice_sample_brian.mp3",
+      "en-US-EmmaNeural": "/voice_sample_emma.mp3",
     };
 
     const src = soundMap[voiceId] || "/voice_sample_christopher.mp3";
@@ -1435,6 +1439,8 @@ export default function Home() {
               userId: auth?.currentUser?.uid || "creator",
               userEmail: auth?.currentUser?.email || "",
               colabGpuUrl: colabGpuUrl.trim(),
+              stylePreset: selectedSceneStyle,
+              captionStyle: selectedCaptionStyle,
             }),
           });
           clearInterval(partTimer);
@@ -2442,48 +2448,23 @@ export default function Home() {
                               Authentic 9:16 vertical AI scenes generated directly on your PC. No third-party API keys required.
                             </p>
                           </div>
+                        </div>
 
-                          {/* Controls: Style selector & Generate All button */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>Style:</label>
-                              <select
-                                value={selectedSceneStyle}
-                                onChange={(e) => setSelectedSceneStyle(e.target.value)}
-                                style={{
-                                  padding: '4px 8px',
-                                  borderRadius: '6px',
-                                  background: '#161922',
-                                  border: '1px solid #334155',
-                                  color: '#e2e8f0',
-                                  fontSize: '11px',
-                                  fontWeight: 600,
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                {[
-                                  "Cinematic Film",
-                                  "Epic Fantasy",
-                                  "Sci-Fi Cyberpunk",
-                                  "Dark Mystery",
-                                  "Historical Epic",
-                                  "Anime / Storybook",
-                                  "Photorealistic Nature",
-                                ].map((st) => (
-                                  <option key={st} value={st}>
-                                    {st}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
+                        {/* Visual Character & Art Style Cards (Person in each style) */}
+                        <div style={{ marginTop: '14px', marginBottom: '14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                            <label style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span>🎨</span> Visual Character & Art Style:
+                              <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 400 }}>(Each scene centers on authentic human / character features)</span>
+                            </label>
 
                             <button
                               type="button"
                               onClick={handleGenerateAllScenes}
                               disabled={isGeneratingAllScenes || generatingSceneIdx !== null}
                               style={{
-                                padding: '6px 12px',
-                                borderRadius: '6px',
+                                padding: '6px 14px',
+                                borderRadius: '8px',
                                 border: '1px solid #a855f7',
                                 background: isGeneratingAllScenes
                                   ? '#581c87'
@@ -2495,7 +2476,7 @@ export default function Home() {
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '6px',
-                                boxShadow: '0 2px 8px rgba(168,85,247,0.3)',
+                                boxShadow: '0 2px 10px rgba(168,85,247,0.35)',
                               }}
                             >
                               {isGeneratingAllScenes ? (
@@ -2505,6 +2486,163 @@ export default function Home() {
                               )}
                               {isGeneratingAllScenes ? "Synthesizing All Scenes..." : "🎨 Synthesize All Scene Visuals"}
                             </button>
+                          </div>
+
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(auto-fit, minmax(165px, 1fr))',
+                              gap: '10px',
+                            }}
+                          >
+                            {[
+                              {
+                                id: "Realism",
+                                name: "Realism",
+                                character: "Photoreal Human",
+                                emoji: "🧔",
+                                badge: "8K Photoreal",
+                                desc: "Cinematic human portrait, lifelike skin & eyes, 35mm lens.",
+                                accent: "#f97316",
+                                bg: "rgba(249, 115, 22, 0.08)",
+                              },
+                              {
+                                id: "Anime",
+                                name: "Anime",
+                                character: "Anime Hero",
+                                emoji: "🌸",
+                                badge: "Ghibli / Shinkai",
+                                desc: "Expressive Japanese anime features, rich glow, crisp lines.",
+                                accent: "#ec4899",
+                                bg: "rgba(236, 72, 153, 0.08)",
+                              },
+                              {
+                                id: "Disney 3D",
+                                name: "Disney 3D",
+                                character: "Pixar 3D Person",
+                                emoji: "✨",
+                                badge: "Pixar 3D",
+                                desc: "Charming animated face, warm 3D studio subsurface glow.",
+                                accent: "#a855f7",
+                                bg: "rgba(168, 85, 247, 0.08)",
+                              },
+                              {
+                                id: "Mecha",
+                                name: "Mecha",
+                                character: "Cyber Warrior",
+                                emoji: "🤖",
+                                badge: "Sci-Fi Cyborg",
+                                desc: "Glowing exoskeleton armor, cyber helmet, neon reflections.",
+                                accent: "#06b6d4",
+                                bg: "rgba(6, 182, 212, 0.08)",
+                              },
+                              {
+                                id: "Dark Fantasy",
+                                name: "Dark Fantasy",
+                                character: "Armored Knight",
+                                emoji: "⚔️",
+                                badge: "Elden / Witcher",
+                                desc: "Steel plate armor, mystical runes, atmospheric mist.",
+                                accent: "#ef4444",
+                                bg: "rgba(239, 68, 68, 0.08)",
+                              },
+                              {
+                                id: "Retro Comic",
+                                name: "Retro Comic",
+                                character: "Comic Superhero",
+                                emoji: "💥",
+                                badge: "Pop-Art Ink",
+                                desc: "Bold ink contours, pop-art halftone dots, vintage cover.",
+                                accent: "#eab308",
+                                bg: "rgba(234, 179, 8, 0.08)",
+                              },
+                            ].map((styleCard) => {
+                              const isSelected = selectedSceneStyle.toLowerCase() === styleCard.id.toLowerCase();
+                              return (
+                                <div
+                                  key={styleCard.id}
+                                  onClick={() => setSelectedSceneStyle(styleCard.id)}
+                                  style={{
+                                    background: isSelected ? styleCard.bg : '#141722',
+                                    border: `1.5px solid ${isSelected ? styleCard.accent : '#25293a'}`,
+                                    borderRadius: '10px',
+                                    padding: '10px 12px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '6px',
+                                    transition: 'all 0.2s ease',
+                                    boxShadow: isSelected ? `0 0 14px ${styleCard.accent}33` : 'none',
+                                    position: 'relative',
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <div
+                                        style={{
+                                          width: '32px',
+                                          height: '32px',
+                                          borderRadius: '8px',
+                                          background: isSelected ? `${styleCard.accent}22` : '#1e2230',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          fontSize: '18px',
+                                          border: `1px solid ${isSelected ? styleCard.accent : '#33384c'}`,
+                                        }}
+                                      >
+                                        {styleCard.emoji}
+                                      </div>
+                                      <div>
+                                        <div style={{ fontSize: '13px', fontWeight: 700, color: isSelected ? '#ffffff' : '#e2e8f0' }}>
+                                          {styleCard.name}
+                                        </div>
+                                        <div style={{ fontSize: '10px', color: styleCard.accent, fontWeight: 600 }}>
+                                          {styleCard.character}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    {isSelected && (
+                                      <div
+                                        style={{
+                                          width: '18px',
+                                          height: '18px',
+                                          borderRadius: '50%',
+                                          background: styleCard.accent,
+                                          color: '#000',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          fontSize: '10px',
+                                          fontWeight: 800,
+                                        }}
+                                      >
+                                        ✓
+                                      </div>
+                                    )}
+                                  </div>
+                                  <p style={{ fontSize: '10px', color: '#94a3b8', margin: '2px 0 0', lineHeight: '1.3' }}>
+                                    {styleCard.desc}
+                                  </p>
+                                  <div style={{ marginTop: 'auto', paddingTop: '4px' }}>
+                                    <span
+                                      style={{
+                                        fontSize: '9px',
+                                        fontWeight: 700,
+                                        color: isSelected ? '#ffffff' : '#64748b',
+                                        background: isSelected ? `${styleCard.accent}33` : '#181b26',
+                                        padding: '2px 6px',
+                                        borderRadius: '4px',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.04em',
+                                      }}
+                                    >
+                                      {styleCard.badge}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
 
@@ -2755,65 +2893,350 @@ export default function Home() {
                     );
                   })()}
 
-                  {/* AI Narrator Selection with Sample Voice Audio Preview */}
-                  <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#9ca3af' }}>AI Narrator Voice:</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  {/* AI Narrator Selection with 6 Person Cards */}
+                  <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>🎙️</span> AI Narrator Voice (6 Person Personas):
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#38bdf8', fontWeight: 500 }}>
+                        Click speaker icon to listen to 100% matched sample
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+                        gap: '10px',
+                      }}
+                    >
                       {[
-                        { id: "en-US-ChristopherNeural", label: "Christopher", desc: "Cinematic Deep" },
-                        { id: "en-US-JennyNeural", label: "Jenny", desc: "Warm Storyteller" },
-                        { id: "en-US-GuyNeural", label: "Guy", desc: "Energetic Viral" },
+                        {
+                          id: "en-US-ChristopherNeural",
+                          name: "Christopher",
+                          avatar: "🧔",
+                          role: "Deep Cinematic Male",
+                          accent: "US English",
+                          badge: "Viral Movie Trailer",
+                          accentColor: "#38bdf8",
+                        },
+                        {
+                          id: "en-US-JennyNeural",
+                          name: "Jenny",
+                          avatar: "👩",
+                          role: "Warm Storyteller Female",
+                          accent: "US English",
+                          badge: "Top Conversational",
+                          accentColor: "#ec4899",
+                        },
+                        {
+                          id: "en-US-GuyNeural",
+                          name: "Guy",
+                          avatar: "⚡",
+                          role: "High-Energy Viral Male",
+                          accent: "US English",
+                          badge: "Shorts & Reels",
+                          accentColor: "#eab308",
+                        },
+                        {
+                          id: "en-US-AriaNeural",
+                          name: "Aria",
+                          avatar: "🔬",
+                          role: "Documentary Female",
+                          accent: "US English",
+                          badge: "Nature & Science",
+                          accentColor: "#10b981",
+                        },
+                        {
+                          id: "en-US-BrianNeural",
+                          name: "Brian",
+                          avatar: "🎩",
+                          role: "British Narrator Male",
+                          accent: "UK English",
+                          badge: "Classic Mystery",
+                          accentColor: "#8b5cf6",
+                        },
+                        {
+                          id: "en-US-EmmaNeural",
+                          name: "Emma",
+                          avatar: "✨",
+                          role: "Youth & Expressive Female",
+                          accent: "UK English",
+                          badge: "Fantasy & Upbeat",
+                          accentColor: "#f43f5e",
+                        },
                       ].map((v) => {
                         const isSelected = aiVoice === v.id;
                         const isPlaying = playingVoiceId === v.id;
                         return (
                           <div
                             key={v.id}
+                            onClick={() => setAiVoice(v.id)}
                             style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              background: isSelected ? 'rgba(14,165,233,0.18)' : '#161922',
-                              border: `1px solid ${isSelected ? '#38bdf8' : '#272a38'}`,
-                              borderRadius: '8px',
-                              padding: '4px 8px',
+                              background: isSelected ? 'rgba(56, 189, 248, 0.10)' : '#141722',
+                              border: `1.5px solid ${isSelected ? v.accentColor : '#25293a'}`,
+                              borderRadius: '10px',
+                              padding: '10px 12px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
                               gap: '6px',
+                              transition: 'all 0.2s ease',
+                              boxShadow: isSelected ? `0 0 14px ${v.accentColor}33` : 'none',
+                              position: 'relative',
                             }}
                           >
-                            <button
-                              type="button"
-                              onClick={() => setAiVoice(v.id)}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div
+                                  style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '8px',
+                                    background: isSelected ? `${v.accentColor}25` : '#1e2230',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '18px',
+                                    border: `1px solid ${isSelected ? v.accentColor : '#33384c'}`,
+                                  }}
+                                >
+                                  {v.avatar}
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '13px', fontWeight: 700, color: isSelected ? '#ffffff' : '#e2e8f0' }}>
+                                    {v.name}
+                                  </div>
+                                  <div style={{ fontSize: '10px', color: '#94a3b8' }}>
+                                    {v.accent}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                title={isPlaying ? "Stop sample voice" : "Listen to sample voice"}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  playSampleVoice(v.id);
+                                }}
+                                style={{
+                                  background: isPlaying ? v.accentColor : '#232733',
+                                  border: 'none',
+                                  color: isPlaying ? '#000' : v.accentColor,
+                                  borderRadius: '50%',
+                                  width: '28px',
+                                  height: '28px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s',
+                                  boxShadow: isPlaying ? `0 0 10px ${v.accentColor}` : 'none',
+                                }}
+                              >
+                                {isPlaying ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                              </button>
+                            </div>
+
+                            <div style={{ fontSize: '11px', color: v.accentColor, fontWeight: 600 }}>
+                              {v.role}
+                            </div>
+
+                            <div style={{ marginTop: 'auto', paddingTop: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <span
+                                style={{
+                                  fontSize: '9px',
+                                  fontWeight: 700,
+                                  color: isSelected ? '#ffffff' : '#64748b',
+                                  background: isSelected ? `${v.accentColor}33` : '#181b26',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.04em',
+                                }}
+                              >
+                                {v.badge}
+                              </span>
+                              {isSelected && (
+                                <span style={{ fontSize: '10px', color: v.accentColor, fontWeight: 800 }}>
+                                  ✓ Selected
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Caption Style Selector Cards */}
+                  <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>💬</span> Caption Subtitle Style:
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#22c55e', fontWeight: 500 }}>
+                        Auto-wrapped • Zero screen shadow • Never cut off
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+                        gap: '10px',
+                      }}
+                    >
+                      {[
+                        {
+                          id: "viral_yellow",
+                          name: "Viral Yellow",
+                          previewText: "VIRAL HOOK",
+                          textColor: "#eab308",
+                          textStroke: "2px #000000",
+                          boxBg: "transparent",
+                          badge: "Zero Shadow",
+                          desc: "Bold yellow text with black outline. No background box.",
+                          accent: "#eab308",
+                        },
+                        {
+                          id: "clean_pill",
+                          name: "Clean Pill",
+                          previewText: "CLEAN PILL",
+                          textColor: "#ffffff",
+                          textStroke: "none",
+                          boxBg: "rgba(0,0,0,0.85)",
+                          badge: "Snug Text Pill",
+                          desc: "Crisp white text in a snug rounded pill covering only words.",
+                          accent: "#38bdf8",
+                        },
+                        {
+                          id: "cinematic",
+                          name: "Cinematic",
+                          previewText: "CINEMATIC",
+                          textColor: "#f1f5f9",
+                          textStroke: "1px #000000",
+                          boxBg: "transparent",
+                          badge: "Zero Box",
+                          desc: "Subtle film subtitle with soft drop shadow. Zero box.",
+                          accent: "#e2e8f0",
+                        },
+                        {
+                          id: "neon_glow",
+                          name: "Neon Glow",
+                          previewText: "NEON CYBORG",
+                          textColor: "#00f5ff",
+                          textStroke: "2px #000000",
+                          boxBg: "transparent",
+                          badge: "Cyber Cyan",
+                          desc: "Glowing cyan text with deep contrast border.",
+                          accent: "#00f5ff",
+                        },
+                        {
+                          id: "soft_shadow_bar",
+                          name: "Soft Text Bar",
+                          previewText: "SUBTLE BAR",
+                          textColor: "#ffffff",
+                          textStroke: "none",
+                          boxBg: "rgba(0,0,0,0.55)",
+                          badge: "Text Backing",
+                          desc: "Translucent soft bar hugging only the caption line.",
+                          accent: "#a855f7",
+                        },
+                      ].map((cStyle) => {
+                        const isSelected = selectedCaptionStyle === cStyle.id;
+                        return (
+                          <div
+                            key={cStyle.id}
+                            onClick={() => setSelectedCaptionStyle(cStyle.id)}
+                            style={{
+                              background: isSelected ? 'rgba(56, 189, 248, 0.08)' : '#141722',
+                              border: `1.5px solid ${isSelected ? cStyle.accent : '#25293a'}`,
+                              borderRadius: '10px',
+                              padding: '10px 12px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px',
+                              transition: 'all 0.2s ease',
+                              boxShadow: isSelected ? `0 0 14px ${cStyle.accent}33` : 'none',
+                              position: 'relative',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: isSelected ? '#ffffff' : '#e2e8f0' }}>
+                                {cStyle.name}
+                              </div>
+                              {isSelected && (
+                                <div
+                                  style={{
+                                    width: '18px',
+                                    height: '18px',
+                                    borderRadius: '50%',
+                                    background: cStyle.accent,
+                                    color: '#000',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '10px',
+                                    fontWeight: 800,
+                                  }}
+                                >
+                                  ✓
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Caption Visual Mini Preview */}
+                            <div
                               style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: isSelected ? '#38bdf8' : '#e2e8f0',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                padding: '2px 4px',
-                              }}
-                            >
-                              🎙️ {v.label} <span style={{ opacity: 0.65, fontWeight: 400, fontSize: '11px' }}>({v.desc})</span>
-                            </button>
-                            <button
-                              type="button"
-                              title={isPlaying ? "Stop sample voice" : "Listen to sample voice"}
-                              onClick={() => playSampleVoice(v.id)}
-                              style={{
-                                background: isPlaying ? '#38bdf8' : '#232733',
-                                border: 'none',
-                                color: isPlaying ? '#000' : '#38bdf8',
-                                borderRadius: '50%',
-                                width: '26px',
-                                height: '26px',
+                                height: '38px',
+                                background: '#0a0c12',
+                                borderRadius: '6px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
+                                border: '1px solid #1a1e2b',
                               }}
                             >
-                              {isPlaying ? <VolumeX size={13} /> : <Volume2 size={13} />}
-                            </button>
+                              <span
+                                style={{
+                                  fontSize: '12px',
+                                  fontWeight: 800,
+                                  color: cStyle.textColor,
+                                  textShadow: cStyle.textStroke !== 'none' ? '0 1px 2px #000, 0 0 1px #000' : 'none',
+                                  background: cStyle.boxBg,
+                                  padding: cStyle.boxBg !== 'transparent' ? '3px 8px' : '0',
+                                  borderRadius: '4px',
+                                  letterSpacing: '0.04em',
+                                }}
+                              >
+                                {cStyle.previewText}
+                              </span>
+                            </div>
+
+                            <p style={{ fontSize: '10px', color: '#94a3b8', margin: '2px 0 0', lineHeight: '1.3' }}>
+                              {cStyle.desc}
+                            </p>
+
+                            <div style={{ marginTop: 'auto', paddingTop: '4px' }}>
+                              <span
+                                style={{
+                                  fontSize: '9px',
+                                  fontWeight: 700,
+                                  color: isSelected ? '#ffffff' : '#64748b',
+                                  background: isSelected ? `${cStyle.accent}33` : '#181b26',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.04em',
+                                }}
+                              >
+                                {cStyle.badge}
+                              </span>
+                            </div>
                           </div>
                         );
                       })}

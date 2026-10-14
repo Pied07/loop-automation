@@ -22,6 +22,8 @@ export async function POST(req: NextRequest) {
     const platforms = body.platforms || { youtube: false, facebook: false, instagram: false };
     const sceneImages = Array.isArray(body.sceneImages) ? body.sceneImages : [];
     const colabGpuUrl = typeof body.colabGpuUrl === "string" ? body.colabGpuUrl.trim() : "";
+    const stylePreset = typeof body.stylePreset === "string" ? body.stylePreset.trim() : "Realism";
+    const captionStyle = typeof body.captionStyle === "string" ? body.captionStyle.trim() : "viral_yellow";
 
     const result = await generateAiVideoAction({
       category,
@@ -39,6 +41,8 @@ export async function POST(req: NextRequest) {
       platforms,
       sceneImages,
       colabGpuUrl,
+      stylePreset,
+      captionStyle,
     });
 
     return NextResponse.json(result);

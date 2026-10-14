@@ -331,7 +331,7 @@ class StorySceneEngine:
     def generate(
         self,
         prompt: str,
-        style_preset: str = "Cinematic Film",
+        style_preset: str = "Realism",
         aspect_ratio: str = "9:16 (Shorts / Reels)",
         seed: Optional[int] = None,
         output_path: Optional[str] = None,
@@ -352,6 +352,7 @@ class StorySceneEngine:
             topic=topic,
             category=category,
             aspect_ratio="9:16" if h > w else "16:9",
+            style_preset=style_preset,
         )
 
         print(f"\n[GENERATE] Story Script: \"{prompt[:60]}...\"")
@@ -431,6 +432,7 @@ def generate_scene_for_script(
     aspect_ratio: str = "9:16 (Shorts / Reels)",
     target_wh: Optional[Tuple[int, int]] = (1080, 1920),
     colab_gpu_url: Optional[str] = None,
+    style_preset: str = "Realism",
 ) -> Optional[Image.Image]:
     """
     Convenience bridge for video engines to generate a scene image directly from script text.
@@ -441,6 +443,7 @@ def generate_scene_for_script(
         prompt=scene_text or topic,
         category=category,
         topic=topic,
+        style_preset=style_preset,
         aspect_ratio=aspect_ratio,
         output_path=output_path,
         target_resolution=target_wh,
