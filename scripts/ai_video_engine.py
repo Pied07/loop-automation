@@ -558,11 +558,37 @@ class AIVideoEngine:
 
     async def _synthesize_voice(self, script: str, voice: str, output_audio: Path) -> List[Dict[str, Any]]:
         """
-        Synthesize neural voiceover:
-        Priority 1: 100% Local Offline ONNX Neural Voice Model (Lifetime free, zero rate-limits, zero network)
-        Priority 2: edge-tts / gTTS fail-safe fallbacks
+        Synthesize authentic, human-grade neural voiceover matching the website samples:
+        Priority 1: High-Definition Microsoft Neural TTS (Christopher, Jenny, Guy, etc.) - 100% exact match to audio preview
+        Priority 2: Offline Local ONNX Neural Model (fail-safe)
+        Priority 3: Google TTS (gTTS fail-safe)
         """
-        # 1. Primary: Local ONNX Neural Voice Engine (Zero network, lifetime free)
+        chosen_voice = voice if voice else "en-US-ChristopherNeural"
+        sentences_timing = []
+
+        # 1. Primary: High-Definition Neural Voice (Matches website sample 1:1)
+        try:
+            import edge_tts
+            communicate = edge_tts.Communicate(script, chosen_voice)
+            with open(output_audio, "wb") as f:
+                async for chunk in communicate.stream():
+                    if chunk["type"] == "audio":
+                        f.write(chunk["data"])
+                    elif chunk["type"] == "SentenceBoundary":
+                        start_sec = chunk["offset"] / 10_000_000.0
+                        dur_sec = chunk["duration"] / 10_000_000.0
+                        sentences_timing.append({
+                            "text": chunk["text"],
+                            "start": start_sec,
+                            "end": start_sec + dur_sec,
+                        })
+            if output_audio.exists() and output_audio.stat().st_size > 1000:
+                print(f"🎙️ Generated high-fidelity neural voiceover ({chosen_voice}): {output_audio.stat().st_size} bytes")
+                return sentences_timing
+        except Exception as e:
+            print(f"Notice: edge-tts neural voiceover notice ({e}), attempting offline local neural voice...")
+
+        # 2. Secondary Fail-Safe: Local ONNX Neural Voice Engine (offline)
         try:
             from scripts.local_neural_tts import LocalNeuralTTS
             timings = LocalNeuralTTS.synthesize(script, output_audio)
@@ -578,27 +604,6 @@ class AIVideoEngine:
                     return timings
             except Exception as onnx_err2:
                 print(f"Notice: Local ONNX Neural voice notice ({onnx_err2}), attempting secondary engines...")
-
-        sentences_timing = []
-        try:
-            import edge_tts
-            communicate = edge_tts.Communicate(script, voice)
-            with open(output_audio, "wb") as f:
-                async for chunk in communicate.stream():
-                    if chunk["type"] == "audio":
-                        f.write(chunk["data"])
-                    elif chunk["type"] == "SentenceBoundary":
-                        start_sec = chunk["offset"] / 10_000_000.0
-                        dur_sec = chunk["duration"] / 10_000_000.0
-                        sentences_timing.append({
-                            "text": chunk["text"],
-                            "start": start_sec,
-                            "end": start_sec + dur_sec,
-                        })
-            if output_audio.exists() and output_audio.stat().st_size > 1000:
-                return sentences_timing
-        except Exception as e:
-            print(f"Notice: edge-tts voiceover notice ({e}), falling back to Google Neural TTS...")
 
         # Fail-safe Fallback: gTTS (Google Text-to-Speech)
         try:
