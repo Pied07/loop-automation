@@ -724,85 +724,131 @@ class AIVideoEngine:
         chosen_voice = voice if voice else "en-US-ChristopherNeural"
         sentences_timing = []
 
+        # Determine reasonable minimum expectations for the speech length
+        clean_words = [w for w in re.split(r"\s+", script.strip()) if w]
+        num_words = len(clean_words)
+        # Average speaking speed is ~2.5 words/sec (150 WPM); allow generous floor of 3.8 words/sec
+        min_expected_sec = max(1.5, num_words / 3.8)
+        # 16-32kbps MP3 is at least 2000 bytes per second
+        min_expected_bytes = max(3000, int(min_expected_sec * 2000))
+
+        def get_file_duration(f_path: Path) -> float:
+            try:
+                probe = subprocess.run(
+                    [str(FFMPEG_BIN), "-i", str(f_path)],
+                    stderr=subprocess.PIPE,
+                    stdout=subprocess.DEVNULL,
+                    text=True,
+                )
+                m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", probe.stderr)
+                if m:
+                    return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
+            except Exception:
+                pass
+            return 0.0
+
+        temp_target = output_audio.parent / f"voice_temp_{int(time.time() * 1000)}.mp3"
+
         # 1. Primary: High-Definition Neural Voice (Matches website sample 1:1)
         try:
             import edge_tts
             communicate = edge_tts.Communicate(script, chosen_voice)
-            with open(output_audio, "wb") as f:
+            curr_timings = []
+            with open(temp_target, "wb") as f:
                 async for chunk in communicate.stream():
                     if chunk["type"] == "audio":
                         f.write(chunk["data"])
                     elif chunk["type"] == "SentenceBoundary":
                         start_sec = chunk["offset"] / 10_000_000.0
                         dur_sec = chunk["duration"] / 10_000_000.0
-                        sentences_timing.append({
+                        curr_timings.append({
                             "text": chunk["text"],
                             "start": start_sec,
                             "end": start_sec + dur_sec,
                         })
-            if output_audio.exists() and output_audio.stat().st_size > 1000:
-                print(f"🎙️ Generated high-fidelity neural voiceover ({chosen_voice}): {output_audio.stat().st_size} bytes")
-                return sentences_timing
+
+            if temp_target.exists():
+                file_sz = temp_target.stat().st_size
+                dur = get_file_duration(temp_target)
+                if file_sz >= min_expected_bytes and dur >= min_expected_sec * 0.7:
+                    if output_audio.exists():
+                        output_audio.unlink()
+                    shutil.move(str(temp_target), str(output_audio))
+                    print(f"🎙️ Generated high-fidelity neural voiceover ({chosen_voice}): {file_sz} bytes ({dur:.2f}s, {num_words} words)")
+                    return curr_timings
+                else:
+                    print(f"Notice: edge-tts returned incomplete audio ({file_sz} bytes, {dur:.2f}s < expected {min_expected_sec:.2f}s). Failing over...")
+                    if temp_target.exists():
+                        temp_target.unlink()
         except Exception as e:
             print(f"Notice: edge-tts neural voiceover notice ({e}), attempting offline local neural voice...")
+            if temp_target.exists():
+                try:
+                    temp_target.unlink()
+                except Exception:
+                    pass
 
         # 2. Secondary Fail-Safe: Local ONNX Neural Voice Engine (offline)
-        try:
-            from scripts.local_neural_tts import LocalNeuralTTS
-            timings = LocalNeuralTTS.synthesize(script, output_audio)
-            if output_audio.exists() and output_audio.stat().st_size > 1000 and timings:
-                print(f"✅ Generated voiceover via Local ONNX Neural Voice Model: {output_audio.stat().st_size} bytes")
-                return timings
-        except Exception as onnx_err:
+        for mod_prefix in ["scripts.", ""]:
             try:
-                from local_neural_tts import LocalNeuralTTS
-                timings = LocalNeuralTTS.synthesize(script, output_audio)
-                if output_audio.exists() and output_audio.stat().st_size > 1000 and timings:
-                    print(f"✅ Generated voiceover via Local ONNX Neural Voice Model: {output_audio.stat().st_size} bytes")
-                    return timings
-            except Exception as onnx_err2:
-                print(f"Notice: Local ONNX Neural voice notice ({onnx_err2}), attempting secondary engines...")
+                mod = __import__(f"{mod_prefix}local_neural_tts", fromlist=["LocalNeuralTTS"])
+                LocalNeuralTTS = getattr(mod, "LocalNeuralTTS")
+                timings = LocalNeuralTTS.synthesize(script, temp_target)
+                if temp_target.exists():
+                    file_sz = temp_target.stat().st_size
+                    dur = get_file_duration(temp_target)
+                    if file_sz >= 2000 and dur >= min_expected_sec * 0.6:
+                        if output_audio.exists():
+                            output_audio.unlink()
+                        shutil.move(str(temp_target), str(output_audio))
+                        print(f"✅ Generated voiceover via Local ONNX Neural Voice Model: {file_sz} bytes ({dur:.2f}s)")
+                        return timings
+                    if temp_target.exists():
+                        temp_target.unlink()
+            except Exception:
+                pass
 
-        # Fail-safe Fallback: gTTS (Google Text-to-Speech)
+        # 3. Third Fail-Safe: Google TTS (gTTS)
         try:
             from gtts import gTTS
             tts = gTTS(text=script, lang="en", tld="com", slow=False)
-            tts.save(str(output_audio))
+            tts.save(str(temp_target))
+            dur = get_file_duration(temp_target)
+            if temp_target.exists() and dur > 0.5:
+                if output_audio.exists():
+                    output_audio.unlink()
+                shutil.move(str(temp_target), str(output_audio))
 
-            # Estimate sentence timings based on duration and sentence length
-            probe = subprocess.run(
-                [str(FFMPEG_BIN), "-i", str(output_audio)],
-                stderr=subprocess.PIPE,
-                stdout=subprocess.DEVNULL,
-                text=True,
-            )
-            dur_match = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", probe.stderr)
-            total_dur = 20.0
-            if dur_match:
-                total_dur = int(dur_match.group(1)) * 3600 + int(dur_match.group(2)) * 60 + float(dur_match.group(3))
-
-            raw_sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+", script) if s.strip()]
-            if not raw_sents:
-                raw_sents = [script]
-            total_chars = sum(len(s) for s in raw_sents)
-            cur = 0.0
-            fallback_timings = []
-            for s in raw_sents:
-                dur = (len(s) / max(1, total_chars)) * total_dur
-                fallback_timings.append({
-                    "text": s,
-                    "start": cur,
-                    "end": cur + dur,
-                })
-                cur += dur
-            return fallback_timings
+                raw_sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+", script) if s.strip()]
+                if not raw_sents:
+                    raw_sents = [script]
+                total_chars = sum(len(s) for s in raw_sents)
+                cur = 0.0
+                fallback_timings = []
+                for s in raw_sents:
+                    s_dur = (len(s) / max(1, total_chars)) * dur
+                    fallback_timings.append({
+                        "text": s,
+                        "start": cur,
+                        "end": cur + s_dur,
+                    })
+                    cur += s_dur
+                print(f"✅ Generated voiceover via gTTS fail-safe: {dur:.2f}s")
+                return fallback_timings
         except Exception as fb_err:
             print(f"Notice: gTTS fallback notice: {fb_err}")
+            if temp_target.exists():
+                try:
+                    temp_target.unlink()
+                except Exception:
+                    pass
 
-        # If both network TTS services fail, generate synthetic silent narration track so rendering succeeds
+        # Fallback if all failed: synthetic silent narration track so rendering succeeds
         if not output_audio.exists() or output_audio.stat().st_size < 100:
+            print(f"⚠️ Warning: All TTS providers failed, generating silence")
+            fallback_dur = max(10.0, float(min_expected_sec))
             subprocess.run(
-                [str(FFMPEG_BIN), "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-t", "20", str(output_audio)],
+                [str(FFMPEG_BIN), "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-t", str(fallback_dur), str(output_audio)],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
@@ -1126,7 +1172,9 @@ class AIVideoEngine:
         final_script = script.strip() if script else ""
         title = prompt.strip() if prompt.strip() else f"{cat_clean} Mystery"
 
-        if not final_script:
+        # If no script provided, or if the user passed only a short phrase/title (under 15 words),
+        # automatically generate a full, engaging multi-sentence script using the story engine!
+        if not final_script or len(final_script.split()) < 15:
             # Generate script using story_engine
             try:
                 try:
@@ -1136,7 +1184,7 @@ class AIVideoEngine:
                 story_res = generate_story_parts(
                     category=cat_clean,
                     custom_tag=custom_tag,
-                    prompt=prompt,
+                    prompt=prompt or final_script,
                     duration_per_part=duration,
                     num_images_per_part=num_images,
                     num_parts=num_parts,
@@ -1146,7 +1194,7 @@ class AIVideoEngine:
                 title = part_data["title"]
             except Exception as e:
                 print(f"Notice: Story engine fallback: {e}")
-                meta_onnx = self.generate_script_from_model(cat_clean, prompt, target_duration=duration, num_scenes=num_images)
+                meta_onnx = self.generate_script_from_model(cat_clean, prompt or final_script, target_duration=duration, num_scenes=num_images)
                 final_script = meta_onnx["script"]
                 title = meta_onnx["title"]
 
@@ -1189,37 +1237,37 @@ class AIVideoEngine:
                 "visual_prompt": visual_prompt,
             })
 
-            meta = {
-                "title": title,
-                "script": final_script,
-                "sentences": sentences,
-                "scenes": scenes,
-                "category": cat_clean,
-                "hashtags": generate_rich_hashtags(title, cat_clean, final_script),
-                "theme": theme,
-                "style_preset": style_preset,
-                "caption_style": caption_style,
-            }
+        meta = {
+            "title": title,
+            "script": final_script,
+            "sentences": sentences,
+            "scenes": scenes,
+            "category": cat_clean,
+            "hashtags": generate_rich_hashtags(title, cat_clean, final_script),
+            "theme": theme,
+            "style_preset": style_preset,
+            "caption_style": caption_style,
+        }
 
-            # 2. Synthesize voiceover
-            chosen_voice = voice if voice else meta["theme"].get("voice", "en-US-ChristopherNeural")
-            timing = asyncio.run(self._synthesize_voice(meta["script"], chosen_voice, audio_path))
+        # 2. Synthesize voiceover (Once for the entire video!)
+        chosen_voice = voice if voice else meta["theme"].get("voice", "en-US-ChristopherNeural")
+        timing = asyncio.run(self._synthesize_voice(meta["script"], chosen_voice, audio_path))
 
-            # Probe actual audio duration
-            probe = subprocess.run(
-                [str(FFMPEG_BIN), "-i", str(audio_path)],
-                stderr=subprocess.PIPE,
-                stdout=subprocess.DEVNULL,
-                text=True,
-            )
-            dur_match = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", probe.stderr)
-            if dur_match:
-                audio_dur = int(dur_match.group(1)) * 3600 + int(dur_match.group(2)) * 60 + float(dur_match.group(3))
-                # Strictly synchronize video duration with narration audio (+0.4s breathing room).
-                # Eliminates idle frozen video and silent pauses before the outro.
-                total_dur = max(4.0, audio_dur + 0.4)
-            else:
-                total_dur = float(duration)
+        # Probe actual audio duration
+        probe = subprocess.run(
+            [str(FFMPEG_BIN), "-i", str(audio_path)],
+            stderr=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            text=True,
+        )
+        dur_match = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", probe.stderr)
+        if dur_match:
+            audio_dur = int(dur_match.group(1)) * 3600 + int(dur_match.group(2)) * 60 + float(dur_match.group(3))
+            # Strictly synchronize video duration with narration audio (+0.4s breathing room).
+            # Eliminates idle frozen video and silent pauses before the outro.
+            total_dur = max(4.0, audio_dur + 0.4)
+        else:
+            total_dur = float(duration)
 
         # 3. Generate AI Images & Render Animated Scene Clips
         scene_duration = total_dur / float(num_images)
