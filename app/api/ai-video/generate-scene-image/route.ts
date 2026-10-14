@@ -11,6 +11,14 @@ export const dynamic = "force-dynamic";
 
 const LOCAL_DAEMON_URL = "http://127.0.0.1:5055";
 
+const COMPREHENSIVE_NEGATIVE_PROMPT =
+  "extra eyes, multi eyes, mutated eyes, duplicate eyes, crossed eyes, fused eyes, deformed iris, deformed pupils, " +
+  "asymmetrical face, deformed face, bad face anatomy, distorted facial features, cloned face, morbid, mutilated, " +
+  "extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, extra fingers, missing fingers, " +
+  "fused fingers, too many fingers, deformed hands, poorly drawn hands, poorly drawn face, mutation, deformed, " +
+  "blurry, bad proportions, gross proportions, unnatural body, text, watermark, signature, username, error, " +
+  "low quality, worst quality, normal quality, jpeg artifacts, overexposed, underexposed, bad lighting";
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -26,6 +34,9 @@ export async function POST(req: NextRequest) {
     const sceneIndex = typeof body.sceneIndex === "number" ? body.sceneIndex : 0;
     const partNumber = typeof body.partNumber === "number" ? body.partNumber : 1;
     const colabGpuUrl = typeof body.colabGpuUrl === "string" ? body.colabGpuUrl.trim() : "";
+    const negativePrompt = typeof body.negativePrompt === "string" && body.negativePrompt.trim()
+      ? body.negativePrompt.trim()
+      : COMPREHENSIVE_NEGATIVE_PROMPT;
 
     // 1. Try Live Colab GPU Bridge or warm local daemon service
     let activeBridgeUrl = colabGpuUrl;
@@ -51,7 +62,14 @@ export async function POST(req: NextRequest) {
           "Content-Type": "application/json",
           "Bypass-Tunnel-Reminder": "true",
         },
-        body: JSON.stringify({ prompt, style, aspect, steps, seed }),
+        body: JSON.stringify({
+          prompt,
+          style,
+          aspect,
+          steps,
+          seed,
+          negative_prompt: negativePrompt,
+        }),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -117,8 +135,9 @@ export async function POST(req: NextRequest) {
     const escapedPrompt = prompt.replace(/"/g, '\\"').replace(/[\r\n]/g, " ");
     const escapedStyle = style.replace(/"/g, '\\"');
     const escapedAspect = aspect.replace(/"/g, '\\"');
+    const escapedNegativePrompt = negativePrompt.replace(/"/g, '\\"');
 
-    const cmd = `"${pyExe}" "${scriptPath}" --prompt "${escapedPrompt}" --style "${escapedStyle}" --aspect "${escapedAspect}" --steps ${steps} --output "${outputPath}" --json ${seed !== undefined ? `--seed ${seed}` : ""}`;
+    const cmd = `"${pyExe}" "${scriptPath}" --prompt "${escapedPrompt}" --style "${escapedStyle}" --aspect "${escapedAspect}" --steps ${steps} --output "${outputPath}" --negative-prompt "${escapedNegativePrompt}" --json ${seed !== undefined ? `--seed ${seed}` : ""}`;
 
     const { stdout, stderr } = await execAsync(cmd, {
       maxBuffer: 10 * 1024 * 1024,

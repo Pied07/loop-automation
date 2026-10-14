@@ -1258,6 +1258,7 @@ export default function Home() {
           sceneIndex,
           partNumber: aiCurrentPart,
           steps: 4,
+          seed: Math.floor(Math.random() * 1000000),
           colabGpuUrl: colabGpuUrl.trim(),
         }),
       });
@@ -1347,6 +1348,7 @@ export default function Home() {
             sceneIndex: scn.scene_index,
             partNumber: aiCurrentPart,
             steps: 4,
+            seed: Math.floor(Math.random() * 1000000),
             colabGpuUrl: colabGpuUrl.trim(),
           }),
         });

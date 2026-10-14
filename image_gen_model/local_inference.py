@@ -39,9 +39,8 @@ def main():
     parser.add_argument(
         "--style",
         type=str,
-        default="Cinematic Film",
-        choices=list(STYLE_PRESETS.keys()),
-        help="Cinematic style preset",
+        default="Realism",
+        help="Cinematic or Character style preset (e.g. Realism, Anime, Disney 3D, Mecha, Dark Fantasy, Retro Comic, Cinematic Film)",
     )
     parser.add_argument(
         "--aspect",
@@ -54,8 +53,10 @@ def main():
     parser.add_argument("--guidance", type=float, default=6.0, help="Guidance scale")
     parser.add_argument("--lora", type=str, default=None, help="Path to trained LoRA .safetensors")
     parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
+    parser.add_argument("--output", type=str, default=None, help="Explicit file path to save output image")
     parser.add_argument("--outdir", type=str, default="./generated_scenes", help="Directory to save output image")
     parser.add_argument("--colab-url", type=str, default=None, help="Google Colab GPU Bridge URL")
+    parser.add_argument("--negative-prompt", type=str, default=None, help="Custom negative prompt to prevent distortion")
     parser.add_argument("--json", action="store_true", help="Output JSON result for API consumption")
 
     args = parser.parse_args()
@@ -78,6 +79,7 @@ def main():
         seed=args.seed,
         output_path=str(out_path),
         colab_gpu_url=args.colab_url,
+        negative_prompt=args.negative_prompt,
     )
     elapsed = time.time() - t0
 

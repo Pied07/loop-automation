@@ -13,6 +13,40 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 MODELS_DIR = Path(__file__).resolve().parent / "models"
 CONFIG_PATH = MODELS_DIR / "ai_video_config.json"
 
+def build_clean_visual_prompt(scene_text: str, fallback_subject: str, style_descriptor: str) -> str:
+    """
+    Synthesizes a clean, high-fidelity visual prompt for a scene image,
+    systematically stripping conversational filler and quantity multipliers (e.g. 'eighteen times', '300 doors')
+    that trigger facial warping or feature duplication in diffusion models,
+    and anchoring anatomical symmetry.
+    """
+    clean = re.sub(
+        r"\b(?:Part\s+\d+|Welcome back to Part\s+\d+|Follow for Part\s+\d+|Watch Part\s+\d+|Save this video|follow for your daily drive|follow for more|subscribe|share this|comment below)[^.]*",
+        "",
+        scene_text,
+        flags=re.IGNORECASE,
+    )
+    clean = re.sub(
+        r"\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|eighteen|twenty|thirty|forty|fifty|hundred|thousand|million)\s+(?:times|doors|days|hours|years|copies|rejections)\b",
+        "",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    clean = re.sub(r'["\'*_#`~]', " ", clean)
+    clean = re.sub(r"[^a-zA-Z0-9\s,.-]", " ", clean)
+    clean = re.sub(r"\s+", " ", clean).strip()
+
+    if len(clean) < 12:
+        clean = fallback_subject
+    else:
+        sentences = [s.strip() for s in re.split(r"[.!?]", clean) if len(s.strip()) > 8]
+        clean = sentences[0] if sentences else clean
+        if len(clean) > 120:
+            clean = clean[:120].rsplit(" ", 1)[0]
+
+    quality_anchors = "symmetrical facial features, natural detailed eyes, sharp focused gaze, anatomically correct"
+    return f"{clean}, {quality_anchors}, {style_descriptor}, vertical 9:16 framing, photorealistic cinematic lighting"
+
 # Curated, verified, real-world mind-blowing origin facts (No news, real history & psychological marketing anomalies)
 UNTOLD_INTERESTING_FACTS = [
     {
@@ -992,12 +1026,13 @@ def generate_story_parts(
 
                 script_text = " ".join(p_sentences)
                 scenes = []
-                clean_kw = re.sub(r"[^a-zA-Z\s]", " ", script_text).lower().split()
-                kw_list = [w for w in clean_kw if len(w) > 3]
                 for s_idx in range(num_images_per_part):
-                    chunk_w = kw_list[s_idx * 4 : (s_idx + 1) * 4]
-                    sub_prompt = " ".join(chunk_w) if chunk_w else subject.lower()
-                    v_prompt = f"{sub_prompt}, historical origin documentary, vintage photorealistic 8k, cinematic lighting, vertical 9:16 framing"
+                    scene_sent = p_sentences[min(s_idx, len(p_sentences) - 1)] if p_sentences else subject
+                    v_prompt = build_clean_visual_prompt(
+                        scene_sent,
+                        subject.lower(),
+                        "historical origin documentary, vintage photorealistic 8k, cinematic lighting"
+                    )
                     scenes.append({
                         "scene_index": s_idx,
                         "text": " ".join(p_sentences[min(s_idx, len(p_sentences) - 1) : min(s_idx + 2, len(p_sentences))]),
@@ -1039,12 +1074,13 @@ def generate_story_parts(
 
                     script_text = " ".join(p_sentences)
                     scenes = []
-                    clean_kw = re.sub(r"[^a-zA-Z\s]", " ", script_text).lower().split()
-                    kw_list = [w for w in clean_kw if len(w) > 3]
                     for s_idx in range(num_images_per_part):
-                        chunk_w = kw_list[s_idx * 4 : (s_idx + 1) * 4]
-                        sub_prompt = " ".join(chunk_w) if chunk_w else subject.lower()
-                        v_prompt = f"{sub_prompt}, historical origin documentary, vintage photorealistic 8k, cinematic lighting, vertical 9:16 framing"
+                        scene_sent = p_sentences[min(s_idx, len(p_sentences) - 1)] if p_sentences else subject
+                        v_prompt = build_clean_visual_prompt(
+                            scene_sent,
+                            subject.lower(),
+                            "historical origin documentary, vintage photorealistic 8k, cinematic lighting"
+                        )
                         scenes.append({
                             "scene_index": s_idx,
                             "text": " ".join(p_sentences[min(s_idx, len(p_sentences) - 1) : min(s_idx + 2, len(p_sentences))]),
@@ -1101,12 +1137,13 @@ def generate_story_parts(
             script_text = " ".join(p_sentences)
 
             scenes = []
-            clean_kw = re.sub(r"[^a-zA-Z\s]", " ", script_text).lower().split()
-            kw_list = [w for w in clean_kw if len(w) > 3]
             for s_idx in range(num_images_per_part):
-                chunk_w = kw_list[s_idx * 4 : (s_idx + 1) * 4]
-                sub_prompt = " ".join(chunk_w) if chunk_w else "mind blowing untold historical mystery"
-                v_prompt = f"{sub_prompt}, mind-blowing real world discovery cosmic scientific phenomenon 8k high detail macro photography, vertical 9:16 framing, cinematic lighting"
+                scene_sent = p_sentences[min(s_idx, len(p_sentences) - 1)] if p_sentences else "mind blowing untold historical mystery"
+                v_prompt = build_clean_visual_prompt(
+                    scene_sent,
+                    "mind blowing untold historical mystery",
+                    "mind-blowing real world discovery cosmic scientific phenomenon 8k high detail macro photography, cinematic lighting"
+                )
                 scenes.append({
                     "scene_index": s_idx,
                     "text": " ".join(p_sentences[min(s_idx, len(p_sentences) - 1) : min(s_idx + 2, len(p_sentences))]),
@@ -1154,12 +1191,13 @@ def generate_story_parts(
                 script_text = " ".join(p_sentences)
 
                 scenes = []
-                clean_kw = re.sub(r"[^a-zA-Z\s]", " ", script_text).lower().split()
-                kw_list = [w for w in clean_kw if len(w) > 3]
                 for s_idx in range(num_images_per_part):
-                    chunk_w = kw_list[s_idx * 4 : (s_idx + 1) * 4]
-                    sub_prompt = " ".join(chunk_w) if chunk_w else "mind blowing untold historical mystery"
-                    v_prompt = f"{sub_prompt}, mind-blowing real world discovery cosmic scientific phenomenon 8k high detail macro photography, vertical 9:16 framing, cinematic lighting"
+                    scene_sent = p_sentences[min(s_idx, len(p_sentences) - 1)] if p_sentences else "mind blowing untold historical mystery"
+                    v_prompt = build_clean_visual_prompt(
+                        scene_sent,
+                        "mind blowing untold historical mystery",
+                        "mind-blowing real world discovery cosmic scientific phenomenon 8k high detail macro photography, cinematic lighting"
+                    )
                     scenes.append({
                         "scene_index": s_idx,
                         "text": " ".join(p_sentences[min(s_idx, len(p_sentences) - 1) : min(s_idx + 2, len(p_sentences))]),
@@ -1246,12 +1284,13 @@ def generate_story_parts(
             script_text = " ".join(p_sentences)
 
             scenes = []
-            clean_kw = re.sub(r"[^a-zA-Z\s]", " ", script_text).lower().split()
-            kw_list = [w for w in clean_kw if len(w) > 3]
             for s_idx in range(num_images_per_part):
-                chunk_w = kw_list[s_idx * 4 : (s_idx + 1) * 4]
-                sub_prompt = " ".join(chunk_w) if chunk_w else f"{chosen_archetype['title'].lower()} determination"
-                v_prompt = f"{sub_prompt}, {v_style}, vertical 9:16 framing, photorealistic cinematic lighting"
+                scene_sent = p_sentences[min(s_idx, len(p_sentences) - 1)] if p_sentences else chosen_archetype["title"]
+                v_prompt = build_clean_visual_prompt(
+                    scene_sent,
+                    f"{chosen_archetype['title'].lower()} determination",
+                    v_style
+                )
                 scenes.append({
                     "scene_index": s_idx,
                     "text": " ".join(p_sentences[min(s_idx, len(p_sentences) - 1) : min(s_idx + 2, len(p_sentences))]),
@@ -1340,12 +1379,13 @@ def generate_story_parts(
         script_text = " ".join(p_sentences)
 
         scenes = []
-        clean_kw = re.sub(r"[^a-zA-Z\s]", " ", script_text).lower().split()
-        kw_list = [w for w in clean_kw if len(w) > 3]
         for s_idx in range(num_images_per_part):
-            chunk_w = kw_list[s_idx * 4 : (s_idx + 1) * 4]
-            sub_prompt = " ".join(chunk_w) if chunk_w else effective_category.lower()
-            v_prompt = f"{sub_prompt}, {v_style}, vertical 9:16 framing, photorealistic cinematic lighting"
+            scene_sent = p_sentences[min(s_idx, len(p_sentences) - 1)] if p_sentences else effective_category
+            v_prompt = build_clean_visual_prompt(
+                scene_sent,
+                effective_category.lower(),
+                v_style
+            )
             scenes.append({
                 "scene_index": s_idx,
                 "text": " ".join(p_sentences[min(s_idx, len(p_sentences) - 1) : min(s_idx + 2, len(p_sentences))]),

@@ -65,6 +65,16 @@ ASPECT_RATIOS = {
     "4:3 (Classic)": (1024, 768),
 }
 
+# Industry standard anti-distortion negative prompt targeting face, eyes, and anatomy mutations
+COMPREHENSIVE_NEGATIVE_PROMPT = (
+    "extra eyes, multi eyes, mutated eyes, duplicate eyes, crossed eyes, fused eyes, deformed iris, deformed pupils, "
+    "asymmetrical face, deformed face, bad face anatomy, distorted facial features, cloned face, morbid, mutilated, "
+    "extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, extra fingers, missing fingers, "
+    "fused fingers, too many fingers, deformed hands, poorly drawn hands, poorly drawn face, mutation, deformed, "
+    "blurry, bad proportions, gross proportions, unnatural body, text, watermark, signature, username, error, "
+    "low quality, worst quality, normal quality, jpeg artifacts, overexposed, underexposed, bad lighting"
+)
+
 
 def find_gpu_bridge_url(explicit_url: Optional[str] = None) -> Optional[str]:
     """Finds active Google Colab GPU bridge tunnel or local daemon endpoint."""
@@ -224,17 +234,20 @@ class StorySceneEngine:
         width: int = 768,
         height: int = 1344,
         steps: int = 20,
-        guidance: float = 7.5,
+        guidance: float = 7.0,
         seed: Optional[int] = None,
+        negative_prompt: Optional[str] = None,
         timeout: int = 60,
     ) -> Optional[Image.Image]:
         """
         Synthesizes photorealistic scene image via Live Google Colab GPU Bridge or local daemon.
         Directly runs custom trained SDXL LoRA on Tesla T4 GPU in 2-3 seconds.
         """
+        eff_neg = negative_prompt or COMPREHENSIVE_NEGATIVE_PROMPT
         endpoint = f"{bridge_url.rstrip('/')}/generate"
         payload = json.dumps({
             "prompt": prompt,
+            "negative_prompt": eff_neg,
             "aspect": "9:16 (Shorts / Reels)" if height > width else "16:9 (YouTube Standard)",
             "width": width,
             "height": height,
@@ -287,6 +300,7 @@ class StorySceneEngine:
         steps: int = 15,
         guidance_scale: float = 7.0,
         seed: Optional[int] = None,
+        negative_prompt: Optional[str] = None,
     ) -> Optional[Image.Image]:
         """Runs local PyTorch diffusion inference (1-Step Fast Turbo on CPU or LoRA on GPU)."""
         self._init_local_pipeline()
@@ -300,17 +314,22 @@ class StorySceneEngine:
         inf_guidance = 0.0 if is_turbo else guidance_scale
         inf_w = 512 if is_turbo else (width // 8) * 8
         inf_h = 512 if is_turbo else (height // 8) * 8
+        eff_neg = negative_prompt or COMPREHENSIVE_NEGATIVE_PROMPT
 
         try:
             with torch.inference_mode():
-                result = self.pipe(
-                    prompt=prompt,
-                    num_inference_steps=inf_steps,
-                    guidance_scale=inf_guidance,
-                    height=inf_h,
-                    width=inf_w,
-                    generator=gen,
-                )
+                pipe_kwargs = {
+                    "prompt": prompt,
+                    "num_inference_steps": inf_steps,
+                    "guidance_scale": inf_guidance,
+                    "height": inf_h,
+                    "width": inf_w,
+                    "generator": gen,
+                }
+                if not is_turbo:
+                    pipe_kwargs["negative_prompt"] = eff_neg
+
+                result = self.pipe(**pipe_kwargs)
                 img = result.images[0]
 
                 # If turbo 512x512, adapt to requested aspect ratio (e.g. 9:16 vertical)
@@ -339,6 +358,7 @@ class StorySceneEngine:
         category: str = "Interesting Facts",
         topic: str = "",
         colab_gpu_url: Optional[str] = None,
+        negative_prompt: Optional[str] = None,
     ) -> Optional[Image.Image]:
         """
         Main entry point for generating authentic scene visuals.
@@ -372,6 +392,7 @@ class StorySceneEngine:
                 width=w,
                 height=h,
                 seed=seed,
+                negative_prompt=negative_prompt,
             )
 
         # Priority 2: Local PyTorch Pipeline (Fast 1-Step SD-Turbo on CPU or SDXL on GPU)
@@ -387,6 +408,7 @@ class StorySceneEngine:
                     steps=15,
                     guidance_scale=7.0,
                     seed=seed,
+                    negative_prompt=negative_prompt,
                 )
 
         # If neither GPU bridge nor local pipeline produced an image, return None

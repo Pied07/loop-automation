@@ -26,6 +26,40 @@ export interface StoryResult {
   source?: string;
 }
 
+/**
+ * Synthesizes a clean, high-fidelity visual prompt for a scene image,
+ * systematically stripping conversational filler and quantity multipliers (e.g. 'eighteen times', '300 doors')
+ * that trigger facial warping or feature duplication in diffusion models,
+ * and anchoring anatomical symmetry.
+ */
+export function buildCleanVisualPrompt(
+  sceneText: string,
+  fallbackSubject: string,
+  styleDescriptor: string
+): string {
+  let clean = sceneText
+    .replace(/\b(?:Part\s+\d+|Welcome back to Part\s+\d+|Follow for Part\s+\d+|Watch Part\s+\d+|Save this video|follow for your daily drive|follow for more|subscribe|share this|comment below)[^.]*/gi, "")
+    // Strip quantity multipliers like 'eighteen times', '300 doors' that confuse cross-attention into duplicating eyes/limbs
+    .replace(/\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|eighteen|twenty|thirty|forty|fifty|hundred|thousand|million)\s+(?:times|doors|days|hours|years|copies|rejections)\b/gi, "")
+    .replace(/["'*_#`~]/g, " ")
+    .replace(/[^a-zA-Z0-9\s,.-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (clean.length < 12) {
+    clean = fallbackSubject;
+  } else {
+    const sentences = clean.split(/[.!?]/).map((s) => s.trim()).filter((s) => s.length > 8);
+    clean = sentences[0] || clean;
+    if (clean.length > 120) {
+      clean = clean.slice(0, 120).replace(/\s+\S*$/, "");
+    }
+  }
+
+  const qualityAnchors = "symmetrical facial features, natural detailed eyes, sharp focused gaze, anatomically correct";
+  return `${clean}, ${qualityAnchors}, ${styleDescriptor}, vertical 9:16 framing, photorealistic cinematic lighting`;
+}
+
 export const UNTOLD_INTERESTING_FACTS = [
   {
     id: "tobacco_marketing",
@@ -1022,14 +1056,17 @@ export async function generateStoryParts(params: {
 
         const scriptText = pSentences.join(" ");
         const scenes: StoryScene[] = [];
-        const cleanKw = scriptText.replace(/[^a-zA-Z\s]/g, " ").toLowerCase().split(/\s+/).filter((w) => w.length > 3);
         for (let sIdx = 0; sIdx < clampedImages; sIdx++) {
-          const chunkW = cleanKw.slice(sIdx * 4, (sIdx + 1) * 4);
-          const subPrompt = chunkW.length > 0 ? chunkW.join(" ") : subject.toLowerCase();
-          const vPrompt = `${subPrompt}, historical origin documentary, vintage photorealistic 8k, cinematic lighting, vertical 9:16 framing`;
+          const sceneSentence = pSentences[Math.min(sIdx, pSentences.length - 1)] || subject;
+          const sceneText = pSentences.slice(Math.min(sIdx, pSentences.length - 1), Math.min(sIdx + 2, pSentences.length)).join(" ");
+          const vPrompt = buildCleanVisualPrompt(
+            sceneSentence,
+            subject.toLowerCase(),
+            "historical origin documentary, vintage photorealistic 8k, cinematic lighting"
+          );
           scenes.push({
             scene_index: sIdx,
-            text: pSentences.slice(Math.min(sIdx, pSentences.length - 1), Math.min(sIdx + 2, pSentences.length)).join(" "),
+            text: sceneText,
             visual_prompt: vPrompt,
           });
         }
@@ -1072,14 +1109,17 @@ export async function generateStoryParts(params: {
 
           const scriptText = pSentences.join(" ");
           const scenes: StoryScene[] = [];
-          const cleanKw = scriptText.replace(/[^a-zA-Z\s]/g, " ").toLowerCase().split(/\s+/).filter((w) => w.length > 3);
           for (let sIdx = 0; sIdx < clampedImages; sIdx++) {
-            const chunkW = cleanKw.slice(sIdx * 4, (sIdx + 1) * 4);
-            const subPrompt = chunkW.length > 0 ? chunkW.join(" ") : subject.toLowerCase();
-            const vPrompt = `${subPrompt}, historical origin documentary, vintage photorealistic 8k, cinematic lighting, vertical 9:16 framing`;
+            const sceneSentence = pSentences[Math.min(sIdx, pSentences.length - 1)] || subject;
+            const sceneText = pSentences.slice(Math.min(sIdx, pSentences.length - 1), Math.min(sIdx + 2, pSentences.length)).join(" ");
+            const vPrompt = buildCleanVisualPrompt(
+              sceneSentence,
+              subject.toLowerCase(),
+              "historical origin documentary, vintage photorealistic 8k, cinematic lighting"
+            );
             scenes.push({
               scene_index: sIdx,
-              text: pSentences.slice(Math.min(sIdx, pSentences.length - 1), Math.min(sIdx + 2, pSentences.length)).join(" "),
+              text: sceneText,
               visual_prompt: vPrompt,
             });
           }
@@ -1133,14 +1173,17 @@ export async function generateStoryParts(params: {
 
       const scriptText = pSentences.join(" ");
       const scenes: StoryScene[] = [];
-      const cleanKw = scriptText.replace(/[^a-zA-Z\s]/g, " ").toLowerCase().split(/\s+/).filter((w) => w.length > 3);
       for (let sIdx = 0; sIdx < clampedImages; sIdx++) {
-        const chunkW = cleanKw.slice(sIdx * 4, (sIdx + 1) * 4);
-        const subPrompt = chunkW.length > 0 ? chunkW.join(" ") : "mind blowing untold historical mystery";
-        const vPrompt = `${subPrompt}, mind-blowing real world discovery cosmic scientific phenomenon 8k high detail macro photography, vertical 9:16 framing, cinematic lighting`;
+        const sceneSentence = pSentences[Math.min(sIdx, pSentences.length - 1)] || "mind blowing untold historical mystery";
+        const sceneText = pSentences.slice(Math.min(sIdx, pSentences.length - 1), Math.min(sIdx + 2, pSentences.length)).join(" ");
+        const vPrompt = buildCleanVisualPrompt(
+          sceneSentence,
+          "mind blowing untold historical mystery",
+          "mind-blowing real world discovery cosmic scientific phenomenon 8k high detail macro photography, cinematic lighting"
+        );
         scenes.push({
           scene_index: sIdx,
-          text: pSentences.slice(Math.min(sIdx, pSentences.length - 1), Math.min(sIdx + 2, pSentences.length)).join(" "),
+          text: sceneText,
           visual_prompt: vPrompt,
         });
       }
@@ -1191,14 +1234,17 @@ export async function generateStoryParts(params: {
 
         const scriptText = pSentences.join(" ");
         const scenes: StoryScene[] = [];
-        const cleanKw = scriptText.replace(/[^a-zA-Z\s]/g, " ").toLowerCase().split(/\s+/).filter((w) => w.length > 3);
         for (let sIdx = 0; sIdx < clampedImages; sIdx++) {
-          const chunkW = cleanKw.slice(sIdx * 4, (sIdx + 1) * 4);
-          const subPrompt = chunkW.length > 0 ? chunkW.join(" ") : "mind blowing untold historical mystery";
-          const vPrompt = `${subPrompt}, mind-blowing real world discovery cosmic scientific phenomenon 8k high detail macro photography, vertical 9:16 framing, cinematic lighting`;
+          const sceneSentence = pSentences[Math.min(sIdx, pSentences.length - 1)] || "mind blowing untold historical mystery";
+          const sceneText = pSentences.slice(Math.min(sIdx, pSentences.length - 1), Math.min(sIdx + 2, pSentences.length)).join(" ");
+          const vPrompt = buildCleanVisualPrompt(
+            sceneSentence,
+            "mind blowing untold historical mystery",
+            "mind-blowing real world discovery cosmic scientific phenomenon 8k high detail macro photography, cinematic lighting"
+          );
           scenes.push({
             scene_index: sIdx,
-            text: pSentences.slice(Math.min(sIdx, pSentences.length - 1), Math.min(sIdx + 2, pSentences.length)).join(" "),
+            text: sceneText,
             visual_prompt: vPrompt,
           });
         }
@@ -1287,14 +1333,17 @@ export async function generateStoryParts(params: {
 
       const scriptText = pSentences.join(" ");
       const scenes: StoryScene[] = [];
-      const cleanKw = scriptText.replace(/[^a-zA-Z\s]/g, " ").toLowerCase().split(/\s+/).filter((w) => w.length > 3);
       for (let sIdx = 0; sIdx < clampedImages; sIdx++) {
-        const chunkW = cleanKw.slice(sIdx * 4, (sIdx + 1) * 4);
-        const subPrompt = chunkW.length > 0 ? chunkW.join(" ") : `${chosenArchetype.title.toLowerCase()} determination`;
-        const vPrompt = `${subPrompt}, ${vStyle}, vertical 9:16 framing, photorealistic cinematic lighting`;
+        const sceneSentence = pSentences[Math.min(sIdx, pSentences.length - 1)] || chosenArchetype.title;
+        const sceneText = pSentences.slice(Math.min(sIdx, pSentences.length - 1), Math.min(sIdx + 2, pSentences.length)).join(" ");
+        const vPrompt = buildCleanVisualPrompt(
+          sceneSentence,
+          `${chosenArchetype.title.toLowerCase()} determination`,
+          vStyle
+        );
         scenes.push({
           scene_index: sIdx,
-          text: pSentences.slice(Math.min(sIdx, pSentences.length - 1), Math.min(sIdx + 2, pSentences.length)).join(" "),
+          text: sceneText,
           visual_prompt: vPrompt,
         });
       }
@@ -1386,14 +1435,17 @@ export async function generateStoryParts(params: {
 
     const scriptText = pSentences.join(" ");
     const scenes: StoryScene[] = [];
-    const cleanKw = scriptText.replace(/[^a-zA-Z\s]/g, " ").toLowerCase().split(/\s+/).filter((w) => w.length > 3);
     for (let sIdx = 0; sIdx < clampedImages; sIdx++) {
-      const chunkW = cleanKw.slice(sIdx * 4, (sIdx + 1) * 4);
-      const subPrompt = chunkW.length > 0 ? chunkW.join(" ") : effectiveCategory.toLowerCase();
-      const vPrompt = `${subPrompt}, ${vStyle}, vertical 9:16 framing, photorealistic cinematic lighting`;
+      const sceneSentence = pSentences[Math.min(sIdx, pSentences.length - 1)] || effectiveCategory;
+      const sceneText = pSentences.slice(Math.min(sIdx, pSentences.length - 1), Math.min(sIdx + 2, pSentences.length)).join(" ");
+      const vPrompt = buildCleanVisualPrompt(
+        sceneSentence,
+        effectiveCategory.toLowerCase(),
+        vStyle
+      );
       scenes.push({
         scene_index: sIdx,
-        text: pSentences.slice(Math.min(sIdx, pSentences.length - 1), Math.min(sIdx + 2, pSentences.length)).join(" "),
+        text: sceneText,
         visual_prompt: vPrompt,
       });
     }

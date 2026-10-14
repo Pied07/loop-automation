@@ -79,10 +79,12 @@ GENRE_VISUAL_STYLES: Dict[str, Dict[str, str]] = {
 
 
 def clean_narration(text: str) -> str:
-    """Removes conversational filler, greetings, and call-to-actions."""
+    """Removes conversational filler, greetings, quantity multipliers, and call-to-actions."""
     clean = text.strip()
     for pat in FILLER_PATTERNS:
         clean = re.sub(pat, "", clean, flags=re.IGNORECASE)
+    # Remove quantity multipliers like 'eighteen times', '300 doors', '5000 times' that confuse diffusion models into duplicating eyes/limbs
+    clean = re.sub(r"\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|eighteen|twenty|thirty|forty|fifty|hundred|thousand|million)\s+(?:times|doors|days|hours|years|copies|rejections)\b", "", clean, flags=re.IGNORECASE)
     # Remove markdown symbols and extra punctuation
     clean = re.sub(r'["\'*_#`~]', "", clean)
     clean = re.sub(r"\s+", " ", clean).strip()
@@ -111,32 +113,32 @@ def infer_genre(category: str, topic: str, text: str) -> str:
 
 CHARACTER_STYLE_PRESETS: Dict[str, Dict[str, str]] = {
     "Realism": {
-        "char_prompt": "highly detailed realistic person with authentic human skin texture and expressive eyes",
+        "char_prompt": "highly detailed realistic person with symmetrical facial features, authentic human skin texture, natural detailed eyes, sharp focused gaze, anatomically correct human face",
         "lighting": "cinematic film still, 35mm photograph, dramatic natural rim lighting, shallow depth of field",
-        "suffix": "photorealistic 8k UHD, award-winning cinematography, photoreal human character, masterpiece",
+        "suffix": "photorealistic 8k UHD, award-winning cinematography, photoreal human character, natural facial symmetry, flawless face anatomy, masterpiece",
     },
     "Anime": {
-        "char_prompt": "masterpiece anime character with detailed expressive eyes and dynamic hair",
+        "char_prompt": "masterpiece anime character with symmetrical detailed expressive eyes, crisp line art, beautiful facial symmetry, dynamic hair",
         "lighting": "Studio Ghibli aesthetic, vibrant anime lighting, lush hand-painted scenery, atmospheric glow",
         "suffix": "Makoto Shinkai anime style, crisp line art, beautiful high quality Japanese animation, 8k",
     },
     "Disney 3D": {
-        "char_prompt": "adorable Disney Pixar 3D animated character, charming expressive facial features, cute stylized person",
+        "char_prompt": "adorable Disney Pixar 3D animated character, charming symmetrical facial features, cute stylized person, natural expressive eyes",
         "lighting": "subsurface scattering, warm studio 3d lighting, soft cinematic rim light",
         "suffix": "Pixar 3D animation movie still, Unreal Engine 5 render, Octane render 8k, adorable character",
     },
     "Mecha": {
-        "char_prompt": "futuristic cyberpunk hero wearing glowing high-tech mecha exoskeleton armor and cybernetic helmet",
+        "char_prompt": "futuristic cyberpunk hero wearing glowing high-tech mecha exoskeleton armor, sharp symmetrical cybernetic helmet",
         "lighting": "neon reflections in the rain, atmospheric cyan and magenta haze, dramatic sci-fi lighting",
         "suffix": "cinematic sci-fi mecha aesthetic, intricate mechanical armor, sharp focus, 8k",
     },
     "Dark Fantasy": {
-        "char_prompt": "epic medieval fantasy warrior knight with intricately engraved steel armor and flowing cape",
+        "char_prompt": "epic medieval fantasy warrior knight with symmetrical facial structure, intricately engraved steel armor and flowing cape",
         "lighting": "volumetric dark mist, glowing magical runes, dramatic torchlight and deep shadows",
         "suffix": "dark fantasy concept art, Elden Ring and Witcher aesthetic, ArtStation trending, 8k masterpiece",
     },
     "Retro Comic": {
-        "char_prompt": "vintage graphic novel comic book character, heroic pose, dynamic bold ink illustration",
+        "char_prompt": "vintage graphic novel comic book character, heroic pose, symmetrical bold ink illustration",
         "lighting": "retro pop-art halftone colors, bold black contour lines, dramatic comic noir shadows",
         "suffix": "classic superhero comic book cover, detailed cross-hatching, vintage comic art, 8k",
     },
@@ -174,9 +176,11 @@ def synthesize_scene_prompt(
                 matched_preset = v
                 break
 
+    quality_anchor = "flawless facial symmetry, perfectly centered natural eyes, detailed iris and pupils, anatomically correct features"
     if matched_preset:
         prompt_parts = [
             f"{matched_preset['char_prompt']} in {visual_core}",
+            quality_anchor,
             matched_preset["lighting"],
             framing,
             matched_preset["suffix"],
@@ -184,6 +188,7 @@ def synthesize_scene_prompt(
     else:
         prompt_parts = [
             visual_core,
+            quality_anchor,
             genre_style["lighting"],
             genre_style["camera"],
             framing,

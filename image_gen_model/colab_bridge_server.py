@@ -18,6 +18,15 @@ from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from PIL import Image
 
+COMPREHENSIVE_NEGATIVE_PROMPT = (
+    "extra eyes, multi eyes, mutated eyes, duplicate eyes, crossed eyes, fused eyes, deformed iris, deformed pupils, "
+    "asymmetrical face, deformed face, bad face anatomy, distorted facial features, cloned face, morbid, mutilated, "
+    "extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, extra fingers, missing fingers, "
+    "fused fingers, too many fingers, deformed hands, poorly drawn hands, poorly drawn face, mutation, deformed, "
+    "blurry, bad proportions, gross proportions, unnatural body, text, watermark, signature, username, error, "
+    "low quality, worst quality, normal quality, jpeg artifacts, overexposed, underexposed, bad lighting"
+)
+
 def start_bridge(pipe=None, port=5055):
     import torch
 
@@ -70,8 +79,9 @@ def start_bridge(pipe=None, port=5055):
             aspect = data.get("aspect", "9:16 (Shorts / Reels)")
             style = data.get("style", "cinematic film still, 35mm photography, dramatic atmospheric lighting, natural depth of field, 8k")
             steps = int(data.get("steps", 20))
-            guidance = float(data.get("guidance", 7.5))
+            guidance = float(data.get("guidance", 7.0))
             seed = data.get("seed", None)
+            negative_prompt = data.get("negative_prompt", "").strip() or COMPREHENSIVE_NEGATIVE_PROMPT
 
             width = int(data.get("width", 768 if "9:16" in aspect else (1344 if "16:9" in aspect else 1024)))
             height = int(data.get("height", 1344 if "9:16" in aspect else (768 if "16:9" in aspect else 1024)))
@@ -82,7 +92,7 @@ def start_bridge(pipe=None, port=5055):
             with torch.inference_mode():
                 result = pipe(
                     prompt=full_prompt,
-                    negative_prompt="blurry, low quality, distorted, extra limbs, bad anatomy, text, watermark, bad lighting",
+                    negative_prompt=negative_prompt,
                     num_inference_steps=steps,
                     guidance_scale=guidance,
                     generator=gen,
