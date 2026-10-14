@@ -4039,7 +4039,6 @@ export default function Home() {
       <div className="video-type-label"><Film size={11} /> {video.isAiVideo ? (video.format || "AI Video") : "Viral"}</div>
       <h3>{video.title}</h3>
       <p style={{ color: video.status === 'failed' ? '#d32f2f' : 'inherit' }}>{video.description}</p>
-      {video.status !== 'failed' && <div className="hashtag-row">{Array.from(new Set(video.hashtags || [])).map((tag, idx) => <span key={`${tag}-${idx}`}>#{tag.replace(/^#/, '')}</span>)}</div>}
       <div className="video-card-actions">
         <div className="card-platform-links">
           {(video.sourceUrl || video.sourceLink) && (
