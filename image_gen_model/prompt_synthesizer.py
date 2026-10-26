@@ -34,10 +34,10 @@ GENRE_VISUAL_STYLES: Dict[str, Dict[str, str]] = {
         "suffix": "Hollywood blockbuster action cinematography, high-octane scene, dynamic motion, debris and sparks, 8k octane render",
     },
     "Horror": {
-        "lighting": "dim flickering amber candlelight, volumetric ominous mist, cold moonlight filtering through cracks, dramatic deep shadows",
-        "camera": "creepy Dutch angle, wide atmospheric shot, 35mm horror film still",
-        "keywords": ["abandoned", "mist", "shadows", "darkness", "decay", "silence", "lantern", "haunted"],
-        "suffix": "masterpiece, suspense thriller cinematography, hyper-detailed, photorealistic, 8k",
+        "lighting": "chilling moonlight piercing cold shadows, volumetric supernatural mist, dim flickering amber candlelight casting long terrifying silhouettes",
+        "camera": "creepy Dutch angle, wide eerie atmospheric perspective, 35mm horror movie film still",
+        "keywords": ["abandoned", "mist", "shadows", "darkness", "ghost", "spectral", "creepy", "haunted", "apparition", "phantom", "demon", "asylum", "horror"],
+        "suffix": "spine-chilling horror masterpiece, terrifying paranormal presence, pale ghostly apparition with haunting hollow dark eyes, James Wan and Guillermo del Toro cinematography, 8k atmospheric dread, terrifyingly creepy scene",
     },
     "Mystery": {
         "lighting": "moody chiaroscuro lighting, heavy atmospheric fog, warm streetlamp glow reflecting on wet cobblestones",
@@ -188,23 +188,25 @@ def synthesize_scene_prompt(
         visual_core = f"{category} scene, {topic}"
 
     # Aspect framing with wide environmental establishing instruction
-    framing = "cinematic wide-angle vertical 9:16 establishing shot, deep environmental background, dynamic action in full scene" if "9:16" in aspect_ratio else "cinematic 16:9 widescreen environmental establishing composition, deep background, dynamic action in full scene"
-
-    matched_preset = None
-    if style_preset:
-        for k, v in CHARACTER_STYLE_PRESETS.items():
-            if k.lower() in style_preset.lower() or style_preset.lower() in k.lower():
-                matched_preset = v
-                break
-
-    is_realism = style_preset and "realism" in style_preset.lower()
-    quality_anchor = (
-        "flawless facial symmetry, perfectly symmetrical eyes, natural centered pupils, harmonious facial features, authentic human anatomy, photorealistic 8k UHD"
-        if is_realism
-        else "perfect facial symmetry, symmetrical almond eyes, perfectly aligned pupils, harmoniously sculpted facial features, clean beautiful art style, no distortion, no horrifying face"
+    is_horror = (
+        genre == "Horror"
+        or "horror" in category.lower()
+        or any(w in f"{script_sentence} {topic}".lower() for w in ["ghost", "specter", "haunt", "demon", "creepy", "phantom", "apparition", "asylum", "curse", "shadowy figure", "entity"])
     )
 
-    if matched_preset:
+    if is_horror:
+        framing = "cinematic wide-angle vertical 9:16 horror scene, terrifyingly creepy atmosphere, deep ominous shadowy background" if "9:16" in aspect_ratio else "cinematic 16:9 widescreen horror scene, terrifyingly creepy atmospheric depth"
+        quality_anchor = "spine-chilling horror aesthetic, pale spectral apparition with hollow haunting dark eyes, creepy ghostly face, eerie shadowy entity, deeply unnerving paranormal dread, masterclass horror cinematography, scary atmospheric realism, 8k"
+    else:
+        framing = "cinematic wide-angle vertical 9:16 establishing shot, deep environmental background, dynamic action in full scene" if "9:16" in aspect_ratio else "cinematic 16:9 widescreen environmental establishing composition, deep background, dynamic action in full scene"
+        is_realism = style_preset and "realism" in style_preset.lower()
+        quality_anchor = (
+            "flawless facial symmetry, perfectly symmetrical eyes, natural centered pupils, harmonious facial features, authentic human anatomy, photorealistic 8k UHD"
+            if is_realism
+            else "perfect facial symmetry, symmetrical almond eyes, perfectly aligned pupils, harmoniously sculpted facial features, clean beautiful art style, no distortion, no deformed face"
+        )
+
+    if matched_preset and not is_horror:
         prompt_parts = [
             f"Cinematic wide establishing scene of {visual_core}",
             f"featuring {matched_preset['character_in_action']}",

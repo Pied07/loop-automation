@@ -27,6 +27,16 @@ const COMPREHENSIVE_NEGATIVE_PROMPT =
   "text, watermark, signature, username, error, " +
   "low quality, worst quality, normal quality, jpeg artifacts, overexposed, underexposed, bad lighting";
 
+const HORROR_NEGATIVE_PROMPT =
+  "happy smile, cheerful face, laughing, friendly smile, sunny day, bright cheerful lighting, pastel colors, " +
+  "cartoon, 3d cute pixar, anime, childish, " +
+  "collaged face, pasted face, cut-and-paste face, mismatched photo, cutout head, frankenstein collage, " +
+  "extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, extra fingers, missing fingers, " +
+  "fused fingers, too many fingers, deformed hands, poorly drawn hands, " +
+  "blurry, bad proportions, gross proportions, plastic skin, " +
+  "close-up passport photo, mugshot, centered headshot, solid color background, " +
+  "text, watermark, signature, username, error, low quality, worst quality, normal quality, jpeg artifacts";
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -44,7 +54,7 @@ export async function POST(req: NextRequest) {
     const colabGpuUrl = typeof body.colabGpuUrl === "string" ? body.colabGpuUrl.trim() : "";
     const negativePrompt = typeof body.negativePrompt === "string" && body.negativePrompt.trim()
       ? body.negativePrompt.trim()
-      : COMPREHENSIVE_NEGATIVE_PROMPT;
+      : (/horror|ghost|haunt|creepy|demon|spectral|phantom/i.test(`${prompt} ${style}`) ? HORROR_NEGATIVE_PROMPT : COMPREHENSIVE_NEGATIVE_PROMPT);
 
     // 1. Try Live Colab GPU Bridge or warm local daemon service
     let activeBridgeUrl = colabGpuUrl;

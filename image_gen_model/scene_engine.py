@@ -83,6 +83,18 @@ COMPREHENSIVE_NEGATIVE_PROMPT = (
     "low quality, worst quality, normal quality, jpeg artifacts, overexposed, underexposed, bad lighting"
 )
 
+# Dedicated Horror negative prompt: prevents cheerful smiles and technical artifacts while ALLOWING scary/ghostly faces
+HORROR_NEGATIVE_PROMPT = (
+    "happy smile, cheerful face, laughing, friendly smile, sunny day, bright cheerful lighting, pastel colors, "
+    "cartoon, 3d cute pixar, anime, childish, "
+    "collaged face, pasted face, cut-and-paste face, mismatched photo, cutout head, frankenstein collage, "
+    "extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, extra fingers, missing fingers, "
+    "fused fingers, too many fingers, deformed hands, poorly drawn hands, "
+    "blurry, bad proportions, gross proportions, plastic skin, "
+    "close-up passport photo, mugshot, centered headshot, solid color background, "
+    "text, watermark, signature, username, error, low quality, worst quality, normal quality, jpeg artifacts"
+)
+
 
 
 def find_gpu_bridge_url(explicit_url: Optional[str] = None) -> Optional[str]:
@@ -393,6 +405,9 @@ class StorySceneEngine:
         print(f"           Resolution: {w}x{h} | Aspect: {aspect_ratio}")
         t0 = time.time()
 
+        is_horror = category.lower() == "horror" or any(w in f"{prompt} {topic}".lower() for w in ["horror", "ghost", "haunt", "demon", "creepy", "spectral", "phantom", "asylum"])
+        effective_negative = negative_prompt or (HORROR_NEGATIVE_PROMPT if is_horror else COMPREHENSIVE_NEGATIVE_PROMPT)
+
         raw_img = None
 
         # Priority 1: Google Colab Live GPU Bridge / Warm Daemon (Runs Custom Trained Model)
@@ -405,7 +420,7 @@ class StorySceneEngine:
                 width=w,
                 height=h,
                 seed=seed,
-                negative_prompt=negative_prompt,
+                negative_prompt=effective_negative,
             )
 
         # Priority 2: Local PyTorch Pipeline (Fast 1-Step SD-Turbo on CPU or SDXL on GPU)
@@ -421,7 +436,7 @@ class StorySceneEngine:
                     steps=15,
                     guidance_scale=7.0,
                     seed=seed,
-                    negative_prompt=negative_prompt,
+                    negative_prompt=effective_negative,
                 )
 
         # If neither GPU bridge nor local pipeline produced an image, return None
