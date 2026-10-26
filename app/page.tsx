@@ -2338,8 +2338,209 @@ export default function Home() {
             )}
 
             {studioMode === "ai" && (
+              <div className="form-section">
+                <div className="section-title">
+                  <span className="step-number">02</span>
+                  <div>
+                    <h2>Choose Visual Character &amp; Art Style</h2>
+                    <p>Select your scene picture style first. The AI script engine matches the story directly to your chosen aesthetic (e.g. Mecha for futuristic robot wars, Dark Fantasy for armored knights &amp; ruins).</p>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(165px, 1fr))',
+                    gap: '10px',
+                    marginTop: '12px',
+                  }}
+                >
+                  {[
+                    {
+                      id: "Realism",
+                      name: "Realism",
+                      character: "Photoreal Human",
+                      image: "/assets/styles/realism.jpg",
+                      badge: "8K Photoreal",
+                      desc: "Cinematic human portrait, lifelike skin & eyes, 35mm lens.",
+                      accent: "#f97316",
+                      bg: "rgba(249, 115, 22, 0.08)",
+                    },
+                    {
+                      id: "Anime",
+                      name: "Anime",
+                      character: "Anime Hero",
+                      image: "/assets/styles/anime.jpg",
+                      badge: "Ghibli / Shinkai",
+                      desc: "Expressive Japanese anime features, rich glow, crisp lines.",
+                      accent: "#ec4899",
+                      bg: "rgba(236, 72, 153, 0.08)",
+                    },
+                    {
+                      id: "Disney 3D",
+                      name: "Disney 3D",
+                      character: "Pixar 3D Person",
+                      image: "/assets/styles/disney3d.jpg",
+                      badge: "Pixar 3D",
+                      desc: "Charming animated face, warm 3D studio subsurface glow.",
+                      accent: "#a855f7",
+                      bg: "rgba(168, 85, 247, 0.08)",
+                    },
+                    {
+                      id: "Mecha",
+                      name: "Mecha",
+                      character: "Cyber Warrior",
+                      image: "/assets/styles/mecha.jpg",
+                      badge: "Sci-Fi Cyborg",
+                      desc: "Glowing exoskeleton armor, cyber helmet, neon reflections.",
+                      accent: "#06b6d4",
+                      bg: "rgba(6, 182, 212, 0.08)",
+                    },
+                    {
+                      id: "Dark Fantasy",
+                      name: "Dark Fantasy",
+                      character: "Armored Knight",
+                      image: "/assets/styles/darkfantasy.jpg",
+                      badge: "Elden / Witcher",
+                      desc: "Steel plate armor, mystical runes, atmospheric mist.",
+                      accent: "#ef4444",
+                      bg: "rgba(239, 68, 68, 0.08)",
+                    },
+                    {
+                      id: "Retro Comic",
+                      name: "Retro Comic",
+                      character: "Comic Superhero",
+                      image: "/assets/styles/retrocomic.jpg",
+                      badge: "Pop-Art Ink",
+                      desc: "Bold ink contours, pop-art halftone dots, vintage cover.",
+                      accent: "#eab308",
+                      bg: "rgba(234, 179, 8, 0.08)",
+                    },
+                  ].map((styleCard) => {
+                    const isSelected = selectedSceneStyle.toLowerCase() === styleCard.id.toLowerCase();
+                    return (
+                      <div
+                        key={styleCard.id}
+                        onClick={() => setSelectedSceneStyle(styleCard.id)}
+                        style={{
+                          background: isSelected ? styleCard.bg : '#141722',
+                          border: `1.5px solid ${isSelected ? styleCard.accent : '#25293a'}`,
+                          borderRadius: '12px',
+                          padding: '10px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                          transition: 'all 0.2s ease',
+                          boxShadow: isSelected ? `0 0 16px ${styleCard.accent}44` : 'none',
+                          position: 'relative',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {/* Real AI Generated Character Image Preview */}
+                        <div
+                          style={{
+                            width: '100%',
+                            height: '110px',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                            position: 'relative',
+                            border: `1px solid ${isSelected ? styleCard.accent : '#25293a'}`,
+                            background: '#0d0f17',
+                          }}
+                        >
+                          <img
+                            src={styleCard.image}
+                            alt={styleCard.character}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              display: 'block',
+                              transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+                              transition: 'transform 0.3s ease',
+                            }}
+                          />
+                          {isSelected && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: '6px',
+                                right: '6px',
+                                width: '20px',
+                                height: '20px',
+                                borderRadius: '50%',
+                                background: styleCard.accent,
+                                color: '#000',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '11px',
+                                fontWeight: 800,
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.6)',
+                              }}
+                            >
+                              ✓
+                            </div>
+                          )}
+                          <div
+                            style={{
+                              position: 'absolute',
+                              bottom: '4px',
+                              left: '6px',
+                              background: 'rgba(0,0,0,0.75)',
+                              backdropFilter: 'blur(4px)',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontSize: '9px',
+                              fontWeight: 700,
+                              color: styleCard.accent,
+                              border: `1px solid ${styleCard.accent}55`,
+                            }}
+                          >
+                            AI STYLE
+                          </div>
+                        </div>
+
+                        {/* Style Details */}
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ fontSize: '13px', fontWeight: 700, color: isSelected ? '#ffffff' : '#e2e8f0' }}>
+                              {styleCard.name}
+                            </div>
+                            <span
+                              style={{
+                                fontSize: '9px',
+                                fontWeight: 700,
+                                color: isSelected ? '#ffffff' : '#64748b',
+                                background: isSelected ? `${styleCard.accent}33` : '#181b26',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.04em',
+                              }}
+                            >
+                              {styleCard.badge}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '10px', color: styleCard.accent, fontWeight: 600, marginTop: '2px' }}>
+                            {styleCard.character}
+                          </div>
+                        </div>
+
+                        <p style={{ fontSize: '10px', color: '#94a3b8', margin: '0', lineHeight: '1.3' }}>
+                          {styleCard.desc}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {studioMode === "ai" && (
               <div className="form-section brief-section">
-                <div className="section-title"><span className="step-number">02</span><div><h2>Customize AI video &amp; generate</h2><p>Generate cliffhanger scripts, configure narration voice, scene backdrops, duration timer, and multi-part series.</p></div></div>
+                <div className="section-title"><span className="step-number">03</span><div><h2>Customize AI video &amp; generate</h2><p>Generate cliffhanger scripts, configure narration voice, scene backdrops, duration timer, and multi-part series.</p></div></div>
                 <div style={{ position: 'relative', marginTop: '8px', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
                   
                   {/* Script Textarea & Auto-Generate Button Header */}
@@ -2528,233 +2729,6 @@ export default function Home() {
                             <p style={{ fontSize: '11px', color: '#94a3b8', margin: '4px 0 0 0' }}>
                               Authentic 9:16 vertical AI scenes generated directly on your PC. No third-party API keys required.
                             </p>
-                          </div>
-                        </div>
-
-                        {/* Visual Character & Art Style Cards (Person in each style) */}
-                        <div style={{ marginTop: '14px', marginBottom: '14px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
-                            <label style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span>🎨</span> Visual Character & Art Style:
-                              <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 400 }}>(Each scene centers on authentic human / character features)</span>
-                            </label>
-
-                            <button
-                              type="button"
-                              onClick={handleGenerateAllScenes}
-                              disabled={isGeneratingAllScenes || generatingSceneIdx !== null}
-                              style={{
-                                padding: '6px 14px',
-                                borderRadius: '8px',
-                                border: '1px solid #a855f7',
-                                background: isGeneratingAllScenes
-                                  ? '#581c87'
-                                  : 'linear-gradient(135deg, #9333ea, #c026d3)',
-                                color: '#fff',
-                                fontSize: '11px',
-                                fontWeight: 700,
-                                cursor: isGeneratingAllScenes ? 'not-allowed' : 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                boxShadow: '0 2px 10px rgba(168,85,247,0.35)',
-                              }}
-                            >
-                              {isGeneratingAllScenes ? (
-                                <LoaderCircle className="spin" size={12} />
-                              ) : (
-                                <Sparkles size={12} />
-                              )}
-                              {isGeneratingAllScenes ? "Synthesizing All Scenes..." : "🎨 Synthesize All Scene Visuals"}
-                            </button>
-                          </div>
-
-                          <div
-                            style={{
-                              display: 'grid',
-                              gridTemplateColumns: 'repeat(auto-fit, minmax(165px, 1fr))',
-                              gap: '10px',
-                            }}
-                          >
-                            {[
-                              {
-                                id: "Realism",
-                                name: "Realism",
-                                character: "Photoreal Human",
-                                image: "/assets/styles/realism.jpg",
-                                badge: "8K Photoreal",
-                                desc: "Cinematic human portrait, lifelike skin & eyes, 35mm lens.",
-                                accent: "#f97316",
-                                bg: "rgba(249, 115, 22, 0.08)",
-                              },
-                              {
-                                id: "Anime",
-                                name: "Anime",
-                                character: "Anime Hero",
-                                image: "/assets/styles/anime.jpg",
-                                badge: "Ghibli / Shinkai",
-                                desc: "Expressive Japanese anime features, rich glow, crisp lines.",
-                                accent: "#ec4899",
-                                bg: "rgba(236, 72, 153, 0.08)",
-                              },
-                              {
-                                id: "Disney 3D",
-                                name: "Disney 3D",
-                                character: "Pixar 3D Person",
-                                image: "/assets/styles/disney3d.jpg",
-                                badge: "Pixar 3D",
-                                desc: "Charming animated face, warm 3D studio subsurface glow.",
-                                accent: "#a855f7",
-                                bg: "rgba(168, 85, 247, 0.08)",
-                              },
-                              {
-                                id: "Mecha",
-                                name: "Mecha",
-                                character: "Cyber Warrior",
-                                image: "/assets/styles/mecha.jpg",
-                                badge: "Sci-Fi Cyborg",
-                                desc: "Glowing exoskeleton armor, cyber helmet, neon reflections.",
-                                accent: "#06b6d4",
-                                bg: "rgba(6, 182, 212, 0.08)",
-                              },
-                              {
-                                id: "Dark Fantasy",
-                                name: "Dark Fantasy",
-                                character: "Armored Knight",
-                                image: "/assets/styles/darkfantasy.jpg",
-                                badge: "Elden / Witcher",
-                                desc: "Steel plate armor, mystical runes, atmospheric mist.",
-                                accent: "#ef4444",
-                                bg: "rgba(239, 68, 68, 0.08)",
-                              },
-                              {
-                                id: "Retro Comic",
-                                name: "Retro Comic",
-                                character: "Comic Superhero",
-                                image: "/assets/styles/retrocomic.jpg",
-                                badge: "Pop-Art Ink",
-                                desc: "Bold ink contours, pop-art halftone dots, vintage cover.",
-                                accent: "#eab308",
-                                bg: "rgba(234, 179, 8, 0.08)",
-                              },
-                            ].map((styleCard) => {
-                              const isSelected = selectedSceneStyle.toLowerCase() === styleCard.id.toLowerCase();
-                              return (
-                                <div
-                                  key={styleCard.id}
-                                  onClick={() => setSelectedSceneStyle(styleCard.id)}
-                                  style={{
-                                    background: isSelected ? styleCard.bg : '#141722',
-                                    border: `1.5px solid ${isSelected ? styleCard.accent : '#25293a'}`,
-                                    borderRadius: '12px',
-                                    padding: '10px',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '8px',
-                                    transition: 'all 0.2s ease',
-                                    boxShadow: isSelected ? `0 0 16px ${styleCard.accent}44` : 'none',
-                                    position: 'relative',
-                                    overflow: 'hidden',
-                                  }}
-                                >
-                                  {/* Real AI Generated Character Image Preview */}
-                                  <div
-                                    style={{
-                                      width: '100%',
-                                      height: '110px',
-                                      borderRadius: '8px',
-                                      overflow: 'hidden',
-                                      position: 'relative',
-                                      border: `1px solid ${isSelected ? styleCard.accent : '#25293a'}`,
-                                      background: '#0d0f17',
-                                    }}
-                                  >
-                                    <img
-                                      src={styleCard.image}
-                                      alt={styleCard.character}
-                                      style={{
-                                        width: '100%',
-                                        height: '100%',
-                                        objectFit: 'cover',
-                                        display: 'block',
-                                        transform: isSelected ? 'scale(1.05)' : 'scale(1)',
-                                        transition: 'transform 0.3s ease',
-                                      }}
-                                    />
-                                    {isSelected && (
-                                      <div
-                                        style={{
-                                          position: 'absolute',
-                                          top: '6px',
-                                          right: '6px',
-                                          width: '20px',
-                                          height: '20px',
-                                          borderRadius: '50%',
-                                          background: styleCard.accent,
-                                          color: '#000',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          fontSize: '11px',
-                                          fontWeight: 800,
-                                          boxShadow: '0 2px 6px rgba(0,0,0,0.6)',
-                                        }}
-                                      >
-                                        ✓
-                                      </div>
-                                    )}
-                                    <div
-                                      style={{
-                                        position: 'absolute',
-                                        bottom: '4px',
-                                        left: '6px',
-                                        background: 'rgba(0,0,0,0.75)',
-                                        backdropFilter: 'blur(4px)',
-                                        padding: '2px 6px',
-                                        borderRadius: '4px',
-                                        fontSize: '9px',
-                                        fontWeight: 700,
-                                        color: styleCard.accent,
-                                        border: `1px solid ${styleCard.accent}55`,
-                                      }}
-                                    >
-                                      AI SAMPLE
-                                    </div>
-                                  </div>
-
-                                  {/* Style Details */}
-                                  <div>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                      <div style={{ fontSize: '13px', fontWeight: 700, color: isSelected ? '#ffffff' : '#e2e8f0' }}>
-                                        {styleCard.name}
-                                      </div>
-                                      <span
-                                        style={{
-                                          fontSize: '9px',
-                                          fontWeight: 700,
-                                          color: isSelected ? '#ffffff' : '#64748b',
-                                          background: isSelected ? `${styleCard.accent}33` : '#181b26',
-                                          padding: '2px 6px',
-                                          borderRadius: '4px',
-                                          textTransform: 'uppercase',
-                                          letterSpacing: '0.04em',
-                                        }}
-                                      >
-                                        {styleCard.badge}
-                                      </span>
-                                    </div>
-                                    <div style={{ fontSize: '10px', color: styleCard.accent, fontWeight: 600, marginTop: '2px' }}>
-                                      {styleCard.character}
-                                    </div>
-                                  </div>
-
-                                  <p style={{ fontSize: '10px', color: '#94a3b8', margin: '0', lineHeight: '1.3' }}>
-                                    {styleCard.desc}
-                                  </p>
-                                </div>
-                              );
-                            })}
                           </div>
                         </div>
 
@@ -4220,7 +4194,62 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Content Mode Selection (Viral, AI Story, Both) */}
+        {/* Automated Content Mode & Random/Chosen Type Toggler */}
+        <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #1f2230' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: '#f8fafc', marginBottom: '8px' }}>
+            🎲 Content Selection Toggler:
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
+            <button
+              type="button"
+              onClick={() => updateCronSelectionMode("random")}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: cronSelectionMode === "random" ? '1.5px solid #10b981' : '1px solid #272a38',
+                background: cronSelectionMode === "random" ? 'rgba(16, 185, 129, 0.15)' : '#0d0e15',
+                color: cronSelectionMode === "random" ? '#34d399' : '#94a3b8',
+                transition: 'all 0.2s',
+              }}
+            >
+              🎲 Post Randomly (Random Category, Voice, Style & Part)
+            </button>
+            <button
+              type="button"
+              onClick={() => updateCronSelectionMode("chosen")}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: cronSelectionMode === "chosen" ? '1.5px solid #ec4899' : '1px solid #272a38',
+                background: cronSelectionMode === "chosen" ? 'rgba(236, 72, 153, 0.15)' : '#0d0e15',
+                color: cronSelectionMode === "chosen" ? '#f472b6' : '#94a3b8',
+                transition: 'all 0.2s',
+              }}
+            >
+              🎯 Post Chosen Type Only (Chosen Category, Voice, Style & Parts)
+            </button>
+          </div>
+          <p style={{ margin: '-4px 0 14px', fontSize: '11px', color: '#64748b' }}>
+            {cronSelectionMode === "random"
+              ? "Random mode: A fresh random video category, random character picture style, random voice narrator, random caption style, and random parts will be posted every time."
+              : `Chosen mode: Only your chosen category (${selectedCategory}), chosen voice, chosen picture style (${selectedSceneStyle}), and chosen parts will be posted, with freshly generated AI stories.`}
+          </p>
+
+          <div style={{ fontSize: '12px', fontWeight: 700, color: '#f8fafc', marginBottom: '8px' }}>
+            🎯 Automated Content Format:
+          </div>
         <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #1f2230' }}>
           <div style={{ fontSize: '12px', fontWeight: 700, color: '#f8fafc', marginBottom: '8px' }}>
             🎯 Automated Content Mode:
