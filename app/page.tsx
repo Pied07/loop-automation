@@ -4248,10 +4248,6 @@ export default function Home() {
           </p>
 
           <div style={{ fontSize: '12px', fontWeight: 700, color: '#f8fafc', marginBottom: '8px' }}>
-            🎯 Automated Content Format:
-          </div>
-        <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #1f2230' }}>
-          <div style={{ fontSize: '12px', fontWeight: 700, color: '#f8fafc', marginBottom: '8px' }}>
             🎯 Automated Content Mode:
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
