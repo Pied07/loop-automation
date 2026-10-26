@@ -26,12 +26,6 @@ export interface StoryResult {
   source?: string;
 }
 
-/**
- * Synthesizes a clean, high-fidelity visual prompt for a scene image,
- * systematically stripping conversational filler and quantity multipliers
- * that trigger facial warping or feature duplication in diffusion models,
- * and anchoring anatomical symmetry.
- */
 export function buildCleanVisualPrompt(
   sceneText: string,
   fallbackSubject: string,
@@ -64,6 +58,83 @@ export function buildCleanVisualPrompt(
 }
 
 export const CHARACTER_ENSEMBLES = [
+  {
+    "id": "action_leo_maya",
+    "genre": "Action",
+    "category": "Action",
+    "keywords": [
+      "action",
+      "agent",
+      "operative",
+      "combat",
+      "train",
+      "explosive",
+      "chase",
+      "mission",
+      "special ops",
+      "assault"
+    ],
+    "title": "Operation Iron Phantom",
+    "char1": "Agent Leo Sterling, elite black ops operative",
+    "char2": "Maya Ray, tactical electronic warfare specialist",
+    "enemy": "The Black Dagger Syndicate",
+    "setting": "a high-speed magnetic bullet train speeding through alpine tunnels",
+    "visual_style": "cinematic wide-angle Hollywood blockbuster action sequence, explosive debris and sparks, dynamic motion blur, high-octane battle scene, dramatic rim lighting, 8k octane render, natural human anatomy, vertical 9:16 framing",
+    "chapters": [
+      {
+        "chapter_num": 1,
+        "hook": "Agent Leo Sterling, an elite black ops operative, and Maya Ray, a tactical electronic warfare specialist, magnetized their boots to the roof of the high-speed Maglev bullet train hurtling at three hundred miles per hour through the Swiss Alps.",
+        "core_beats": [
+          "High-altitude wind screamed past Leo's tactical visor as Maya connected an override clamp to the train's armored dorsal hatch.",
+          "'Security feeds show sixteen armed mercenaries securing the central biometric vault in Car 4, Leo,' Maya warned through the comms.",
+          "Leo primed his suppressed submachine gun, checking the chamber with fluid, practiced precision.",
+          "Beneath their boots, the magnetic rails hummed with thousands of volts of raw electrical power as the train entered an unlit mountain tunnel.",
+          "Maya bypassed the hydraulic lock in four seconds, sparks showering across the graphite roof as the hatch hissed open.",
+          "'Drop in three... two... one... execute!' shouted Leo, dropping feet-first into the darkened maintenance corridor.",
+          "Two syndicate guards spun around with automatic weapons, but Leo neutralized both with lightning-fast close-quarters strikes before they could raise an alarm."
+        ],
+        "expansion_beats": [
+          "Red emergency strobes bathed the narrow passage in rhythmic crimson pulses, casting elongated shadows along the titanium bulkheads.",
+          "Maya dropped down behind him, deploying a miniature acoustic drone that mapped enemy positions through the reinforced steel doors.",
+          "'They have installed a seismic charge on the central coupling,' Maya whispered, tapping the holographic tactical display on her wrist.",
+          "'If Arthur Sterling's mercenaries realize they are cornered, they will decouple the passenger cars into the canyon abyss.'",
+          "Leo advanced with tactical discipline, slicing through the smoke-filled galley with his weapon held at high-ready.",
+          "Through the panoramic passenger windows, snow-capped alpine peaks blurred past like jagged razor blades under the moonlight.",
+          "Every second brought them closer to the border checkpoint where the syndicate planned to transfer the stolen warhead onto a private chopper.",
+          "Leo breached the double security blast doors of Car 4, where the syndicate commander stood with his finger resting over a remote detonator.",
+          "'Step away from the console, Sterling,' Leo commanded, his laser sight locked dead center on the detonator's transceiver."
+        ],
+        "cliffhanger": "The syndicate commander smirked and slammed his palm onto the emergency release lever, causing the floor beneath Leo and Maya to buckle violently as the train decoupled at full speed... Follow right now for Part 2 to witness the high-speed extraction!"
+      },
+      {
+        "chapter_num": 2,
+        "hook": "Picking up immediately as the passenger car decoupled at three hundred miles per hour, Agent Leo Sterling fired a high-tension grappling cable, hooking the lead locomotive just as the gap widened.",
+        "core_beats": [
+          "'Hold on to me, Maya!' Leo roared, wrapping one arm around her tactical harness as the cable snapped taut with bone-jarring force.",
+          "They swung across the dizzying void between the accelerating train cars, boots slamming onto the rear platform of the engine.",
+          "Syndicate reinforcements opened fire from the upper catwalks, high-caliber tracer rounds tearing through the steel siding.",
+          "Maya hurled a customized EMP concussion grenade upward, detonating it mid-air in a blinding blue electromagnetic shockwave.",
+          "The blast disabled the mercenaries' night-vision optics and weapons sights, throwing the entire syndicate squad into disarray.",
+          "Leo swept the catwalk with rapid, pinpoint bursts, advancing relentlessly through the hail of ricocheting lead.",
+          "'The engine controls have been locked into an irreversible acceleration loop!' Maya shouted, interfacing her terminal with the primary throttle."
+        ],
+        "expansion_beats": [
+          "Flames poured from the overheated turbine vents as the speedometer climbed toward four hundred miles per hour toward the terminal curve.",
+          "Leo covered the doorway, engaging three remaining operatives in intense hand-to-hand combat amidst flying glass and shattered instrument panels.",
+          "With a crushing sweep, Leo disarmed the final attacker and tossed the detonator clear of the locomotive into the river far below.",
+          "'I need five seconds to reverse the magnetic polarity on the emergency brakes, Leo!' Maya yelled over the deafening roar of the engines.",
+          "Sparks erupted from the brake shoes, screaming like banshees as millions of pounds of magnetic braking resistance engaged simultaneously.",
+          "The train shuddered violently, sliding across the glowing rails in a shower of brilliant white sparks before coming to a dead halt ten feet from the cliff edge.",
+          "Silence settled over the alpine pass, broken only by the ticking of the cooling reactor and the distant sound of falling snow.",
+          "Maya leaned against the console with an exhausted grin, securing the recovered biometric briefcase in her tactical pouch.",
+          "Leo holstered his weapon, tapped his radio frequency, and announced: 'Extraction complete. The syndicate is neutralized.'"
+        ],
+        "cliffhanger": "As the extraction helicopter lowered its winch, an incoming missile lock warning shrieked inside the cockpit... Follow for Part 3!",
+        "resolution": "Agent Leo Sterling and Maya Ray neutralized the syndicate, secured the biometric weapon, and saved hundreds of innocent lives.",
+        "cta": "Mission accomplished with lethal precision. Double tap, save this video right now, and follow for more heart-stopping high-octane action thrillers!"
+      }
+    ]
+  },
   {
     "id": "realism_evelyn_marcus",
     "genre": "Realism",
@@ -108,11 +179,7 @@ export const CHARACTER_ENSEMBLES = [
           "Yet beneath the polished press releases lay billions in redirected pension funds and illicit offshore covenants.",
           "Marcus keyed in the secondary emergency backup frequency, uploading duplicate partitions to their secure cloud proxy.",
           "'If we lose this uplink now, twenty thousand pensioners lose everything by morning,' Evelyn stated without looking up.",
-          "The forensic algorithm completed its pass, revealing Arthur Sterling's personal digital signature on the authorizing wire.",
-          "Evelyn examined the hash keys, confirming that the transfer codes originated from Sterling's penthouse IP address.",
-          "Marcus locked the surveillance van's secondary blast doors, his hand resting near the emergency GPS beacon.",
-          "In the distance, the muffled rumble of approaching security patrol vehicles resonated off the granite facades.",
-          "Every second of delay increased the probability of their signal being triangulated by corporate countermeasures."
+          "The forensic algorithm completed its pass, revealing Arthur Sterling's personal digital signature on the authorizing wire."
         ],
         "cliffhanger": "Just as the final encrypted audit trail synchronized, a laser targeting beam painted the dashboard, and a gloved hand banged violently against the van door... Follow right now for Part 2!"
       },
@@ -138,38 +205,9 @@ export const CHARACTER_ENSEMBLES = [
           "Evelyn bypassed the firewall of the city communications array, using Sterling's own stolen cryptographic key.",
           "Her hands moved across the keyboard with surgical precision despite the violent rattling of the suspension.",
           "Every document in the dossier was now verified, containing sworn affidavits, audio intercepts, and forensic ledgers.",
-          "Behind them, the pursuit vehicle clipped a concrete barrier, spinning across the wet tracks in a shower of sparks.",
-          "Marcus swerved around an abandoned maintenance tram, cutting the headlights to navigate solely by thermal sensors.",
-          "Evelyn confirmed that the secondary satellite dish was powered on and awaiting the direct optical injection.",
-          "The damp subterranean air carried the pungent smell of ozone and burning rubber as they neared the harbor exit."
+          "Behind them, the pursuit vehicle clipped a concrete barrier, spinning across the wet tracks in a shower of sparks."
         ],
         "cliffhanger": "As the van skidded onto the pier, the automated security gates slammed shut, trapping them against the dark harbor water with headlights closing in... Follow for Part 3 to witness the showdown!",
-        "resolution": "Marcus and Evelyn broke through the perimeter and delivered the verified evidence directly to international prosecutors.",
-        "cta": "Justice always prevails when the truth is brought into the light. Save this video and follow for more gripping investigative thrillers!"
-      },
-      {
-        "chapter_num": 3,
-        "hook": "Trapped against the freezing waters of Pier 4, Dr. Evelyn Reed and Marcus Vance grabbed the hard drives and bolted for the maintenance ladder of the transmission tower.",
-        "core_beats": [
-          "Wind whipped off the bay as Marcus shoved the steel security door open and bolted the heavy crossbar from the inside.",
-          "'We have four minutes before they breach that door,' Evelyn said, her fingers numb as she plugged the terminal into the transmitter.",
-          "Below them, sledgehammers pounded against the reinforced iron, rattling the entire steel staircase.",
-          "Marcus calibrated the microwave dish, aligning the broadcast beam toward the regional television antennas.",
-          "'Arthur Sterling is live on national television right now at his annual charity gala,' Marcus said, checking his phone.",
-          "'Then let's give his guests a presentation they will never forget,' Evelyn replied, initiating the satellite hijack.",
-          "On thousands of screens across the nation, the live gala feed flickered and replaced Sterling's speech with the incriminating ledger."
-        ],
-        "expansion_beats": [
-          "The silence that fell over the high-society gala ballroom across town was captured live on every national network.",
-          "Every guest, investor, and television viewer watched in stunned disbelief as forensic evidence proved the multi-billion fraud.",
-          "Below the tower, the sound of sledgehammers abruptly ceased as federal law enforcement sirens converged on the pier.",
-          "Marcus and Evelyn stood together on the gantry, looking out over the illuminated skyline as the truth echoed worldwide.",
-          "Decades of systemic corruption had been disassembled in thirty seconds of undeniable mathematical proof.",
-          "Arthur Sterling had believed money could purchase silence forever, but he underestimated the relentless pursuit of truth.",
-          "The morning sun broke through the storm clouds, painting the harbor in brilliant shades of gold and amber.",
-          "Evelyn closed the laptop with a quiet, triumphant breath, knowing the victims of the fraud would finally receive justice."
-        ],
-        "cliffhanger": "Arthur Sterling attempted to board his private jet at dawn, but federal marshals were already waiting on the tarmac... Follow for the final aftermath!",
         "resolution": "Arthur Sterling was arrested on live television at dawn, and every stolen dollar was returned to the pension funds.",
         "cta": "Justice always prevails when the truth is brought into the light. Save this video and follow for more gripping investigative thrillers!"
       }
@@ -669,6 +707,10 @@ export const STYLE_NARRATIVE_PROFILES: Record<string, any> = {
 };
 
 export const GENRE_CTA: Record<string, string[]> = {
+  "Action": [
+    "Mission accomplished with lethal precision. Double tap, save this video right now, and follow for more heart-stopping high-octane action thrillers!",
+    "When danger strikes, heroes rise. Save this video and follow for more epic cinematic action sagas!",
+  ],
   "Horror": [
     "The shadows are always watching. Double tap, save this video, and follow for the next terrifying story!",
     "Save this video if you dare, and follow for more chilling real-world horror encounters!",
@@ -706,10 +748,11 @@ export function findMatchingInterestingFact(prompt: string, excludeId: string = 
 
 /**
  * Main story generator that guarantees:
- * 1. Characters are introduced by name in the opening sentence.
- * 2. In multi-part videos, Part 2 contains 0% duplicate sentences from Part 1.
- * 3. Supports durations from 1 minute (60s) up to 10 minutes (600s) (~140 to ~1400 words).
- * 4. Generates 1 to 20 AI scene visual prompts evenly distributed across sentences.
+ * 1. Category is strictly respected (Action -> Action, Horror -> Horror, etc.).
+ * 2. Characters are introduced by name in the opening sentence.
+ * 3. In multi-part videos, Part 2 contains 0% duplicate sentences from Part 1.
+ * 4. Supports durations from 1 minute (60s) up to 10 minutes (600s) (~140 to ~1400 words).
+ * 5. Generates 1 to 20 AI scene visual prompts evenly distributed across sentences.
  */
 export async function generateStoryParts(params: {
   category: string;
@@ -722,7 +765,7 @@ export async function generateStoryParts(params: {
   sceneStyle?: string;
 }): Promise<StoryResult> {
   const {
-    category = "Interesting Facts",
+    category = "Action",
     customTag = "",
     prompt = "",
     duration = 60,
@@ -736,21 +779,43 @@ export async function generateStoryParts(params: {
   const clampedDuration = Math.max(60, Math.min(600, Number(duration)));
   const clampedImages = Math.max(1, Math.min(20, Number(numImages)));
 
-  // Target word count based on standard speaking rate (~2.3 words/sec, ~138 words/min)
   const targetWords = Math.round(clampedDuration * 2.3);
 
-  // Find best matching character ensemble
   const cleanPrompt = (prompt || "").trim().toLowerCase();
   const cleanCategory = (category || "").trim().toLowerCase();
   const cleanStyle = (sceneStyle || "").trim().toLowerCase();
 
-  let matchedEnsemble = CHARACTER_ENSEMBLES.find((e) => {
-    if (cleanStyle && e.genre.toLowerCase() === cleanStyle) return true;
-    if (cleanCategory && (e.category.toLowerCase() === cleanCategory || e.genre.toLowerCase() === cleanCategory)) return true;
-    if (cleanPrompt && e.keywords && e.keywords.some((k: string) => cleanPrompt.includes(k))) return true;
-    return false;
-  });
+  // CATEGORY-FIRST ENSEMBLE MATCHING:
+  // Strictly prioritize the user's selected category!
+  let matchedEnsemble = null;
 
+  if (cleanCategory && cleanCategory !== "others") {
+    // 1. Match category and style if possible
+    matchedEnsemble = CHARACTER_ENSEMBLES.find((e) =>
+      (e.category.toLowerCase() === cleanCategory || e.genre.toLowerCase() === cleanCategory) &&
+      cleanStyle && e.genre.toLowerCase() === cleanStyle
+    );
+    // 2. Otherwise match category alone
+    if (!matchedEnsemble) {
+      matchedEnsemble = CHARACTER_ENSEMBLES.find((e) =>
+        e.category.toLowerCase() === cleanCategory || e.genre.toLowerCase() === cleanCategory
+      );
+    }
+  }
+
+  // 3. If prompt has specific keywords, try matching keywords
+  if (!matchedEnsemble && cleanPrompt) {
+    matchedEnsemble = CHARACTER_ENSEMBLES.find((e) =>
+      e.keywords && e.keywords.some((k: string) => cleanPrompt.includes(k))
+    );
+  }
+
+  // 4. If category is Others or not matched yet, match by sceneStyle
+  if (!matchedEnsemble && cleanStyle) {
+    matchedEnsemble = CHARACTER_ENSEMBLES.find((e) => e.genre.toLowerCase() === cleanStyle);
+  }
+
+  // 5. Fallback
   if (!matchedEnsemble) {
     matchedEnsemble = CHARACTER_ENSEMBLES[0];
   }
@@ -759,11 +824,8 @@ export async function generateStoryParts(params: {
   const storySeed = Math.floor(Math.random() * 90000) + 10000;
   const storyId = `${matchedEnsemble.id}_${storySeed}`;
 
-  // Global sentence tracking to mathematically GUARANTEE ZERO sentence repetition across parts!
   const usedGlobalSentences = new Set<string>();
-
   const countWords = (arr: string[]) => arr.join(" ").trim().split(/\s+/).filter(Boolean).length;
-
   const partsData: StoryPart[] = [];
 
   for (let pIdx = 0; pIdx < clampedParts; pIdx++) {
@@ -771,7 +833,6 @@ export async function generateStoryParts(params: {
     const isLast = pNum === clampedParts;
     const pSentences: string[] = [];
 
-    // Select chapter for this part
     const chapter = matchedEnsemble.chapters[Math.min(pIdx, matchedEnsemble.chapters.length - 1)];
 
     // 1. Chapter Opening Hook (introduces characters by name)
@@ -790,7 +851,7 @@ export async function generateStoryParts(params: {
       }
     }
 
-    // 3. Dynamic Narrative Expansion to fulfill requested duration (up to 10 minutes)
+    // 3. Dynamic Narrative Expansion for requested duration (up to 10 minutes)
     if (chapter.expansion_beats && countWords(pSentences) < targetWords - 35) {
       for (const exp of chapter.expansion_beats) {
         if (!usedGlobalSentences.has(exp)) {
@@ -817,7 +878,7 @@ export async function generateStoryParts(params: {
 
     const scriptText = pSentences.join(" ");
 
-    // 5. Generate 1 to 20 AI Scene Visual Prompts evenly distributed across the story
+    // 5. Generate 1 to 20 AI Scene Visual Prompts
     const scenes: StoryScene[] = [];
     for (let sIdx = 0; sIdx < clampedImages; sIdx++) {
       const sentIndex = Math.min(pSentences.length - 1, Math.floor((sIdx * pSentences.length) / clampedImages));
@@ -847,8 +908,10 @@ export async function generateStoryParts(params: {
     });
   }
 
+  const effectiveCategory = cleanCategory ? category : matchedEnsemble.category;
+
   return {
-    category: matchedEnsemble.category,
+    category: effectiveCategory,
     factId: storyId,
     overallTitle: baseTitle,
     numParts: clampedParts,

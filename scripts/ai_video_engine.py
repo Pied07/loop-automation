@@ -139,7 +139,7 @@ THEMES["Trending"] = THEMES["Interesting Facts"]
 THEMES["Food"] = THEMES["Interesting Facts"]
 
 CATEGORIES_LIST = [
-    "Interesting Facts", "Comedy", "Motivational", "Horror", "Educational",
+    "Interesting Facts", "Action", "Comedy", "Motivational", "Horror", "Educational",
     "Romance", "Adventure", "Music", "Others"
 ]
 
@@ -258,6 +258,10 @@ def generate_rich_hashtags(title: str, category: str, script: str) -> List[str]:
                 break
 
     category_tag_banks = {
+        "action": [
+            "action", "actionmovie", "thriller", "tactical", "combat", "blockbuster",
+            "highoctane", "epicbattle", "specialops", "chase", "explosive", "adrenaline"
+        ],
         "interestingfacts": [
             "facts", "dailyfacts", "interestingfacts", "amazingfacts", "mindblown",
             "didyouknow", "truefacts", "historyfacts", "unknownfacts", "bizarre",
@@ -1182,6 +1186,7 @@ class AIVideoEngine:
                     duration_per_part=duration,
                     num_images_per_part=num_images,
                     num_parts=num_parts,
+                    scene_style=style_preset,
                 )
                 part_data = story_res["parts"][part_number - 1]
                 final_script = part_data["script"]
