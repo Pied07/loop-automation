@@ -106,24 +106,6 @@ Production requirements:
     }
   }
 
-  const pollinationsKey = process.env.POLLINATION_API_KEY?.trim() || process.env.POLLINATIONS_API_KEY?.trim() || process.env.POLLINATIONS_KEY?.trim();
-  if (pollinationsKey) {
-    try {
-      const response = await fetch("https://gen.pollinations.ai/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${pollinationsKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "openai", messages: [{ role: "user", content: prompt }] }),
-        signal: AbortSignal.timeout(10000),
-      });
-      if (response.ok) {
-        const text = (await response.json())?.choices?.[0]?.message?.content?.trim();
-        if (typeof text === "string" && text.length > 30) return NextResponse.json({ success: true, prompt: text });
-      } else errors.push(`Pollinations HTTP ${response.status}`);
-    } catch (error) {
-      errors.push(`Pollinations ${error instanceof Error ? error.message : "request failed"}`);
-    }
-  }
-
   console.warn("AI prompt providers unavailable; returning local prompt fallback:", errors.join(" | "));
   return NextResponse.json({ success: true, prompt: fallback, fallback: true });
 }

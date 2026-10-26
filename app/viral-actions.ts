@@ -1004,11 +1004,18 @@ export async function publishClipAndCleanup(params: {
     if (platforms.includes("YouTube")) {
       publishTasks.push((async () => {
         try {
+          if (!tokens?.youtube || (!tokens.youtube.access_token && !tokens.youtube.refresh_token)) {
+            logs.push("⚠️ YouTube: Not connected in tokens. Please connect YouTube in Settings.");
+            return;
+          }
           const { google } = require("googleapis");
-          const oauth2Client = new google.auth.OAuth2(
-            process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-            process.env.GOOGLE_CLIENT_SECRET
-          );
+          const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+          const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+          if (!clientId || !clientSecret) {
+            logs.push("❌ YouTube: Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET in environment.");
+            return;
+          }
+          const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
           oauth2Client.setCredentials(tokens.youtube);
 
           try {
@@ -2355,8 +2362,12 @@ export async function generateAiVideoAction(params: {
       if (params.platforms.facebook) activePlats.push("Facebook");
       if (params.platforms.instagram) activePlats.push("Instagram");
 
+      const localOrCloudVideo = (parsed.videoPath && fs.existsSync(parsed.videoPath))
+        ? parsed.videoPath
+        : (cloudinaryUrl || parsed.videoPath);
+
       publishResult = await publishClipAndCleanup({
-        clipPath: cloudinaryUrl || parsed.videoPath,
+        clipPath: localOrCloudVideo,
         title: parsed.title,
         description: parsed.description,
         hashtags: parsed.hashtags,

@@ -34,6 +34,7 @@ export function buildCleanVisualPrompt(
   let clean = sceneText
     .replace(/\b(?:Part\s+\d+|Welcome back to Part\s+\d+|Follow for Part\s+\d+|Watch Part\s+\d+|Save this video|follow for your daily drive|follow for more|subscribe|share this|comment below)[^.]*/gi, "")
     .replace(/\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|eighteen|twenty|thirty|forty|fifty|hundred|thousand|million)\s+(?:times|doors|days|hours|years|copies|rejections)\b/gi, "")
+    .replace(/\b(?:spinal mobility|highway crash|car crash|crash|paralysis|paralyzed|wheelchair|crutches|rehabilitation|hospital|amputation|injured|injury|deformity|deformed|broken|surgery|disease|sick|illness|twisted|severed|bleeding|wound)\b/gi, "")
     .replace(/["'*_#`~]/g, " ")
     .replace(/[^a-zA-Z0-9\s,.-]/g, " ")
     .replace(/\s+/g, " ")
@@ -50,9 +51,10 @@ export function buildCleanVisualPrompt(
   }
 
   const isRealism = /realism|photoreal|35mm/i.test(styleDescriptor);
+  const faceQuality = "perfect facial symmetry, symmetrical almond eyes, centered focused pupils, harmonious facial features, beautiful natural smile, clean human anatomy";
   const sceneComposition = isRealism
-    ? "cinematic wide-angle environmental establishing shot, dynamic action in full scene, deep background architecture and scenery, atmospheric environmental storytelling, natural human anatomy, photorealistic 8k"
-    : "cinematic wide-angle environmental establishing shot, dynamic action in full scene, deep background architecture and scenery, atmospheric environmental storytelling, unified artistic illustration, seamless character rendering, no photorealistic face collage";
+    ? `cinematic wide-angle environmental establishing shot, dynamic action in full scene, deep background architecture and scenery, atmospheric environmental storytelling, ${faceQuality}, natural skin texture, photorealistic 8k`
+    : `cinematic wide-angle environmental establishing shot, dynamic action in full scene, deep background architecture and scenery, atmospheric environmental storytelling, ${faceQuality}, unified artistic illustration, seamless character rendering, no deformed face, no collage`;
 
   return `Cinematic scene of ${clean}, ${sceneComposition}, ${styleDescriptor}, vertical 9:16 framing`;
 }
@@ -672,8 +674,8 @@ export const CHARACTER_ENSEMBLES = [
       "mindset",
       "overcome"
     ],
-    "title": "The Broken Champion's Return",
-    "char1": "Maya Lin, injured world-record marathon runner",
+    "title": "The Undefeated Champion's Return",
+    "char1": "Maya Lin, champion world-record marathon runner",
     "char2": "Coach Thomas Vance, veteran athletic mentor",
     "enemy": "The medical diagnosis that claimed she would never walk without crutches",
     "setting": "an empty frozen athletic stadium at 5:00 AM",
@@ -681,7 +683,7 @@ export const CHARACTER_ENSEMBLES = [
     "chapters": [
       {
         "chapter_num": 1,
-        "hook": "Maya Lin, an undeterred marathon runner who lost her sponsors and spinal mobility in a highway crash, stood on the frozen stadium track with Coach Thomas Vance at 5:00 AM.",
+        "hook": "Maya Lin, an undeterred marathon runner returning to elite competition against all odds, stood on the frozen stadium track with Coach Thomas Vance at 5:00 AM.",
         "core_beats": [
           "The orthopedic surgeons had signed paperwork six months ago declaring she would spend the rest of her life walking with assistance.",
           "Her former sponsors had terminated every contract before she even checked out of the rehabilitation hospital.",

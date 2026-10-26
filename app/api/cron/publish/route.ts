@@ -96,33 +96,41 @@ async function handleCronPublish(req: NextRequest) {
         } catch {}
       }
 
-      // If random mode: select a completely random category, voice, caption style, and scene picture style
-      const ALL_CATEGORIES = ["Interesting Facts", "Horror", "Motivational", "Romance", "Adventure", "Educational", "Comedy", "Music", "Others"];
+      // If random mode: select a completely random category, duration (time), parts, voice, caption style, and scene picture style
+      const ALL_CATEGORIES = ["Action", "Interesting Facts", "Horror", "Motivational", "Romance", "Adventure", "Educational", "Comedy", "Music", "Others"];
       const ALL_VOICES = ["en-US-ChristopherNeural", "en-US-JennyNeural", "en-US-GuyNeural", "en-US-AriaNeural", "en-US-BrianNeural", "en-US-EmmaNeural"];
       const ALL_CAPTIONS = ["viral_yellow", "clean_pill", "cinematic", "neon_glow", "soft_shadow_bar"];
       const ALL_STYLES = ["Realism", "Anime", "Disney 3D", "Mecha", "Dark Fantasy", "Retro Comic"];
+      const ALL_DURATIONS = [60, 90, 120, 180, 240, 300]; // 1 minute to 5 minutes
 
       let effectiveCategory = chosenCategory;
       let effectiveVoice = chosenVoice;
       let effectiveCaption = chosenCaption;
       let effectiveStyle = chosenSceneStyle;
       let effectiveParts = chosenParts;
+      let effectiveDuration = chosenDuration;
 
       if (cronSelectionMode === "random") {
         effectiveCategory = ALL_CATEGORIES[Math.floor(Math.random() * ALL_CATEGORIES.length)];
         effectiveVoice = ALL_VOICES[Math.floor(Math.random() * ALL_VOICES.length)];
         effectiveCaption = ALL_CAPTIONS[Math.floor(Math.random() * ALL_CAPTIONS.length)];
         effectiveStyle = ALL_STYLES[Math.floor(Math.random() * ALL_STYLES.length)];
-        effectiveParts = Math.floor(Math.random() * 3) + 1; // 1 to 3 parts randomly
+        effectiveDuration = ALL_DURATIONS[Math.floor(Math.random() * ALL_DURATIONS.length)];
+        effectiveParts = Math.floor(Math.random() * 5) + 1; // 1 to 5 parts randomly
       }
+
+      // Automatically scale number of scene images with video length (up to 20 images)
+      const calculatedImages = Math.min(20, Math.max(3, Math.round(effectiveDuration / 20)));
+
+      console.log(`[Cron Auto-Pilot] Running AI Video: Category="${effectiveCategory}", Duration=${effectiveDuration}s, Parts=${effectiveParts}, Caption="${effectiveCaption}", Style="${effectiveStyle}", Images=${calculatedImages}`);
 
       const aiResult = await generateAiVideoAction({
         category: effectiveCategory,
         voice: effectiveVoice,
         captionStyle: effectiveCaption,
         stylePreset: effectiveStyle,
-        numImages: 3,
-        duration: chosenDuration,
+        numImages: calculatedImages,
+        duration: effectiveDuration,
         numParts: effectiveParts,
         userId: ownerUserId,
         userEmail: ownerEmail,
@@ -130,14 +138,17 @@ async function handleCronPublish(req: NextRequest) {
         platforms: { youtube: true, facebook: true, instagram: true },
       });
 
+      console.log(`[Cron Auto-Pilot] AI Video generation completed. Title="${aiResult?.title}", YT Upload=${aiResult?.publishResult?.youtubeVideoId || aiResult?.publishResult?.youtubeUrl || "none"}`);
+
       if (database) {
         try {
           const cronHistoryRef = doc(database, "app_config", "cron_history");
           await setDoc(cronHistoryRef, {
             lastRunAt: new Date().toISOString(),
             lastTitle: aiResult.title || "AI Story Video",
-            lastCategory: "Interesting Facts",
+            lastCategory: effectiveCategory,
             lastCronType: "ai",
+            lastYoutubeUrl: aiResult?.publishResult?.youtubeUrl || (aiResult?.publishResult?.youtubeVideoId ? `https://www.youtube.com/shorts/${aiResult.publishResult.youtubeVideoId}` : ""),
           }, { merge: true });
         } catch {}
       }
@@ -145,10 +156,14 @@ async function handleCronPublish(req: NextRequest) {
       return NextResponse.json({
         success: true,
         mode: "ai-story",
-        category: "Interesting Facts",
+        category: effectiveCategory,
+        duration: effectiveDuration,
+        parts: effectiveParts,
+        captionStyle: effectiveCaption,
         title: aiResult.title,
         videoUrl: aiResult.videoUrl,
-        message: `[Cron Auto-Pilot] AI Story "${aiResult.title}" synthesized and published across socials!`,
+        youtubeUrl: aiResult?.publishResult?.youtubeUrl || (aiResult?.publishResult?.youtubeVideoId ? `https://www.youtube.com/shorts/${aiResult.publishResult.youtubeVideoId}` : ""),
+        message: `[Cron Auto-Pilot] AI Story "${aiResult.title}" synthesized and published across YouTube & socials!`,
         result: aiResult,
       });
     }

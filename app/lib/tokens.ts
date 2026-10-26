@@ -10,6 +10,14 @@ const getSecretDocId = () => {
 };
 
 export async function readTokens(): Promise<Record<string, any>> {
+  let localTokens: Record<string, any> = {};
+  try {
+    const tokensFile = path.join(process.cwd(), "tokens.json");
+    if (fs.existsSync(tokensFile)) {
+      localTokens = JSON.parse(fs.readFileSync(tokensFile, "utf8")) || {};
+    }
+  } catch {}
+
   let firestoreTokens: Record<string, any> | null = null;
   if (database) {
     try {
@@ -17,28 +25,33 @@ export async function readTokens(): Promise<Record<string, any>> {
       const snapshot = await getDoc(tokenRef);
       if (snapshot.exists()) {
         firestoreTokens = (snapshot.data() as Record<string, any>) || {};
-      } else {
-        firestoreTokens = {};
       }
     } catch (error) {
       console.error("Failed to read tokens from Firestore:", error);
     }
   }
 
-  // If Firestore tokens exist, Firestore is the single authoritative store
-  if (firestoreTokens !== null) {
-    return firestoreTokens;
+  // Merge Firestore and local tokens so valid credentials (like YouTube OAuth) are never lost
+  const merged: Record<string, any> = { ...localTokens, ...(firestoreTokens || {}) };
+  // If Firestore is missing a platform that exists in localTokens, restore it
+  for (const [k, v] of Object.entries(localTokens)) {
+    if (!merged[k] || (typeof merged[k] === "object" && Object.keys(merged[k]).length === 0)) {
+      merged[k] = v;
+    }
   }
 
-  // Fallback to local tokens.json ONLY if Firestore is unavailable
-  try {
-    const tokensFile = path.join(process.cwd(), "tokens.json");
-    if (fs.existsSync(tokensFile)) {
-      return JSON.parse(fs.readFileSync(tokensFile, "utf8"));
+  // If Firestore exists and was missing keys from localTokens, backfill Firestore
+  if (database && firestoreTokens !== null && Object.keys(localTokens).length > 0) {
+    const missingKeys = Object.keys(localTokens).filter((k) => !firestoreTokens?.[k]);
+    if (missingKeys.length > 0) {
+      try {
+        const tokenRef = doc(database, "app_config", getSecretDocId());
+        await setDoc(tokenRef, merged, { merge: true });
+      } catch {}
     }
-  } catch {}
+  }
 
-  return {};
+  return merged;
 }
 
 export async function writeTokens(tokens: Record<string, any>): Promise<void> {

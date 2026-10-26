@@ -12,12 +12,16 @@ export const dynamic = "force-dynamic";
 const LOCAL_DAEMON_URL = "http://127.0.0.1:5055";
 
 const COMPREHENSIVE_NEGATIVE_PROMPT =
+  "horrifying face, grotesque face, scary distorted face, deformed face, disfigured face, twisted face, " +
+  "crossed eyes, strabismus, wall-eyed, cockeyed, misaligned eyes, lazy eye, asymmetrical eyes, crooked pupils, dilated pupils, " +
+  "deformed eyes, missing pupils, unnatural iris, crooked mouth, twisted jaw, deformed teeth, melted face, claymation face, " +
+  "zombie face, plastic dummy, uncanny valley, ugly proportions, malformed facial structure, bad anatomy, " +
+  "spinal deformity, broken neck, mutilated neck, twisted spine, physical deformity, " +
   "collaged face, pasted face, cut-and-paste face, mismatched face, photo collage, cutout head, frankenstein face, " +
-  "extra eyes, multi eyes, mutated eyes, duplicate eyes, crossed eyes, fused eyes, deformed iris, deformed pupils, " +
-  "asymmetrical face, deformed face, bad face anatomy, distorted facial features, cloned face, morbid, mutilated, " +
+  "extra eyes, multi eyes, mutated eyes, duplicate eyes, fused eyes, " +
   "extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, extra fingers, missing fingers, " +
   "fused fingers, too many fingers, deformed hands, poorly drawn hands, poorly drawn face, mutation, deformed, " +
-  "blurry, bad proportions, gross proportions, unnatural body, plastic skin, deformed jaw, multiple heads, uncanny valley, " +
+  "blurry, bad proportions, gross proportions, unnatural body, plastic skin, multiple heads, " +
   "close-up, headshot, portrait, passport photo, mugshot, ID photo, centered face, static pose, " +
   "blank background, solid color background, plain background, studio backdrop, cropped head, " +
   "text, watermark, signature, username, error, " +

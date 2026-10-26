@@ -85,12 +85,19 @@ GENRE_VISUAL_STYLES: Dict[str, Dict[str, str]] = {
 
 
 def clean_narration(text: str) -> str:
-    """Removes conversational filler, greetings, quantity multipliers, and call-to-actions."""
+    """Removes conversational filler, greetings, quantity multipliers, medical/injury triggers, and call-to-actions."""
     clean = text.strip()
     for pat in FILLER_PATTERNS:
         clean = re.sub(pat, "", clean, flags=re.IGNORECASE)
     # Remove quantity multipliers like 'eighteen times', '300 doors', '5000 times' that confuse diffusion models into duplicating eyes/limbs
     clean = re.sub(r"\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|eighteen|twenty|thirty|forty|fifty|hundred|thousand|million)\s+(?:times|doors|days|hours|years|copies|rejections)\b", "", clean, flags=re.IGNORECASE)
+    # Aggressively filter physical trauma, injury, hospital, and medical deformity keywords that trigger mutilated/distorted face renders
+    clean = re.sub(
+        r"\b(?:spinal mobility|highway crash|car crash|crash|paralysis|paralyzed|wheelchair|crutches|rehabilitation|hospital|amputation|injured|injury|deformity|deformed|broken|surgery|disease|sick|illness|twisted|severed|bleeding|wound)\b",
+        "",
+        clean,
+        flags=re.IGNORECASE,
+    )
     # Remove markdown symbols and extra punctuation
     clean = re.sub(r'["\'*_#`~]', "", clean)
     clean = re.sub(r"\s+", " ", clean).strip()
@@ -121,37 +128,37 @@ def infer_genre(category: str, topic: str, text: str) -> str:
 
 CHARACTER_STYLE_PRESETS: Dict[str, Dict[str, str]] = {
     "Realism": {
-        "character_in_action": "expressive person in dynamic motion and authentic stance with natural anatomy",
+        "character_in_action": "flawlessly symmetrical human face, natural human anatomy, expressive person in dynamic motion and authentic stance",
         "environment_vibe": "richly detailed cinematic living world, deep atmospheric background architecture, authentic environmental depth of field",
         "lighting": "cinematic film still, 35mm photograph, dramatic natural rim lighting, volumetric depth",
-        "suffix": "photorealistic 8k UHD, award-winning cinematic storytelling, wide establishing environmental composition, photoreal scene, masterpiece",
+        "suffix": "photorealistic 8k UHD, award-winning cinematic storytelling, wide establishing environmental composition, photoreal scene, natural skin texture, masterpiece",
     },
     "Anime": {
-        "character_in_action": "cohesive Japanese 2D anime hero in dynamic motion and action stance, expressive anime eyes and stylized anime facial features",
+        "character_in_action": "beautiful Japanese 2D anime protagonist in dynamic motion, perfectly drawn symmetrical anime eyes, clean line art, charming anime face",
         "environment_vibe": "lush hand-painted anime landscape, Studio Ghibli and Makoto Shinkai aesthetic, gorgeous environmental scenery, deep sky vistas and floating particles",
         "lighting": "vibrant anime lighting, atmospheric god rays, glowing embers, dynamic wind",
-        "suffix": "Makoto Shinkai aesthetic, crisp clean line art, beautiful high quality Japanese animation scenery, unified anime movie still, no photo face",
+        "suffix": "Makoto Shinkai aesthetic, crisp clean line art, beautiful high quality Japanese animation scenery, unified anime movie still, perfect facial symmetry, no photo face",
     },
     "Disney 3D": {
-        "character_in_action": "expressive stylized 3D animated character in lively active motion, cohesive 3D feature animation facial anatomy",
-        "environment_vibe": "lush Pixar 3D animated world, detailed storybook architecture, rich environmental scenery, immersive background world",
+        "character_in_action": "beautifully sculpted Pixar Disney 3D animation character in dynamic action, perfectly symmetrical facial features, clear expressive eyes with centered pupils, smooth charming aesthetic, Disney animation movie quality",
+        "environment_vibe": "lush Pixar 3D animated world, vibrant storybook architecture, rich environmental scenery, immersive background world",
         "lighting": "subsurface scattering, warm studio 3d lighting, soft cinematic volumetric rim light",
-        "suffix": "Pixar 3D animation movie still, Unreal Engine 5 render, Octane render 8k, full wide animated scene, seamless 3D rendering",
+        "suffix": "Pixar Disney 3D animation movie still, Unreal Engine 5 render, Octane render 8k, full wide animated scene, polished, symmetrical face, no deformity",
     },
     "Mecha": {
-        "character_in_action": "cyberpunk operative in sleek glowing high-tech mecha exoskeleton armor with integrated cyber helmet and glowing visor",
+        "character_in_action": "cyberpunk operative in sleek glowing high-tech mecha exoskeleton armor with integrated cyber helmet and glowing visor, symmetrical anatomy",
         "environment_vibe": "neon-lit rainy futuristic cyberpunk metropolis, towering holographic skyscrapers, wet reflective asphalt, cybernetic industrial machinery in background",
         "lighting": "neon reflections in the rain, atmospheric cyan and magenta haze, dramatic volumetric sci-fi lighting",
         "suffix": "cinematic sci-fi mecha concept art, intricate mechanical armor, sharp focus, 8k wide angle scene, cohesive sci-fi design",
     },
     "Dark Fantasy": {
-        "character_in_action": "epic medieval dark fantasy knight in ornate steel plate armor, sculpted helmet, cohesive dark fantasy concept art character",
+        "character_in_action": "epic medieval dark fantasy knight in ornate steel plate armor, sculpted helmet, cohesive dark fantasy concept art character, symmetrical anatomy",
         "environment_vibe": "crumbling gothic stone fortress ruins, burning torchlight, dark volumetric mist, swirling ember fog, towering ancient castle spires in deep background",
         "lighting": "volumetric dark mist, glowing magical runes, dramatic torchlight and moonlit deep shadows",
         "suffix": "dark fantasy cinematic digital concept art, Elden Ring and Witcher aesthetic, cohesive painterly illustration, ArtStation trending, seamless character rendering, no photorealistic face collage",
     },
     "Retro Comic": {
-        "character_in_action": "vintage graphic novel superhero in heroic dynamic action stance, stylized comic book facial rendering",
+        "character_in_action": "vintage graphic novel superhero in heroic dynamic action stance, beautifully illustrated symmetrical comic book facial rendering",
         "environment_vibe": "dramatic retro comic book cityscape background, stylized noir architecture, graphic halftone skyline, dynamic perspective lines",
         "lighting": "retro pop-art halftone colors, bold black contour lines, dramatic comic noir shadows",
         "suffix": "classic superhero comic book action panel, detailed cross-hatching, vintage comic art, 8k wide action scene, uniform comic illustration",
@@ -192,9 +199,9 @@ def synthesize_scene_prompt(
 
     is_realism = style_preset and "realism" in style_preset.lower()
     quality_anchor = (
-        "flawless anatomical symmetry, natural detailed eyes, sharp focused gaze, anatomically correct photoreal"
+        "flawless facial symmetry, perfectly symmetrical eyes, natural centered pupils, harmonious facial features, authentic human anatomy, photorealistic 8k UHD"
         if is_realism
-        else "stylistically cohesive anatomy, expressive art features, seamless character rendering, no photo collage, no pasted face"
+        else "perfect facial symmetry, symmetrical almond eyes, perfectly aligned pupils, harmoniously sculpted facial features, clean beautiful art style, no distortion, no horrifying face"
     )
 
     if matched_preset:
