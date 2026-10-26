@@ -127,41 +127,47 @@ def infer_genre(category: str, topic: str, text: str) -> str:
 
 
 CHARACTER_STYLE_PRESETS: Dict[str, Dict[str, str]] = {
-    "Realism": {
-        "character_in_action": "flawlessly symmetrical human face, natural human anatomy, expressive person in dynamic motion and authentic stance",
-        "environment_vibe": "richly detailed cinematic living world, deep atmospheric background architecture, authentic environmental depth of field",
-        "lighting": "cinematic film still, 35mm photograph, dramatic natural rim lighting, volumetric depth",
-        "suffix": "photorealistic 8k UHD, award-winning cinematic storytelling, wide establishing environmental composition, photoreal scene, natural skin texture, masterpiece",
+    "Retro Comic": {
+        "style_prefix": "vintage retro comic book art panel, classic graphic novel illustration, bold black ink contour lines, pop-art halftone dots",
+        "character": "illustrated superhero in dynamic comic action stance",
+        "lighting": "dramatic comic noir lighting, stylized shadows, halftone print texture",
+        "suffix": "detailed cross-hatching, classic comic book aesthetic, 8k comic artwork",
+        "horror_style": "vintage retro horror comic book panel, Tales from the Crypt comic style, bold black ink contour lines, halftone print texture, creepy spectral entity with hollow dark eyes, eerie comic noir shadows",
     },
     "Anime": {
-        "character_in_action": "beautiful Japanese 2D anime protagonist in dynamic motion, perfectly drawn symmetrical anime eyes, clean line art, charming anime face",
-        "environment_vibe": "lush hand-painted anime landscape, Studio Ghibli and Makoto Shinkai aesthetic, gorgeous environmental scenery, deep sky vistas and floating particles",
-        "lighting": "vibrant anime lighting, atmospheric god rays, glowing embers, dynamic wind",
-        "suffix": "Makoto Shinkai aesthetic, crisp clean line art, beautiful high quality Japanese animation scenery, unified anime movie still, perfect facial symmetry, no photo face",
+        "style_prefix": "Japanese anime movie still, beautiful 2D anime illustration, clean line art, Makoto Shinkai aesthetic",
+        "character": "expressive anime protagonist in dynamic stance, symmetrical anime face",
+        "lighting": "vibrant anime lighting, atmospheric god rays, glowing embers",
+        "suffix": "crisp line art, beautiful high quality Japanese animation scenery, unified anime still",
+        "horror_style": "dark psychological horror anime movie still, creepy hand-drawn anime aesthetic, pale spectral apparition with hollow haunting eyes, eerie shadowy entity",
     },
     "Disney 3D": {
-        "character_in_action": "beautifully sculpted Pixar Disney 3D animation character in dynamic action, perfectly symmetrical facial features, clear expressive eyes with centered pupils, smooth charming aesthetic, Disney animation movie quality",
-        "environment_vibe": "lush Pixar 3D animated world, vibrant storybook architecture, rich environmental scenery, immersive background world",
-        "lighting": "subsurface scattering, warm studio 3d lighting, soft cinematic volumetric rim light",
-        "suffix": "Pixar Disney 3D animation movie still, Unreal Engine 5 render, Octane render 8k, full wide animated scene, polished, symmetrical face, no deformity",
+        "style_prefix": "Pixar Disney 3D animation style, beautifully sculpted 3D animated character, smooth CGI render",
+        "character": "expressive 3D animated character with symmetrical charming features",
+        "lighting": "warm cinematic studio 3D lighting, subsurface scattering, soft volumetric rim light",
+        "suffix": "Pixar 3D animation movie still, Unreal Engine 5 Octane render 8k, polished animated scene",
+        "horror_style": "spooky dark 3D animation, stylized haunted scene, creepy glowing apparitions, moody volumetric shadows, Tim Burton Pixar aesthetic",
     },
     "Mecha": {
-        "character_in_action": "cyberpunk operative in sleek glowing high-tech mecha exoskeleton armor with integrated cyber helmet and glowing visor, symmetrical anatomy",
-        "environment_vibe": "neon-lit rainy futuristic cyberpunk metropolis, towering holographic skyscrapers, wet reflective asphalt, cybernetic industrial machinery in background",
-        "lighting": "neon reflections in the rain, atmospheric cyan and magenta haze, dramatic volumetric sci-fi lighting",
-        "suffix": "cinematic sci-fi mecha concept art, intricate mechanical armor, sharp focus, 8k wide angle scene, cohesive sci-fi design",
+        "style_prefix": "cyberpunk mecha concept art, sleek futuristic exoskeleton armor, glowing cyber helmet",
+        "character": "cyber operative in tactical mecha armor, symmetrical anatomy",
+        "lighting": "neon reflections in the rain, atmospheric cyan and magenta haze, dramatic sci-fi lighting",
+        "suffix": "cinematic sci-fi mecha concept art, intricate mechanical armor, sharp focus, 8k wide scene",
+        "horror_style": "biomechanical horror mecha concept art, corrupted cybernetic entity with glowing malevolent visor, ominous dark industrial mist",
     },
     "Dark Fantasy": {
-        "character_in_action": "epic medieval dark fantasy knight in ornate steel plate armor, sculpted helmet, cohesive dark fantasy concept art character, symmetrical anatomy",
-        "environment_vibe": "crumbling gothic stone fortress ruins, burning torchlight, dark volumetric mist, swirling ember fog, towering ancient castle spires in deep background",
+        "style_prefix": "dark fantasy cinematic digital concept art, Elden Ring and Witcher aesthetic, gothic painterly illustration",
+        "character": "medieval knight in ornate dark plate armor, cohesive concept art character",
         "lighting": "volumetric dark mist, glowing magical runes, dramatic torchlight and moonlit deep shadows",
-        "suffix": "dark fantasy cinematic digital concept art, Elden Ring and Witcher aesthetic, cohesive painterly illustration, ArtStation trending, seamless character rendering, no photorealistic face collage",
+        "suffix": "dark fantasy concept art, ArtStation trending, seamless painterly rendering",
+        "horror_style": "grim dark fantasy horror art, terrifying necromantic specter, cursed undead knight with glowing malevolent eyes, gothic graveyard mist",
     },
-    "Retro Comic": {
-        "character_in_action": "vintage graphic novel superhero in heroic dynamic action stance, beautifully illustrated symmetrical comic book facial rendering",
-        "environment_vibe": "dramatic retro comic book cityscape background, stylized noir architecture, graphic halftone skyline, dynamic perspective lines",
-        "lighting": "retro pop-art halftone colors, bold black contour lines, dramatic comic noir shadows",
-        "suffix": "classic superhero comic book action panel, detailed cross-hatching, vintage comic art, 8k wide action scene, uniform comic illustration",
+    "Realism": {
+        "style_prefix": "cinematic 35mm film still, photorealistic wide establishing shot",
+        "character": "authentic human with symmetrical facial features and natural posture",
+        "lighting": "dramatic natural rim lighting, volumetric atmospheric depth",
+        "suffix": "photorealistic 8k UHD, award-winning cinematic storytelling, natural skin texture, masterpiece",
+        "horror_style": "cinematic horror film still, terrifyingly creepy atmosphere, pale spectral apparition with hollow haunting dark eyes, creepy ghostly face, eerie shadowy entity, deeply unnerving paranormal dread, 35mm film grain, 8k",
     },
 }
 
@@ -174,9 +180,10 @@ def synthesize_scene_prompt(
     style_preset: Optional[str] = "Realism",
 ) -> str:
     """
-    Transforms any story script sentence into a rich, photorealistic,
-    scene-specific prompt that image generators will faithfully render as a
-    full environmental cinematic scene with dynamic action (never a flat portrait).
+    Transforms any story script sentence into a rich, style-accurate,
+    scene-specific prompt that image generators will faithfully render.
+    CRITICAL: Keeps total tokens under 70 so CLIP never truncates visual style.
+    Style keywords appear at the VERY START of the prompt for maximum diffusion weight.
     """
     clean = clean_narration(script_sentence)
     genre = infer_genre(category, topic, script_sentence)
@@ -187,44 +194,56 @@ def synthesize_scene_prompt(
     if not visual_core or len(visual_core) < 4:
         visual_core = f"{category} scene, {topic}"
 
-    # Aspect framing with wide environmental establishing instruction
+    # Truncate visual_core if excessively long to preserve CLIP token budget
+    words = visual_core.split()
+    if len(words) > 18:
+        visual_core = " ".join(words[:18])
+
+    # 1. Match style preset if specified (e.g. Retro Comic, Anime, Disney 3D, Realism, Mecha, Dark Fantasy)
+    matched_preset = None
+    if style_preset:
+        for k, v in CHARACTER_STYLE_PRESETS.items():
+            if k.lower() in style_preset.lower() or style_preset.lower() in k.lower():
+                matched_preset = v
+                break
+
+    # Default to Realism if no preset matched
+    if matched_preset is None:
+        matched_preset = CHARACTER_STYLE_PRESETS["Realism"]
+
+    # 2. Check if this is a horror narrative
     is_horror = (
         genre == "Horror"
         or "horror" in category.lower()
         or any(w in f"{script_sentence} {topic}".lower() for w in ["ghost", "specter", "haunt", "demon", "creepy", "phantom", "apparition", "asylum", "curse", "shadowy figure", "entity"])
     )
 
-    if is_horror:
-        framing = "cinematic wide-angle vertical 9:16 horror scene, terrifyingly creepy atmosphere, deep ominous shadowy background" if "9:16" in aspect_ratio else "cinematic 16:9 widescreen horror scene, terrifyingly creepy atmospheric depth"
-        quality_anchor = "spine-chilling horror aesthetic, pale spectral apparition with hollow haunting dark eyes, creepy ghostly face, eerie shadowy entity, deeply unnerving paranormal dread, masterclass horror cinematography, scary atmospheric realism, 8k"
-    else:
-        framing = "cinematic wide-angle vertical 9:16 establishing shot, deep environmental background, dynamic action in full scene" if "9:16" in aspect_ratio else "cinematic 16:9 widescreen environmental establishing composition, deep background, dynamic action in full scene"
-        is_realism = style_preset and "realism" in style_preset.lower()
-        quality_anchor = (
-            "flawless facial symmetry, perfectly symmetrical eyes, natural centered pupils, harmonious facial features, authentic human anatomy, photorealistic 8k UHD"
-            if is_realism
-            else "perfect facial symmetry, symmetrical almond eyes, perfectly aligned pupils, harmoniously sculpted facial features, clean beautiful art style, no distortion, no deformed face"
-        )
+    framing_tag = "vertical 9:16 composition" if "9:16" in aspect_ratio else "widescreen 16:9 composition"
 
-    if matched_preset and not is_horror:
+    # Assemble compact, high-impact prompt where STYLE ALWAYS COMES FIRST
+    if is_horror:
+        style_lead = matched_preset.get("horror_style", matched_preset["style_prefix"])
         prompt_parts = [
-            f"Cinematic wide establishing scene of {visual_core}",
-            f"featuring {matched_preset['character_in_action']}",
-            matched_preset["environment_vibe"],
-            framing,
-            quality_anchor,
+            style_lead,
+            f"scene of {visual_core}",
+            framing_tag,
+            matched_preset["lighting"],
+        ]
+    else:
+        prompt_parts = [
+            matched_preset["style_prefix"],
+            f"scene depicting {visual_core}",
+            matched_preset["character"],
+            framing_tag,
             matched_preset["lighting"],
             matched_preset["suffix"],
         ]
-    else:
-        prompt_parts = [
-            f"Cinematic wide establishing scene of {visual_core}",
-            genre_style["lighting"],
-            genre_style["camera"],
-            framing,
-            quality_anchor,
-            genre_style["suffix"],
-        ]
 
-    return ", ".join(p for p in prompt_parts if p)
+    # Clean and assemble - keep under 65 words (~70 tokens)
+    full_prompt = ", ".join(p for p in prompt_parts if p)
+    tokens_approx = full_prompt.split()
+    if len(tokens_approx) > 55:
+        full_prompt = " ".join(tokens_approx[:55])
+
+    return full_prompt
 

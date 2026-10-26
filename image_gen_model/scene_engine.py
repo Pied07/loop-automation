@@ -336,11 +336,11 @@ class StorySceneEngine:
         import torch
         gen = torch.Generator(device=self.pipe.device).manual_seed(seed) if seed is not None else None
         is_turbo = "turbo" in getattr(self, "current_model_id", "").lower()
-        inf_steps = 2 if is_turbo else steps
-        inf_guidance = 1.5 if is_turbo else guidance_scale
+        inf_steps = 1 if is_turbo else steps
+        inf_guidance = 0.0 if is_turbo else guidance_scale
         inf_w = 512 if is_turbo else (width // 8) * 8
         inf_h = 512 if is_turbo else (height // 8) * 8
-        eff_neg = negative_prompt or COMPREHENSIVE_NEGATIVE_PROMPT
+        eff_neg = None if is_turbo else (negative_prompt or COMPREHENSIVE_NEGATIVE_PROMPT)
 
         try:
             with torch.inference_mode():
@@ -351,8 +351,9 @@ class StorySceneEngine:
                     "height": inf_h,
                     "width": inf_w,
                     "generator": gen,
-                    "negative_prompt": eff_neg,
                 }
+                if eff_neg is not None:
+                    pipe_kwargs["negative_prompt"] = eff_neg
 
                 result = self.pipe(**pipe_kwargs)
                 img = result.images[0]
