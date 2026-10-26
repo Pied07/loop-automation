@@ -1262,8 +1262,8 @@ class AIVideoEngine:
         dur_match = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", probe.stderr)
         if dur_match:
             audio_dur = int(dur_match.group(1)) * 3600 + int(dur_match.group(2)) * 60 + float(dur_match.group(3))
-            # Synchronize video duration with requested timer (e.g. 60s for 1 min video), or speech length if longer
-            total_dur = max(float(duration), audio_dur + 0.4)
+            # Synchronize video duration directly with vocal narration length so voiceover speaks across 100% of the video duration!
+            total_dur = audio_dur + 0.4
         else:
             total_dur = float(duration)
 

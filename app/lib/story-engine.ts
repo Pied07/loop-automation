@@ -97,12 +97,47 @@ export const CHARACTER_ENSEMBLES = [
           "Red emergency strobes bathed the narrow passage in rhythmic crimson pulses, casting elongated shadows along the titanium bulkheads.",
           "Maya dropped down behind him, deploying a miniature acoustic drone that mapped enemy positions through the reinforced steel doors.",
           "'They have installed a seismic charge on the central coupling,' Maya whispered, tapping the holographic tactical display on her wrist.",
-          "'If Arthur Sterling's mercenaries realize they are cornered, they will decouple the passenger cars into the canyon abyss.'",
+          "'If the mercenaries realize they are cornered, they will decouple the passenger cars into the canyon abyss.'",
           "Leo advanced with tactical discipline, slicing through the smoke-filled galley with his weapon held at high-ready.",
           "Through the panoramic passenger windows, snow-capped alpine peaks blurred past like jagged razor blades under the moonlight.",
           "Every second brought them closer to the border checkpoint where the syndicate planned to transfer the stolen warhead onto a private chopper.",
           "Leo breached the double security blast doors of Car 4, where the syndicate commander stood with his finger resting over a remote detonator.",
-          "'Step away from the console, Sterling,' Leo commanded, his laser sight locked dead center on the detonator's transceiver."
+          "'Step away from the console, Sterling,' Leo commanded, his laser sight locked dead center on the detonator's transceiver.",
+          "A hail of automatic rifle fire from concealed side alcoves ricocheted off Leo's ballistic shield as reinforcements converged.",
+          "'Take cover behind the bulkhead!' Maya shouted, hurling a flashbang down the narrow aisle.",
+          "The deafening concussion disoriented the syndicate shooters, allowing Leo to advance with rapid, calculated fire.",
+          "The train rocked violently as it rounded a mountain curve at nearly four hundred kilometers per hour, throwing two mercenaries off balance.",
+          "Leo vaulted over a row of executive passenger seats, disarming a rifleman in mid-stride with a devastating sweep.",
+          "Maya scrambled to the primary server terminal, plugging in a military-grade cryptographic bypass to prevent the payload from arming.",
+          "'The biometric code requires an iris scan from the syndicate commander!' Maya called out over the chatter of gunfire.",
+          "Leo locked eyes with the commander across the smoke-filled compartment, reading the desperation in his hardened face.",
+          "'You're too late, Sterling,' the commander snarled, reaching for a secondary detonator pinned to his tactical vest.",
+          "Leo fired a non-lethal disabling round, knocking the commander against the reinforced observation window.",
+          "Maya grabbed the optical scanner, forcing the commander's eyelid open to synchronize the bypass key.",
+          "The terminal flashed amber as the first phase of the countdown was successfully halted with twenty-two seconds to spare.",
+          "Suddenly, heavy footsteps thundered on the exterior metal roof directly above their heads.",
+          "A secondary strike team had deployed from an overhead stealth gunship, cutting through the ceiling with thermal lances.",
+          "Shower of molten titanium sprayed across the aisle as the roof buckled under the weight of armored assault troops.",
+          "'They are willing to destroy the entire train just to bury the evidence!' Maya shouted, bracing herself against the wall.",
+          "Leo reloaded with his last high-capacity magazine, his breathing steady despite the chaos closing in around them.",
+          "'We fight our way to the locomotive engine, Maya. That's where the manual emergency brake is housed,' Leo ordered.",
+          "She nodded, priming two miniature shock grenades to cover their forward movement through the connecting vestibule.",
+          "The air smelled heavily of cordite, melted rubber, and freezing alpine mist blowing through the breached roof.",
+          "Outside, searchlights from the pursuing gunship illuminated the snowy gorge thousands of feet below the trestle bridge.",
+          "Every instinct honed over fifteen years of covert operations told Leo that this was a trap designed to wipe them out completely.",
+          "Yet retreat was impossible; letting the bioweapon reach the border would ignite an international catastrophe.",
+          "Maya fired three rapid suppressing shots down the exterior catwalk, forcing the lead gunship operative to take cover.",
+          "'Catwalk is clear for ten seconds, Leo! Move now!' she signaled, unhooking her tactical safety tether.",
+          "They lunged through the pressurized airlock, wind tearing at their uniforms as they fought for traction on the icy outer gangway.",
+          "The train's magnetic suspension shrieked as emergency power cut out, plunging the rear carriages into darkness.",
+          "Behind them, the thermal lances breached the ceiling completely, and armed commandos poured into the carriage they had just vacated.",
+          "Leo turned, firing two precise rounds into the pressurized fuel lines above the door, triggering a localized firewall that halted the pursuit.",
+          "Flames roared into the sub-zero night air, creating an impassable barrier between them and the syndicate strike team.",
+          "Maya reached the heavy steel hatch of Car 3, rapidly entering the bypass sequence while bullets chipped the doorframe beside her cheek.",
+          "'Almost got it... latch is disengaging!' Maya shouted, throwing her full weight against the heavy lever.",
+          "The heavy hatch swung inward, pulling them inside just as a sniper bullet punched through the glass inches from Leo's helmet.",
+          "They sealed the hatch from the inside, panting in the dim amber glow of the emergency auxiliary lights.",
+          "Ahead of them lay the final three hundred meters of the train\u2014and the heavily fortified control cabin of the locomotive."
         ],
         "cliffhanger": "The syndicate commander smirked and slammed his palm onto the emergency release lever, causing the floor beneath Leo and Maya to buckle violently as the train decoupled at full speed... Follow right now for Part 2 to witness the high-speed extraction!"
       },
@@ -127,7 +162,22 @@ export const CHARACTER_ENSEMBLES = [
           "The train shuddered violently, sliding across the glowing rails in a shower of brilliant white sparks before coming to a dead halt ten feet from the cliff edge.",
           "Silence settled over the alpine pass, broken only by the ticking of the cooling reactor and the distant sound of falling snow.",
           "Maya leaned against the console with an exhausted grin, securing the recovered biometric briefcase in her tactical pouch.",
-          "Leo holstered his weapon, tapped his radio frequency, and announced: 'Extraction complete. The syndicate is neutralized.'"
+          "Leo holstered his weapon, tapped his radio frequency, and announced: 'Extraction complete. The syndicate is neutralized.'",
+          "Through the shattered cockpit windshield, the dawn broke over the alpine horizon, casting long golden beams across the snow.",
+          "Maya inspected the biometric container's seal, confirming that the digital failsafes had remained intact throughout the struggle.",
+          "'If that train had made it across the border, three million people would have been exposed by noon,' Maya said softly.",
+          "Leo patted her shoulder, wiping sweat and gunpowder residue from his tactical goggles.",
+          "'Good work, Maya. You held your nerve when the bridge gave out,' Leo replied, his voice firm and steady.",
+          "In the distance, the rhythmic thumping of friendly rescue helicopters echoed through the mountain valley.",
+          "Two black tactical Blackhawks crested the ridge, their searchlights locking onto the steaming locomotive.",
+          "Friendly operatives rappelled down onto the snow-covered platform, establishing a defensive perimeter around the wreckage.",
+          "Leo and Maya stepped out into the crisp mountain air, feeling the biting cold soothe their bruised muscles and scorched gear.",
+          "The syndicate's multi-billion-dollar shadow operation had been completely shattered in forty minutes of unyielding courage.",
+          "Every operative on the squad knew that the mission would never appear in official news broadcasts or military histories.",
+          "Yet the quiet knowledge of having stood between millions of innocent lives and catastrophic devastation was the only reward they needed.",
+          "Maya handed the briefcase to the extraction commander, watching the biometric lock click into government quarantine custody.",
+          "Leo took one last look back at the winding mountain tracks stretching back toward the darkened tunnel.",
+          "The danger had passed, the conspirators were in federal custody, and peace was secured for another day."
         ],
         "cliffhanger": "As the extraction helicopter lowered its winch, an incoming missile lock warning shrieked inside the cockpit... Follow for Part 3!",
         "resolution": "Agent Leo Sterling and Maya Ray neutralized the syndicate, secured the biometric weapon, and saved hundreds of innocent lives.",
@@ -179,7 +229,29 @@ export const CHARACTER_ENSEMBLES = [
           "Yet beneath the polished press releases lay billions in redirected pension funds and illicit offshore covenants.",
           "Marcus keyed in the secondary emergency backup frequency, uploading duplicate partitions to their secure cloud proxy.",
           "'If we lose this uplink now, twenty thousand pensioners lose everything by morning,' Evelyn stated without looking up.",
-          "The forensic algorithm completed its pass, revealing Arthur Sterling's personal digital signature on the authorizing wire."
+          "The forensic algorithm completed its pass, revealing Arthur Sterling's personal digital signature on the authorizing wire.",
+          "Evelyn examined the hash keys, confirming that the transfer codes originated from Sterling's penthouse IP address.",
+          "Marcus locked the surveillance van's secondary blast doors, his hand resting near the emergency GPS beacon.",
+          "In the distance, the muffled rumble of approaching security patrol vehicles resonated off the granite facades.",
+          "Every second of delay increased the probability of their signal being triangulated by corporate countermeasures.",
+          "Evelyn zoomed in on the bank routing numbers, discovering accounts registered under names of deceased foreign diplomats.",
+          "'This wasn't an ordinary embezzlement,' Marcus muttered, cross-referencing corporate filings from Delaware and Panama.",
+          "'This was an intentional decapitalization scheme designed to bankrupt the parent firm while shielding executive bonuses.'",
+          "A sudden shadow crossed the alleyway camera feed, moving deliberately toward their rear bumper.",
+          "Marcus tapped the dashboard screen, shifting the infrared optics to track the approaching individual.",
+          "'It's Sterling's head of internal security,' Marcus murmured, recognizing the scarred jawline from the congressional hearing transcripts.",
+          "Evelyn remained laser-focused, watching the encryption decryption percentage reach ninety-four percent.",
+          "Her fingers flew across the keyboard, setting up automated mirror nodes across four independent cloud regions.",
+          "If their physical hardware was seized or destroyed, the dossiers would automatically publish to twenty international newsrooms at dawn.",
+          "The heavy rain muffled the sound of the intruder's footsteps, but the wet scraping of boot leather on gravel was unmistakable.",
+          "Marcus pulled a high-intensity blinding strobe from the glove compartment, preparing to defend the van's side egress.",
+          "'Do not open that door until the checksum validates,' Evelyn instructed with steely composure.",
+          "The forensic ledger unmasked the full magnitude of the financial fraud: over seven billion dollars systematically drained.",
+          "Every signature was backed by timestamped cryptographic handshakes that no defense attorney could challenge in court.",
+          "The countdown clock on Evelyn's screen hit zero as the final verification block fell into place.",
+          "A heavy metallic object struck the van's rear door, followed by the sound of a crowbar jamming into the hinge mechanism.",
+          "'Time to move, Marcus,' Evelyn said, closing the laptop and securing the primary drive in her shielded briefcase.",
+          "Marcus shifted into drive, his foot hovering over the accelerator as the alleyway suddenly filled with high-beam halogen headlights."
         ],
         "cliffhanger": "Just as the final encrypted audit trail synchronized, a laser targeting beam painted the dashboard, and a gloved hand banged violently against the van door... Follow right now for Part 2!"
       },
@@ -205,7 +277,23 @@ export const CHARACTER_ENSEMBLES = [
           "Evelyn bypassed the firewall of the city communications array, using Sterling's own stolen cryptographic key.",
           "Her hands moved across the keyboard with surgical precision despite the violent rattling of the suspension.",
           "Every document in the dossier was now verified, containing sworn affidavits, audio intercepts, and forensic ledgers.",
-          "Behind them, the pursuit vehicle clipped a concrete barrier, spinning across the wet tracks in a shower of sparks."
+          "Behind them, the pursuit vehicle clipped a concrete barrier, spinning across the wet tracks in a shower of sparks.",
+          "Marcus swerved around an abandoned maintenance tram, cutting the headlights to navigate solely by thermal sensors.",
+          "Evelyn confirmed that the secondary satellite dish was powered on and awaiting the direct optical injection.",
+          "The damp subterranean air carried the pungent smell of ozone and burning rubber as they neared the harbor exit.",
+          "Wind whipped off the bay as Marcus shoved the steel security door of the pier tower open and bolted the heavy crossbar.",
+          "'We have four minutes before they breach that door,' Evelyn said, her fingers numb as she plugged the terminal into the transmitter.",
+          "Below them, sledgehammers pounded against the reinforced iron, rattling the entire steel staircase.",
+          "Marcus calibrated the microwave dish, aligning the broadcast beam toward the regional television antennas.",
+          "'Arthur Sterling is live on national television right now at his annual charity gala,' Marcus said, checking his phone.",
+          "'Then let's give his guests a presentation they will never forget,' Evelyn replied, initiating the satellite hijack.",
+          "On thousands of screens across the nation, the live gala feed flickered and replaced Sterling's speech with the incriminating ledger.",
+          "The silence that fell over the high-society gala ballroom across town was captured live on every national network.",
+          "Every guest, investor, and television viewer watched in stunned disbelief as forensic evidence proved the multi-billion fraud.",
+          "Below the tower, the sound of sledgehammers abruptly ceased as federal law enforcement sirens converged on the pier.",
+          "Marcus and Evelyn stood together on the gantry, looking out over the illuminated skyline as the truth echoed worldwide.",
+          "Decades of systemic corruption had been disassembled in thirty seconds of undeniable mathematical proof.",
+          "Arthur Sterling was arrested on live television at dawn, and every stolen dollar was returned to the pension funds."
         ],
         "cliffhanger": "As the van skidded onto the pier, the automated security gates slammed shut, trapping them against the dark harbor water with headlights closing in... Follow for Part 3 to witness the showdown!",
         "resolution": "Arthur Sterling was arrested on live television at dawn, and every stolen dollar was returned to the pension funds.",
@@ -258,7 +346,20 @@ export const CHARACTER_ENSEMBLES = [
           "The air grew dense with the stench of ozone, petrified bone, and ancient scorched iron as the shadows lengthened.",
           "Gabriel stepped forward into the center of the nave, his greatsword carving glowing arcs through the gathering mist.",
           "Visions of his fallen brothers flashed before his eyes\u2014their souls trapped within the obsidian walls of this godless tomb.",
-          "He knew that once they crossed the inner threshold, neither prayer nor armor could guarantee their return to the sunlight."
+          "He knew that once they crossed the inner threshold, neither prayer nor armor could guarantee their return to the sunlight.",
+          "The shadows against the towering obsidian buttresses detached themselves, coalescing into serpentine specters with talons of black ice.",
+          "Gabriel swung with two hands, his enchanted blade shearing through the spectral manifestations in a spray of azure sparks.",
+          "'Gabriel, the runes upon the altar are reversing!' Morwenna called out, her hands glowing with volatile blood magic.",
+          "The ground beneath them split open, revealing subterranean rivers of liquid silver illuminating the catacombs below.",
+          "A bone-chilling shriek resonated through the vaulted ceiling, cracking the ancient stonework and sending granite boulders crashing down.",
+          "Gabriel caught Morwenna by the arm, diving beneath the archway of the inner sanctum as a massive pillar collapsed behind them.",
+          "'We cannot turn back now,' Gabriel said grimly, gazing into the subterranean chasm where the Eclipse Core throbbed like a dying star.",
+          "Morwenna withdrew the silver crucible from her robes, preparing the final counter-binding ritual to seal the rift.",
+          "Every breath in this subterranean darkness felt like inhaling ground glass, but their resolve remained unshakeable.",
+          "A phalanx of undead knights stepped from the gloom, their corroded plate armor held together by dark sorcery.",
+          "Gabriel braced his shield against the front rank, holding the choke point with veteran precision and unwavering courage.",
+          "'Complete the ritual, Morwenna! I will hold this line until the dawn!' Gabriel roared, driving his blade into the stone floor.",
+          "The cathedral vibrated with apocalyptic resonance as the final eclipse reached its peak in the cursed sky above."
         ],
         "cliffhanger": "As the throne room doors collapsed inward, an colossal shadow crowned in jagged obsidian stepped from the abyss, raising a cursed black cleaver... Drop a like and follow for Part 2!"
       },
@@ -266,16 +367,15 @@ export const CHARACTER_ENSEMBLES = [
         "chapter_num": 2,
         "hook": "Picking up right after the throne room breach, Sir Gabriel Thorne intercepted Malakor's colossal black cleaver with his shield, sparks showering across the dark flagstones.",
         "core_beats": [
-          "The shockwave knocked Lady Morwenna backward into the rune circle as Gabriel was driven to one knee by the monstrous blow.",
           "'Gabriel, strike at the soul prism embedded in his chest!' Morwenna screamed, hurling two flasks of volatile alchemical fire.",
           "The azure explosion engulfed Malakor in blinding light, exposing the pulsing crimson crystal fused to his necrotic ribcage.",
           "Malakor roared with the fury of a thousand damned souls, the sound shattering the ancient stained glass of the cathedral.",
           "Gabriel rolled beneath a sweeping counterstrike, his blade slicing through the armor joints of the undead titan.",
           "Dark ichor hissed like acid against the stone as Gabriel channeled the last ember of the sacred Sun fire through his hilt.",
-          "'You fought for a kingdom that betrayed you, paladin,' Malakor's hollow voice echoed inside Gabriel's mind."
+          "'You fought for a kingdom that betrayed you, paladin,' Malakor's hollow voice echoed inside Gabriel's mind.",
+          "The obsidian pillars groaned under the violent tremors of their duel, raining chunks of ancient masonry onto the altar."
         ],
         "expansion_beats": [
-          "The obsidian pillars groaned under the violent tremors of their duel, raining chunks of ancient masonry onto the altar.",
           "Morwenna chanted frantically, drawing upon her own vitality to weave shimmering spectral chains around Malakor's limbs.",
           "The chains pulled taut with a deafening screech of stressed iron, momentarily anchoring the monstrosity to the altar floor.",
           "'Now, Gabriel! The prism is exposed!' she cried out, blood trickling from her lips under the strain of the spell.",
@@ -284,7 +384,13 @@ export const CHARACTER_ENSEMBLES = [
           "The curse that had held the Forgotten Kingdom in torment for six hundred years began to dissolve into silver ash.",
           "Malakor's physical form collapsed into a pile of lifeless blackened plate armor, leaving only the shattered core.",
           "Gabriel stood breathing heavily amidst the silence of the dawn, offering a hand to pull Morwenna from the stone floor.",
-          "Through the shattered cathedral rose-window, the first rays of true sunlight in six centuries touched the ashlands."
+          "Through the shattered cathedral rose-window, the first rays of true sunlight in six centuries touched the ashlands.",
+          "The black blight across the valley receded in waves of shimmering mist, revealing green shoots rising from the ancient soil.",
+          "Morwenna smiled through her exhaustion, holding the neutralized sliver of star-crystal in her palm.",
+          "'It is finished, Gabriel. The order was wrong\u2014the darkness was not eternal,' she whispered.",
+          "Gabriel unclasped his battered helm, letting the cool morning wind sweep across his scarred face.",
+          "They turned together toward the eastern horizon, where the sun rose over a kingdom finally liberated from its torment.",
+          "The bells of the citadel tolled once more, not in doom, but in celebration of a dawn that mortals had waited six hundred years to see."
         ],
         "cliffhanger": "As they picked up the remains of the core, a faint heartbeat throbbed within the stone... Follow right now for Part 3!",
         "resolution": "Malakor was vanquished, and the curse over the Forgotten Kingdom was broken forever as sunlight returned to the realm.",
@@ -337,7 +443,20 @@ export const CHARACTER_ENSEMBLES = [
           "Debris rained down over the sea as Ren ignited the high-frequency vibro-blade to engage the secondary interceptors.",
           "'Commander, seismic sensors show a colossal anomaly emerging from the clouds directly beneath you!' Maya shouted.",
           "Ren looked down as the clouds parted to reveal a mechanical leviathan the size of an aircraft carrier rising into firing range.",
-          "Its primary particle accelerator was charging directly toward the city center below."
+          "Its primary particle accelerator was charging directly toward the city center below.",
+          "Ren executed an inverted barrel roll, dropping through the flak barrier at three times the speed of sound.",
+          "Missiles streaked across his HUD as Vanguard's automated point-defense turrets intercepted thirty incoming projectiles in two seconds.",
+          "'Coolant pressure is dropping in the left thruster manifold, Ren!' Maya's voice urged through the static.",
+          "'Reroute auxiliary reactor power to the forward kinetic dampeners, Maya,' Ren instructed, pulling hard on the dual flight sticks.",
+          "The g-forces pressed him deep into the shock-absorbing pilot couch as Vanguard carved a glowing arc through the night sky.",
+          "The mechanical leviathan fired its secondary plasma batteries, scorching Vanguard's titanium shoulder armor.",
+          "Ren countered with a full volley of micro-missiles, targeting the exhaust ports of the leviathan's anti-gravity generators.",
+          "Secondary detonations ripped across the alien ship's hull, causing the colossal warship to list thirty degrees to port.",
+          "'Maya, I'm going inside the trench of the main hull to plant the seismic disruptor,' Ren announced.",
+          "'That's suicide, Ren! The thermal radiation will fry your cockpit before you can eject!' Maya protested.",
+          "'If that cannon fires, fifty million civilians die, Maya. Prepare the remote detonation sequence on my mark.'",
+          "Vanguard dove headfirst into the heavily defended trench, blazing twin plasma cannons at automated defensive turrets.",
+          "Sparks and shrapnel pelted the armored canopy as Vanguard closed the distance to the central core."
         ],
         "cliffhanger": "Vanguard-01's thruster fuel gauge flashed red just as the titan leviathan fired its main orbital cannon directly at the cockpit... Follow for Part 2 to witness the dogfight!"
       },
@@ -413,7 +532,15 @@ export const CHARACTER_ENSEMBLES = [
           "'The director attempted to summon an entity from the lower catacombs,' Clara murmured, reading a blood-stained ledger.",
           "'He believed he could harness eternal memory, but whatever came through the portal consumed everyone inside in a single night.'",
           "A sudden thud resonated from the ceiling directly above their heads, followed by the sound of rapid, crawling footsteps.",
-          "Lucas stepped in front of Clara, his knuckles white around the flashlight as the hallway lights began to flicker and burst one by one."
+          "Lucas stepped in front of Clara, his knuckles white around the flashlight as the hallway lights began to flicker and burst one by one.",
+          "The shadows along the baseboards stretched upward like reaching fingers, defying the beam of their lanterns.",
+          "Clara quickly drew a protective circle of salt around their feet, chanting the binding verses in ancient Latin.",
+          "The temperature dropped so low that frost began forming across the glass of Lucas's watch face.",
+          "Every clock in the building was frozen at exactly 3:17 AM, ticking backward in a slow, unnatural cadence.",
+          "Lucas noticed that their shadows on the wall were moving independently of their bodies, raising twisted arms toward the ceiling.",
+          "'Do not look into the mirrors on the walls, Lucas!' Clara warned, pulling an antique silver talisman from her coat.",
+          "From deep within the ventilation grates came the muffled sound of hundreds of voices whispering in discordant unison.",
+          "Lucas gripped his weapon, knowing that whatever ruled this asylum was closing in to claim them as permanent residents."
         ],
         "cliffhanger": "Then the heavy iron doors at both ends of the ward slammed shut simultaneously, plunging them into total darkness as something whispered Clara's name... Follow right now for Part 2!"
       },
@@ -491,7 +618,14 @@ export const CHARACTER_ENSEMBLES = [
           "Across the bridge stood the towering double gates of the inner sanctum, adorned with golden sun dials.",
           "Elena scanned the perimeter with thermal binoculars, detecting faint heat signatures moving along the upper ledges.",
           "'We are definitely not alone down here,' Elena said quietly, unholstering her tactical machete and flare pistol.",
-          "Nathan smiled despite the danger, his curiosity far outweighing any sense of self-preservation."
+          "Nathan smiled despite the danger, his curiosity far outweighing any sense of self-preservation.",
+          "They advanced across the narrow bridge step by step, feeling the vibrations of ancient subterranean gears turning beneath their feet.",
+          "Every carving along the parapet depicted celestial maps with constellations that had shifted thousands of years ago.",
+          "Elena pointed to a cluster of petrified skeletons lying near the gateway, still clutching ornate bronze shields.",
+          "'Others found this place before us, Nathan,' she observed, 'but none of them ever made it past the threshold.'",
+          "Nathan knelt down, carefully examining a pressure plate hidden beneath the dust of ages.",
+          "With a surgeon's delicate touch, he inserted a titanium shim to disable the counterweighted pendulum trap.",
+          "The bronze mechanism clicked softly, releasing the tension and granting them safe passage to the massive gates."
         ],
         "cliffhanger": "Suddenly, the center span of the stone bridge began to retract into the cavern walls, cutting off their retreat as stone sentinels awoke on the opposite ledge... Follow for Part 2 to see the escape!"
       },
@@ -567,7 +701,12 @@ export const CHARACTER_ENSEMBLES = [
           "The doubt that had weighed down her mind for months began to incinerate under the heat of pure determination.",
           "She realized that pain was temporary, but quitting would remain a permanent stain on her soul.",
           "When ordinary people would have thrown in the towel and walked away, she dug deeper into her spiritual reservoir.",
-          "The sun began to peek over the stadium bleachers, casting a long golden shadow across the final hundred meters."
+          "The sun began to peek over the stadium bleachers, casting a long golden shadow across the final hundred meters.",
+          "Every breath burned in her chest, but it was the burn of life returning to muscles that refused to die.",
+          "Thomas paced along the infield grass, calling out lap times that were rivaling her pre-injury personal bests.",
+          "'Feel the track beneath you, Maya!' Thomas shouted. 'You are not fighting your past\u2014you are writing your future!'",
+          "She leaned into the final bend, the cold wind whipping across her face as her stride lengthened with ferocious elegance.",
+          "The mental barrier that had held her hostage for two hundred days dissolved into pure, unstoppable momentum."
         ],
         "cliffhanger": "As she crossed the finish line of her twentieth lap, the stopwatch display showed a time that shocked Coach Vance to his core... Follow for Part 2 to see the world championship comeback!"
       },
@@ -640,7 +779,12 @@ export const CHARACTER_ENSEMBLES = [
           "The psychological association was brilliant and diabolical: smoking was no longer an unhealthy habit, it was the ultimate badge of liberty.",
           "Within hours, telegraph wires carried the phrase 'Torches of Freedom' to front pages across Europe, America, and Asia.",
           "The American Tobacco Company watched its sales to women surge by hundreds of percent over the subsequent twelve months.",
-          "Every modern marketing agency today still uses this exact Bernays formula: never sell the physical product, sell the buyer's desired identity."
+          "Every modern marketing agency today still uses this exact Bernays formula: never sell the physical product, sell the buyer's desired identity.",
+          "Bernays understood that human beings are fundamentally irrational creatures driven by unconscious desires for status and belonging.",
+          "By manipulating the symbols that people associate with freedom, he proved that mass behavior could be steered like a herd of cattle.",
+          "Decades later, archival records revealed that the entire parade stunt cost less than five thousand dollars to orchestrate.",
+          "Yet it generated hundreds of millions of dollars in recurring corporate profits across three generations of consumers.",
+          "The psychological playbook Bernays invented would soon be adopted by political campaigns, military intelligence, and global cartels."
         ],
         "cliffhanger": "Wait until you see how Bernays used the exact same trick to overturn a Central American government... Follow right now for Part 2!",
         "resolution": "Edward Bernays permanently transformed global marketing by exploiting subconscious desire rather than logical utility.",
@@ -747,11 +891,59 @@ export function findMatchingInterestingFact(prompt: string, excludeId: string = 
 }
 
 /**
+ * Procedural narrative deepening generator that generates genre-specific,
+ * character-named expansion sentences when a long duration (e.g. 5 to 10 minutes)
+ * is selected, guaranteeing that the script length is EXACTLY equivalent to the video duration.
+ */
+function getDynamicDeepeningBeats(
+  char1: string,
+  char2: string,
+  enemy: string,
+  setting: string,
+  genre: string,
+  count: number = 30
+): string[] {
+  const c1 = char1.split(",")[0].trim();
+  const c2 = char2.split(",")[0].trim();
+  const beats: string[] = [];
+
+  const genericTemplates = [
+    `${c1} adjusted their tactical stance, calculating the exact trajectory of the hazard developing across ${setting}.`,
+    `"Stay focused, ${c2}!" called out ${c1}, keeping a watchful eye on the perimeter to prevent ${enemy} from advancing.`,
+    `${c2} accessed the secondary diagnostics, bypassing the corrupted protocol with steady, practiced precision.`,
+    `The atmosphere within ${setting} grew dense as unseen mechanisms shifted beneath the floorboards.`,
+    `Every passing second brought new clarity to the real objective behind ${enemy}'s coordinated maneuvers.`,
+    `${c1} signaled for an immediate defensive repositioning as echoing vibrations rattled the structural supports.`,
+    `"We are running out of time before the window closes permanently," ${c2} warned, monitoring the fluctuating sensors.`,
+    `A sudden fracture of light revealed a hidden access corridor that historical schematics had failed to document.`,
+    `${c1} and ${c2} pressed forward together, their shared training allowing them to move in perfect synchronized harmony.`,
+    `The stakes had expanded far beyond their original mission parameters into a struggle that neither could afford to lose.`,
+    `Through the reinforced observation glass, ${c1} observed the silhouettes of secondary reinforcements deploying across the courtyard.`,
+    `${c2} synchronized the auxiliary transmitters, ensuring that every piece of decrypted telemetry was permanently archived.`,
+    `"They underestimated our resolve from the very beginning," ${c1} stated with quiet, unwavering determination.`,
+    `The hum of electrical conduits resonated through the damp concrete walls as backup generators kicked into gear.`,
+    `With tactical precision honed over years of relentless discipline, they navigated around the primary sensor sweep.`,
+    `"Hold your fire until we have confirmed the target coordinates," ${c2} cautioned, analyzing the fluctuating frequencies.`,
+    `A sharp metallic chime indicated that the secondary failsafe protocol was already initiating its countdown.`,
+    `${c1} moved with fluid speed, neutralizing the perimeter lock and clearing the way into the inner containment sector.`,
+    `Neither fatigue nor fear could slow their advance as the final confrontation with ${enemy} drew inevitably closer.`,
+    `The silence of ${setting} was broken only by their synchronized footsteps and the rhythmic beep of the guidance system.`
+  ];
+
+  for (let i = 0; i < count; i++) {
+    const tpl = genericTemplates[i % genericTemplates.length];
+    const prefix = i >= genericTemplates.length ? `Advancing to the secondary sector, ` : "";
+    beats.push(`${prefix}${tpl}`);
+  }
+  return beats;
+}
+
+/**
  * Main story generator that guarantees:
- * 1. Category is strictly respected (Action -> Action, Horror -> Horror, etc.).
- * 2. Characters are introduced by name in the opening sentence.
- * 3. In multi-part videos, Part 2 contains 0% duplicate sentences from Part 1.
- * 4. Supports durations from 1 minute (60s) up to 10 minutes (600s) (~140 to ~1400 words).
+ * 1. Script length is EQUIVALENT to the selected time duration (60s -> ~140 words, 300s -> ~690 words, 600s -> ~1380 words).
+ * 2. Category is strictly respected (Action -> Action, Horror -> Horror, etc.).
+ * 3. Characters are introduced by name in the opening sentence.
+ * 4. In multi-part videos, Part 2 contains 0% duplicate sentences from Part 1.
  * 5. Generates 1 to 20 AI scene visual prompts evenly distributed across sentences.
  */
 export async function generateStoryParts(params: {
@@ -779,6 +971,11 @@ export async function generateStoryParts(params: {
   const clampedDuration = Math.max(60, Math.min(600, Number(duration)));
   const clampedImages = Math.max(1, Math.min(20, Number(numImages)));
 
+  // Target word count based on standard speaking rate (~2.3 words/sec, ~138 words/min)
+  // For 60s (1 min): ~138 words
+  // For 180s (3 min): ~414 words
+  // For 300s (5 min): ~690 words
+  // For 600s (10 min): ~1380 words
   const targetWords = Math.round(clampedDuration * 2.3);
 
   const cleanPrompt = (prompt || "").trim().toLowerCase();
@@ -786,16 +983,13 @@ export async function generateStoryParts(params: {
   const cleanStyle = (sceneStyle || "").trim().toLowerCase();
 
   // CATEGORY-FIRST ENSEMBLE MATCHING:
-  // Strictly prioritize the user's selected category!
   let matchedEnsemble = null;
 
   if (cleanCategory && cleanCategory !== "others") {
-    // 1. Match category and style if possible
     matchedEnsemble = CHARACTER_ENSEMBLES.find((e) =>
       (e.category.toLowerCase() === cleanCategory || e.genre.toLowerCase() === cleanCategory) &&
       cleanStyle && e.genre.toLowerCase() === cleanStyle
     );
-    // 2. Otherwise match category alone
     if (!matchedEnsemble) {
       matchedEnsemble = CHARACTER_ENSEMBLES.find((e) =>
         e.category.toLowerCase() === cleanCategory || e.genre.toLowerCase() === cleanCategory
@@ -803,19 +997,16 @@ export async function generateStoryParts(params: {
     }
   }
 
-  // 3. If prompt has specific keywords, try matching keywords
   if (!matchedEnsemble && cleanPrompt) {
     matchedEnsemble = CHARACTER_ENSEMBLES.find((e) =>
       e.keywords && e.keywords.some((k: string) => cleanPrompt.includes(k))
     );
   }
 
-  // 4. If category is Others or not matched yet, match by sceneStyle
   if (!matchedEnsemble && cleanStyle) {
     matchedEnsemble = CHARACTER_ENSEMBLES.find((e) => e.genre.toLowerCase() === cleanStyle);
   }
 
-  // 5. Fallback
   if (!matchedEnsemble) {
     matchedEnsemble = CHARACTER_ENSEMBLES[0];
   }
@@ -851,7 +1042,7 @@ export async function generateStoryParts(params: {
       }
     }
 
-    // 3. Dynamic Narrative Expansion for requested duration (up to 10 minutes)
+    // 3. Narrative Expansion Beats (up to hundreds of words)
     if (chapter.expansion_beats && countWords(pSentences) < targetWords - 35) {
       for (const exp of chapter.expansion_beats) {
         if (!usedGlobalSentences.has(exp)) {
@@ -862,7 +1053,26 @@ export async function generateStoryParts(params: {
       }
     }
 
-    // 4. Chapter Ending: Cliffhanger (if more parts follow) or Resolution + CTA (if last part)
+    // 4. Procedural Deepening Beats to GUARANTEE script length matches 5 to 10 min durations!
+    if (countWords(pSentences) < targetWords - 35) {
+      const deepBeats = getDynamicDeepeningBeats(
+        matchedEnsemble.char1,
+        matchedEnsemble.char2,
+        matchedEnsemble.enemy,
+        matchedEnsemble.setting,
+        matchedEnsemble.genre,
+        60
+      );
+      for (const deep of deepBeats) {
+        if (!usedGlobalSentences.has(deep)) {
+          pSentences.push(deep);
+          usedGlobalSentences.add(deep);
+          if (countWords(pSentences) >= targetWords - 35) break;
+        }
+      }
+    }
+
+    // 5. Chapter Ending: Cliffhanger or Resolution + CTA
     if (!isLast && clampedParts > 1) {
       const cliff = (chapter.cliffhanger || "What happened next will shock you... Follow right now for Part " + (pNum + 1) + "!")
         .replace(/Part\s+\d+/gi, `Part ${pNum + 1}`);
@@ -878,7 +1088,7 @@ export async function generateStoryParts(params: {
 
     const scriptText = pSentences.join(" ");
 
-    // 5. Generate 1 to 20 AI Scene Visual Prompts
+    // 6. Generate 1 to 20 AI Scene Visual Prompts evenly distributed across the script
     const scenes: StoryScene[] = [];
     for (let sIdx = 0; sIdx < clampedImages; sIdx++) {
       const sentIndex = Math.min(pSentences.length - 1, Math.floor((sIdx * pSentences.length) / clampedImages));
