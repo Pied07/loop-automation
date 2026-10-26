@@ -19,11 +19,12 @@ from flask_cors import CORS
 from PIL import Image
 
 COMPREHENSIVE_NEGATIVE_PROMPT = (
+    "collaged face, pasted face, cut-and-paste face, mismatched face, photo collage, cutout head, frankenstein face, "
     "extra eyes, multi eyes, mutated eyes, duplicate eyes, crossed eyes, fused eyes, deformed iris, deformed pupils, "
     "asymmetrical face, deformed face, bad face anatomy, distorted facial features, cloned face, morbid, mutilated, "
     "extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, extra fingers, missing fingers, "
     "fused fingers, too many fingers, deformed hands, poorly drawn hands, poorly drawn face, mutation, deformed, "
-    "blurry, bad proportions, gross proportions, unnatural body, "
+    "blurry, bad proportions, gross proportions, unnatural body, plastic skin, deformed jaw, multiple heads, uncanny valley, "
     "close-up, headshot, portrait, passport photo, mugshot, ID photo, centered face, static pose, "
     "blank background, solid color background, plain background, studio backdrop, cropped head, "
     "text, watermark, signature, username, error, "

@@ -30,7 +30,7 @@ export interface StoryResult {
  * Synthesizes a clean, high-fidelity visual prompt for a scene image,
  * systematically stripping conversational filler and quantity multipliers (e.g. 'eighteen times', '300 doors')
  * that trigger facial warping or feature duplication in diffusion models,
- * and anchoring anatomical symmetry.
+ * and anchoring anatomical symmetry and stylized aesthetic cohesion.
  */
 export function buildCleanVisualPrompt(
   sceneText: string,
@@ -56,140 +56,268 @@ export function buildCleanVisualPrompt(
     }
   }
 
-  const sceneComposition = "cinematic wide-angle environmental establishing shot, dynamic action in full scene, deep background architecture and scenery, atmospheric environmental storytelling, natural anatomy";
-  return `Cinematic scene of ${clean}, ${sceneComposition}, ${styleDescriptor}, vertical 9:16 framing, photorealistic 8k`;
+  const isRealism = /realism|photoreal|35mm/i.test(styleDescriptor);
+  const sceneComposition = isRealism
+    ? "cinematic wide-angle environmental establishing shot, dynamic action in full scene, deep background architecture and scenery, atmospheric environmental storytelling, natural human anatomy, photorealistic 8k"
+    : "cinematic wide-angle environmental establishing shot, dynamic action in full scene, deep background architecture and scenery, atmospheric environmental storytelling, unified artistic illustration, seamless character rendering, no photorealistic face collage";
+
+  return `Cinematic scene of ${clean}, ${sceneComposition}, ${styleDescriptor}, vertical 9:16 framing`;
 }
 
-
-export const STYLE_NARRATIVE_PROFILES: Record<string, { genreTag: string; visualDesc: string; narrativeVibe: string; hooks: string[]; developments: string[]; cliffhangers: string[]; resolutions: string[] }> = {
+export const STYLE_NARRATIVE_PROFILES: Record<string, {
+  genreTag: string;
+  visualDesc: string;
+  narrativeVibe: string;
+  hooks: string[];
+  developments: string[];
+  cliffhangers: string[];
+  resolutions: string[];
+  partBridges?: string[];
+}> = {
   "Dark Fantasy": {
     genreTag: "Dark Fantasy",
-    visualDesc: "dark fantasy masterpiece, steel plate knight armor, glowing mystical runes, ominous atmospheric mist, blood red moonlight, Elden Ring and Witcher aesthetics, photorealistic 8k",
+    visualDesc: "dark fantasy concept art masterpiece, sculpted dark steel plate knight armor, glowing mystical runes, ominous atmospheric mist, blood red moonlight, Elden Ring and Witcher aesthetics, cohesive painterly digital illustration, seamless character anatomy",
     narrativeVibe: "dark grimdark fantasy with ancient curses and eldritch secrets",
     hooks: [
-      "In the cursed ashlands of the Forgotten Kingdom, no mortal dared kindle an open fire after dusk.",
-      "The ancient obsidian gate had remained sealed for six centuries beneath the cathedral of bones.",
-      "Carrying a broken rune-forged greatsword, the lone knight walked into the shadow of the weeping fortress.",
+      "In the cursed ashlands of the Forgotten Kingdom, no mortal dared kindle an open flame after dusk.",
+      "The ancient obsidian gate had remained sealed for six centuries beneath the cathedral of weeping bones.",
+      "Carrying a rune-forged greatsword pulsing with ancient blood magic, the lone knight entered the shadow of the crying fortress.",
+      "Beneath the petrified gargoyles of the fallen kingdom, an unholy bell tolled for the first time in a thousand years.",
+      "They whispered that whoever entered the Eclipse Citadel would trade their mortal soul for forbidden ancestral power.",
     ],
     developments: [
-      "Whispers echoed from the hollow stones, speaking of an ancient blood pact sealed in silence.",
-      "A storm of black ash began to descend, extinguishing the last remaining torchlight across the valley.",
-      "Carved into the crypt walls were the glowing glyphs of the immortal dragon lords who ruled before mankind.",
-      "Every step deeper into the citadel revealed the petrified remains of heroes who came before.",
+      "Whispers echoed from the hollow stone walls, reciting an ancient blood pact sealed in silence by the dragon lords.",
+      "A suffocating storm of black ash descended across the valley, extinguishing the last remaining torchlight in an instant.",
+      "Carved into the deep crypt walls were the glowing crimson glyphs of immortal sorcerer kings who ruled before the age of man.",
+      "Every step deeper into the citadel revealed the petrified remains of fallen champions who had dared challenge the silence.",
+      "The ground beneath his armored sabatons trembled as subterranean chains groaned, hoisting an obsidian altar from the depths.",
+      "Visions of forgotten wars flooded his mind, depicting a celestial rebellion that shattered the sun into dying embers.",
+      "Cold ethereal fog swirled around the shattered throne, taking the spectral form of an ancient monarch clutching an unholy crest.",
+      "The air grew dense with ozone and ancient iron as the rune carvings upon the greatsword flared with blinding scarlet fire.",
+      "Drawing upon forbidden necromantic oaths, the knight braced his shield against the onslaught of shadowy phantoms.",
+      "Across the ruined grand cathedral, broken stained-glass windows mirrored a blood-red eclipse bleeding light over the realm.",
+      "He discovered a leather-bound chronicle stained with dark ichor, warning that the gatekeeper was once a king sworn to protect mankind.",
+      "With every heartbeat, the dark aura emanating from the central chamber grew heavier, testing the absolute limits of mortal will.",
+    ],
+    partBridges: [
+      "The blood moon rose higher over the weeping fortress as the true trial of shadows began.",
+      "Deep inside the subterranean crypt, an ancient omen awakened from its six-century slumber.",
+      "With his runic greatsword vibrating violently against the darkness, the knight pressed deeper into the forbidden sanctum.",
+      "The silence shattered as the cathedral foundations groaned under the weight of an awakening eldritch titan.",
     ],
     cliffhangers: [
-      "As the black steel door groaned open, two glowing crimson eyes pierced through the void. Follow for Part {next_part}!",
-      "The runes etched upon his blade suddenly flared with blinding red flame. Check Part {next_part} for the final clash!",
+      "As the black steel door groaned open, two glowing crimson eyes pierced through the endless void. Follow for Part {next_part}!",
+      "The runes etched upon his blade suddenly flared with blinding crimson flame as the shadow leaped. Check Part {next_part} for the final clash!",
+      "A deafening battle horn sounded from beneath the floorboards, awakening the army of petrified guardians. Follow now for Part {next_part}!",
     ],
     resolutions: [
-      "With one final surge of ancestral power, the eldritch curse was broken, bathing the ashlands in dawn.",
-      "The knight stood victorious over the fallen throne, claiming the forbidden relic that would reshape the realm.",
+      "With one final surge of ancestral power, the eldritch curse was broken, bathing the ashlands in the radiant light of dawn.",
+      "The knight stood victorious over the fallen throne, claiming the forbidden relic that would reshape the fate of the realm.",
+      "Planting his blade into the obsidian pedestal, the dark eclipse faded and eternal warmth returned to the forgotten kingdom.",
     ],
   },
   "Mecha": {
     genreTag: "Futuristic Mecha",
-    visualDesc: "futuristic mecha sci-fi masterpiece, giant bipedal battle robots, glowing cyber exoskeleton armor, neon HUD reflections, hydraulic thrusters, cyberpunk neon city rain, ultra detailed 8k",
+    visualDesc: "futuristic mecha sci-fi concept art masterpiece, giant bipedal battle robots, sleek cybernetic exoskeleton armor, glowing neon visor, HUD reflections, hydraulic thrusters, cyberpunk neon city rain, sharp focus, cohesive sci-fi design",
     narrativeVibe: "futuristic high-tech mecha combat and cybernetic warfare",
     hooks: [
       "Deep beneath Neo-Tokyo in Hangar 07, the forbidden Titan-Class Mecha was powered on for the first time in thirty years.",
       "When the orbital defense grid collapsed, only one experimental cybernetically linked robot stood between humanity and total annihilation.",
       "The neural synchronization gauge flashed warning red as pilot Eva locked her consciousness into the mechanical war engine.",
+      "A rogue artificial intelligence breached the planetary perimeter, deploying thousands of hunter-killer drones across the neon skyline.",
+      "High above the smog-choked stratosphere, an abandoned military orbital platform fired its orbital particle cannon at the city below.",
     ],
     developments: [
       "Hydraulic valves hissed with superheated plasma as the dual shoulder-mounted particle cannons charged to maximum yield.",
       "The enemy fleet dropped through the ionosphere, deploying hundreds of autonomous combat drones over the burning skyline.",
       "Overclocking the core reactor to two hundred percent, the mecha leaped across the skyscraper rooftops at Mach 3.",
       "Internal telemetry sensors detected an unknown cybernetic virus attempting to hijack the central pilot neural link.",
+      "The pilot manually rerouted the backup cooling conduits, pushing the quantum turbine past safe thermodynamic thresholds.",
+      "Shockwaves from the supersonic boosters shattered the reinforced glass of towering corporate skyscrapers below.",
+      "Tactical holographic overlays illuminated the rain-slicked battlefield, calculating microsecond evasion trajectories against incoming laser barrages.",
+      "A direct kinetic strike detonated against the left titanium shoulder plate, sending warning sirens blaring through the cockpit.",
+      "Synchronizing the neural link to ninety-nine percent, the boundary between human intuition and machine reflex vanished entirely.",
+      "The city power grid below flickered and died as the Titan drew emergency wattage to charge its ultimate electromagnetic railgun.",
+      "Hostile electronic counter-measures jammed all satellite communication, leaving the pilot alone against an invading armada.",
+      "Flames and electrical sparks trailed from the mecha's back thrusters as it stabilized from a near-fatal atmospheric descent.",
+    ],
+    partBridges: [
+      "With city sirens wailing and the skyline engulfed in plasma fire, the decisive counterattack commenced.",
+      "The neural gauge reached critical redline as the mothership descended through the burning neon clouds.",
+      "Overriding every safety limit on the quantum reactor, the steel titan prepared to make its final stand.",
+      "As emergency coolant vented into the midnight rain, an ominous seismic signature registered on the radar.",
     ],
     cliffhangers: [
       "A colossal mothership descended through the neon clouds, targeting the city core. Follow right now for Part {next_part}!",
-      "The core reactor began its critical 30-second meltdown countdown. See what happened in Part {next_part}!",
+      "The core reactor began its critical 30-second meltdown countdown with enemy missiles locked on. See what happened in Part {next_part}!",
+      "An unexpected secondary signature powered up behind the smoke—a mecha identical to his own. Follow for Part {next_part}!",
     ],
     resolutions: [
       "Unleashing a devastating synchronized EMP wave, the Titan Mecha eradicated the hostile armada and saved the metropolis.",
-      "Standing amidst the smoking battlefield, the lone steel warrior raised its plasma blade in decisive victory.",
+      "Standing amidst the smoking battlefield as the morning sun rose, the lone steel warrior raised its plasma blade in decisive victory.",
+      "The pilot disconnected from the neural dock, having permanently rewritten the history of modern cybernetic warfare.",
     ],
   },
   "Anime": {
     genreTag: "Anime Hero",
-    visualDesc: "Studio Ghibli and Makoto Shinkai inspired anime aesthetic, expressive vibrant anime hero, glowing energy aura, luminous sky, crisp clean outlines, masterpiece anime visual",
+    visualDesc: "Studio Ghibli and Makoto Shinkai inspired anime aesthetic, expressive vibrant anime hero, glowing energy aura, luminous sky, crisp clean outlines, seamless Japanese animation art, unified anime illustration, no photo face",
     narrativeVibe: "epic anime adventure with supernatural power awakenings",
     hooks: [
       "Born without a single trace of elemental spiritual energy, everyone in the academy called him an outcast.",
       "On the night of the crimson lunar eclipse, the forbidden ancient seal on his right arm shattered.",
-      "Standing alone on the mountain peak under starry skies, he unlocked the legendary lost technique.",
+      "Standing alone on the mountain peak under starry skies, he unlocked the legendary lost technique of the celestial masters.",
+      "When the dark guild surrounded the village sanctuary, a dormant ancient spirit awakened within his soul.",
+      "A mysterious scroll found in the forgotten archives spoke of a warrior who could command both storm and flame.",
     ],
     developments: [
-      "A blazing golden aura exploded around his body, defying the laws of the spirit realm.",
-      "The grandmaster stared in disbelief as the supposedly talentless student deflected the ultimate technique.",
-      "Remembering the promise he made to his fallen mentor, he refused to take a single step backward.",
+      "A blazing golden aura exploded around his body, defying the fundamental spiritual laws of the martial realm.",
+      "The grandmaster stared in utter disbelief as the supposedly talentless student deflected the ultimate secret strike with a single palm.",
+      "Remembering the sacred promise he made to his fallen mentor, he refused to take a single step backward.",
       "Energy rippled across the battlefield as the two greatest prodigies of the era met at supersonic speed.",
+      "Swirling spiritual pressure kicked up gale-force winds, scattering cherry blossom petals across the ancient stone courtyard.",
+      "He closed his eyes and breathed deeply, tapping into an ocean of celestial power that had slumbered for generations.",
+      "Every strike produced thundering sonic booms that shook the mountain peaks and lit the night sky with azure lightning.",
+      "His opponents stepped back in awe as ancient draconic markings illuminated along his forearms.",
+      "Through blood and unbroken discipline, he transformed the mockery of his past into the fuel of his ultimate awakening.",
+      "The celestial seal cracked completely, releasing a golden phoenix of spiritual energy that spread across the heavens.",
+      "With crystal clarity, he perceived every movement of his adversary in slow motion, dodging effortlessly.",
+      "Standing amidst swirling ethereal embers, he focused his entire spirit into one singular, decisive strike.",
+    ],
+    partBridges: [
+      "The spiritual storm unleashed across the mountain pass as the ancient master stepped into the ring.",
+      "As cherry blossoms were swept away by gale-force winds, the true extent of his dormant power was unveiled.",
+      "With the celestial eclipse reaching totality, the final duel between prodigy and master commenced.",
+      "The ground beneath the temple began to levitate as ancient spiritual frequencies resonated through the air.",
     ],
     cliffhangers: [
       "Drawing his blade to reveal its true spiritual form, the arena went completely silent. Follow for Part {next_part}!",
-      "An unexpected challenger emerged from the shadows of the arena. Don't miss Part {next_part}!",
+      "An unexpected challenger emerged from the shadows of the temple courtyard. Don't miss Part {next_part}!",
+      "The sky split open as two opposing celestial dragons materialized above the arena. Check Part {next_part} now!",
     ],
     resolutions: [
       "He surpassed every limit set by the ancient masters, establishing a legendary new era of heroes.",
-      "With an unstoppable burst of radiant light, he secured victory and proved that will triumphs over destiny.",
+      "With an unstoppable burst of radiant light, he secured victory and proved that indomitable will triumphs over destiny.",
+      "The academy elders bowed in respect, acknowledging him as the rightful protector of the realm.",
     ],
   },
   "Disney 3D": {
     genreTag: "Pixar 3D",
-    visualDesc: "Pixar and Disney 3D style character animation, charming stylized facial features, warm 3D studio lighting, subsurface scattering, colorful magical atmosphere, 8k render",
+    visualDesc: "Pixar and Disney 3D style character animation, charming stylized facial features, warm 3D studio lighting, subsurface scattering, colorful magical atmosphere, full 3D animated scene, seamless 3D render",
     narrativeVibe: "heartwarming animated adventure with wonder and whimsical discovery",
     hooks: [
       "In a whimsical clockwork village tucked between rolling green hills, a curious apprentice made an extraordinary discovery.",
       "Every animal in the enchanted forest possessed a magical talent—except for Barnaby the little red fox.",
       "Hidden inside grandmother's attic was a miniature golden compass that didn't point north—it pointed to adventure.",
+      "When the annual Starlight Festival lanterns floated away on a runaway cloud, one tiny inventor had a daring idea.",
+      "Deep inside the Whispering Valley, a playful baby dragon had lost its way home to the Cloud Kingdom.",
     ],
     developments: [
-      "With a joyful spark and a twirl of gears, the little brass automaton sprang to life and blinked happily.",
-      "They journeyed past floating rainbow waterfalls and glowing crystal caves that nobody had ever seen.",
+      "With a joyful spark and a twirl of gears, the little brass automaton sprang to life and blinked happily with glowing blue eyes.",
+      "They journeyed past floating rainbow waterfalls and glowing crystal caves that nobody in the village had ever seen.",
       "When a sudden gust of wind scattered the village's prized starlight festival balloons, Barnaby knew what he had to do.",
       "Working together with a quirky band of friendly forest creatures, they devised the most creative rescue plan.",
+      "A trail of sparkling enchanted acorns guided them through the canopy as singing bluebirds pointed the way.",
+      "The little clockwork wings fluttered into motion, lifting the brave inventor just high enough to touch the morning clouds.",
+      "Laughter echoed across the enchanted meadow as friendly forest mice built a bridge out of intertwined honeysuckle vines.",
+      "Inside the heart of the great hollow oak, thousands of tiny fireflies lit up a map of secret underground tunnels.",
+      "With curiosity outmatching fear, the little friends helped the lost creature find comfort by singing a whimsical lullaby.",
+      "Every obstacle they faced was met with teamwork, quick thinking, and a warm sense of joyful optimism.",
+      "Magical sparkles filled the air as the ancient clockwork machine whirred back to life with a cheerful melody.",
+      "Hand in hand, the band of little dreamers realized that the true magic was the friendship they forged along the journey.",
+    ],
+    partBridges: [
+      "Following the glowing trail of enchanted stardust, the little adventurers discovered a hidden clockwork doorway.",
+      "With gears whirring and magical lanterns flickering, they ventured past the whispering waterfalls into the unknown.",
+      "As twilight painted the enchanted forest in warm hues of lavender and gold, the real challenge began.",
+      "High above the treetops on a flying leaf glider, they caught their first glimpse of the lost kingdom.",
     ],
     cliffhangers: [
       "Reaching into the hollow glowing oak tree, Barnaby discovered the missing golden key. Follow for Part {next_part}!",
-      "A giant friendly shadow stepped out from the magical mist. See who it was in Part {next_part}!",
+      "A giant friendly shadow stepped out from the magical mist with a warm smile. See who it was in Part {next_part}!",
+      "The map began glowing with secret rainbow pathways that led straight into the clouds. Follow for Part {next_part}!",
     ],
     resolutions: [
       "The entire village cheered as the festival lights illuminated the night sky in breathtaking beauty.",
       "Barnaby discovered that the greatest magic of all wasn't spells or potions—it was having the courage to be yourself.",
+      "The little baby dragon was safely reunited with its family, circling the village in a joyous shower of colorful stardust.",
     ],
   },
   "Retro Comic": {
     genreTag: "Pop-Art Comic",
-    visualDesc: "vintage 1970s comic book pop-art style, bold black ink outlines, dynamic halftone dot shading, vibrant saturated colors, dramatic superhero pose, retro aesthetic",
+    visualDesc: "vintage 1970s comic book pop-art style, bold black ink outlines, dynamic halftone dot shading, vibrant saturated colors, dramatic superhero pose, authentic comic panel aesthetic, unified comic art",
     narrativeVibe: "golden age comic book heroics with dynamic cliffhanger drama",
     hooks: [
       "By day, mild-mannered photojournalist Jack Miller was invisible—but when the city sirens wailed, justice answered.",
-      "The nefarious Doctor Chronos had just frozen the downtown financial district inside a temporal stasis field.",
-      "High above the gargoyles of Empire City, the masked guardian watched the midnight bank heist unfold.",
+      "The nefarious Doctor Chronos had just frozen the downtown financial district inside an impenetrable temporal stasis field.",
+      "High above the stone gargoyles of Empire City, the masked guardian watched the midnight bank heist unfold.",
+      "A mysterious transmission crackled across the police radios: the Crimson Skull had broken out of Ironwood Penitentiary.",
+      "Underneath the city subway tracks, an underground syndicate had built an experimental tectonic earthquake generator.",
     ],
     developments: [
       "Leaping across steel suspension cables, our hero intercepted the hypersonic getaway flyer in mid-air.",
       "With a thundering punch that rattled the city grid, the villain's sonic disruptor was shattered into pieces.",
       "The city police were trapped inside the vault, leaving only seconds before the countdown hit zero.",
       "Using every ounce of enhanced superhuman strength, he lifted the collapsing bridge beam to safety.",
+      "Bullet-proof gauntlets deflected incoming laser bursts as our hero dashed across the rain-slicked rooftop.",
+      "Doctor Chronos sneered from the control room, activating the backup generators with a sinister mechanical laugh.",
+      "Bold onomatopoeic shockwaves echoed through the concrete streets as fists clashed in a battle for the city's soul.",
+      "Dodging past high-voltage electric traps, the masked crusader closed the distance to the master control terminal.",
+      "With the entire metropolitan power grid surging towards a blackout, he made a split-second tactical maneuver.",
+      "A smoke grenade filled the skyscraper boardroom, turning the fight into a shadow game of speed and wits.",
+      "He remembered the vow he made beneath the city lights: never let innocent citizens live in fear of tyranny.",
+      "Ripping the primary power conduit from the villain's mechanical harness, the temporal field began to collapse.",
+    ],
+    partBridges: [
+      "Sirens wailed across the neon skyscraper district as Doctor Chronos unleashed his secondary shockwave.",
+      "Swinging from suspension cables through the midnight fog, our hero arrived at the secret waterfront docks.",
+      "With only thirty seconds remaining on the doomsday clock, the city's fate hung by a single thread.",
+      "Bursting through the skylight in a flurry of glass and smoke, justice met the criminal mastermind face to face.",
     ],
     cliffhangers: [
       "Just as the villain seemed cornered, a smoke grenade detonated on the rooftop! Follow for Part {next_part}!",
       "The timer on the temporal device dropped to three seconds! Check Part {next_part} for the thrilling climax!",
+      "From the shadows of the blimp stepped an unexpected arch-nemesis with a sinister grin. Check Part {next_part} now!",
     ],
     resolutions: [
       "With the mastermind in handcuffs and the city saved, the masked hero vanished into the moonlit skyline.",
       "Once again, the forces of justice prevailed, proving that good will always triumph over darkness.",
+      "The morning sun broke over Empire City as the mayor presented the key to the city to our unnamed protector.",
     ],
   },
   "Realism": {
     genreTag: "Photorealism",
     visualDesc: "cinematic 35mm photography, natural human skin texture and lifelike eyes, dramatic film lighting, shallow depth of field, photorealistic 8k",
     narrativeVibe: "cinematic photorealistic narrative grounded in realism",
-    hooks: [],
-    developments: [],
-    cliffhangers: [],
-    resolutions: [],
+    hooks: [
+      "It started as an ordinary rainy morning, until an unexpected sealed letter arrived on his desk.",
+      "Looking out across the foggy skyline, she realized the decision she had to make would change everything.",
+      "The boardroom fell completely silent as the evidence was placed upon the center table.",
+      "After years of searching through forgotten county archives, the final missing document was finally in his hands.",
+      "Standing at the edge of the quiet harbor, he knew there was no turning back from this journey.",
+    ],
+    developments: [
+      "Every detail in the files pointed to a coordinated operation that had remained hidden in plain sight.",
+      "The tension in the room was palpable as footsteps approached the double wooden doors.",
+      "He cross-referenced the flight manifests with the offshore financial records, uncovering an undeniable pattern.",
+      "Under the warm amber streetlamps, they spoke in hushed tones about what had to happen next.",
+      "The rain continued to beat against the glass windowpane as the clock ticked closer to midnight.",
+      "With calm precision and years of discipline, she prepared the final presentation that would expose the truth.",
+      "A sudden realization hit him: the person who leaked the data had been on their team the entire time.",
+      "Walking through the crowded city streets, every passerby seemed like an observer in a high-stakes chess match.",
+    ],
+    partBridges: [
+      "As dusk settled over the skyline, the true motive behind the transaction was laid bare.",
+      "Behind closed doors, the pressure escalated to a fever pitch as key players took their positions.",
+      "With the deadline rapidly approaching, every piece of the puzzle snapped into place.",
+    ],
+    cliffhangers: [
+      "Just as he clicked send on the encrypted file, his phone rang with an unknown overseas caller. Follow for Part {next_part}!",
+      "She turned around to find the safe door wide open and the folder gone. Follow for Part {next_part}!",
+    ],
+    resolutions: [
+      "The truth was finally revealed to the world, restoring justice and closing a painful chapter for good.",
+      "Standing by the quiet waterfront at dawn, he finally found the peace that had eluded him for so long.",
+    ],
   },
 };
 
@@ -1170,8 +1298,62 @@ export async function generateStoryParts(params: {
   const clampedParts = Math.max(1, Math.min(5, Number(numParts)));
   const clampedDuration = Math.max(10, Math.min(120, Number(duration)));
   const clampedImages = Math.max(1, Math.min(5, Number(numImages)));
-  const sentencesNeeded = Math.max(3, Math.min(14, Math.floor(clampedDuration / 6.5)));
+  
+  // Calibrate word count to duration: average narration rate is 2.25-2.3 words/sec.
+  // 60s video -> ~135-145 words. 30s -> ~70 words. 20s -> ~46 words.
+  const targetWords = Math.max(25, Math.round(clampedDuration * 2.3));
+  const minSentencesNeeded = Math.max(4, Math.ceil(targetWords / 15));
   const effectiveCategory = catClean === "Others" && customTag.trim() ? customTag.trim() : catClean;
+
+  const countWords = (arr: string[]) => arr.join(" ").trim().split(/\s+/).filter(Boolean).length;
+
+  const CATEGORY_BRIDGES: Record<string, string[]> = {
+    "Horror": [
+      "The cold air grew suffocating as the shadows lengthened across the hallway.",
+      "A sudden metallic vibration rattled the doorframe from the locked room inside.",
+      "The floorboards groaned under the weight of an unseen presence standing beside us.",
+    ],
+    "Adventure": [
+      "Every compass reading went wild as the expedition plunged deeper into the uncharted canyon.",
+      "With the ropes straining under violent gusts of wind, the path ahead narrowed to a knife-edge.",
+      "Our atmospheric sensors began flashing warning sirens as the cavern floor opened beneath us.",
+    ],
+    "Romance": [
+      "Under the quiet amber streetlights, the unspoken truth between them could no longer be denied.",
+      "Every passing moment made the distance between their worlds feel smaller and smaller.",
+      "With fingers barely brushing against the antique locket, a forgotten memory surfaced.",
+    ],
+    "Educational": [
+      "Archival satellite logs and laboratory spectrometry revealed an anomaly that puzzled top researchers.",
+      "When the mathematical model was simulated in reverse, a shocking correlation emerged.",
+      "Instruments detected a rhythmic signal deep within the core samples that defied existing physics.",
+    ],
+    "Comedy": [
+      "And just when everyone thought the situation couldn't possibly get any worse, total chaos struck.",
+      "The neighbors gathered on their porches with popcorn as the mechanical malfunction escalated.",
+      "What happened in the next sixty seconds will permanently go down in family folklore.",
+    ],
+    "Action": [
+      "With adrenaline surging through his veins and warning klaxons shrieking, there was only one way forward.",
+      "Shattered glass rained down over the alleyway as the secondary ambush was triggered.",
+      "Overclocking his tactical harness, he leaped across the chasm under heavy crossfire.",
+    ],
+    "Interesting Facts": [
+      "Declassified archival documents from that year reveal an even more shocking calculated secret.",
+      "What corporate executives and government officials whispered behind closed doors was never made public.",
+      "The real breakthrough happened when an overlooked laboratory error was analyzed under magnification.",
+    ],
+    "Motivational": [
+      "At the exact breaking point where ordinary people surrender, an unshakeable inner discipline took over.",
+      "Through the sweat, exhaustion, and silence of an empty arena, the turning point was quietly forged.",
+      "He shut out the doubts of the crowd, locked his eyes on the target, and refused to yield.",
+    ],
+    "Others": [
+      "As the twilight deepened, the true nature of the mystery unfolded with unexpected clarity.",
+      "Every piece of evidence gathered over the preceding weeks pointed towards one astonishing conclusion.",
+      "The silence was broken by an unmistakable pulse resonating through the chamber.",
+    ],
+  };
 
   // 1. INTERESTING FACTS
   if (catClean === "Interesting Facts") {
@@ -1186,7 +1368,9 @@ export async function generateStoryParts(params: {
         const pSentences: string[] = [
           `Have you ever wondered the bizarre true origin of ${subject}? What history books rarely tell you is that it was shaped by an unbelievable real-world accident.`,
         ];
-        for (const s of scrapedSents.slice(0, sentencesNeeded - 1)) {
+        let sentIdx = 0;
+        while (countWords(pSentences) < targetWords - 22 && sentIdx < scrapedSents.length) {
+          const s = scrapedSents[sentIdx++];
           if (!pSentences.includes(s)) pSentences.push(s);
         }
         pSentences.push(`Today, the legacy of ${subject} has permanently transformed our world. Save this video right now and follow for more untold daily facts!`);
@@ -1217,7 +1401,7 @@ export async function generateStoryParts(params: {
           isLastPart: true,
         });
       } else {
-        const sentsPerPart = Math.max(3, sentencesNeeded - 2);
+        const sentsPerPart = Math.max(3, Math.ceil(scrapedSents.length / clampedParts));
         for (let pIdx = 0; pIdx < clampedParts; pIdx++) {
           const pNum = pIdx + 1;
           const isLast = pNum === clampedParts;
@@ -1226,7 +1410,8 @@ export async function generateStoryParts(params: {
           if (pNum === 1) {
             pSentences.push(`Have you ever wondered the bizarre untold origin of ${subject}? What history books never teach you is that it was created by pure accident.`);
           } else {
-            pSentences.push(`Welcome back to Part ${pNum}. The untold story of ${subject} takes an even stranger turn...`);
+            const bridge = CATEGORY_BRIDGES["Interesting Facts"][(pIdx - 1) % CATEGORY_BRIDGES["Interesting Facts"].length];
+            pSentences.push(bridge);
           }
 
           const chunkStart = (pIdx * sentsPerPart) % Math.max(1, scrapedSents.length);
@@ -1234,7 +1419,7 @@ export async function generateStoryParts(params: {
           for (const s of rotated) {
             if (!pSentences.includes(s)) {
               pSentences.push(s);
-              if (pSentences.length >= sentencesNeeded - 1) break;
+              if (countWords(pSentences) >= targetWords - 20) break;
             }
           }
 
@@ -1291,9 +1476,14 @@ export async function generateStoryParts(params: {
     const deepBackground = [
       "Behind closed doors, the initial prototypes faced relentless skepticism and doubt from industry veterans.",
       "Every conventional expert at the time insisted that this strange concept could never survive in the open market.",
+      "The inventors exhausted their personal bank accounts, mortgaged their homes, and worked through freezing winter nights in secret.",
+      "Corporate competitors launched aggressive smear campaigns to suppress the breakthrough before it could reach the public eye.",
       "Yet against all odds, a single breakthrough moment changed the entire trajectory of the project.",
       "The secret lied in a completely overlooked detail that none of the competitors had ever noticed.",
       "What began as an ignored laboratory anomaly soon unlocked an entirely unprecedented technological breakthrough.",
+      "Archival court filings prove that multiple international patents were fought over this exact formula for over twenty years.",
+      "When the finished innovation was finally unveiled to journalists, the demonstration stunned every critic in the auditorium.",
+      "Within months of launch, consumer demand exploded so rapidly that factories operated twenty-four hours a day to keep up.",
     ];
 
     const partsData: StoryPart[] = [];
@@ -1301,10 +1491,12 @@ export async function generateStoryParts(params: {
     if (clampedParts === 1) {
       const cleanBody = factItem.part_2_body.replace(/^Welcome back to Part \d+\.\s*/, "").trim();
       const pSentences = [factItem.part_1_hook];
-      for (const bg of deepBackground) {
-        if (pSentences.length < sentencesNeeded - 2) pSentences.push(bg);
-      }
       pSentences.push(cleanBody);
+      
+      let bgI = 0;
+      while (countWords(pSentences) < targetWords - 25 && bgI < deepBackground.length) {
+        pSentences.push(deepBackground[bgI++]);
+      }
       pSentences.push(factItem.part_2_suspense);
       pSentences.push("Save this video right now and follow for more mind-bending untold facts every single day!");
 
@@ -1341,30 +1533,32 @@ export async function generateStoryParts(params: {
 
         if (pNum === 1) {
           pSentences.push(factItem.part_1_hook);
-          pSentences.push("Nobody at the time questioned the real motive behind what was happening.");
-          for (let bgIdx = 0; bgIdx < deepBackground.length; bgIdx++) {
-            if (pSentences.length < sentencesNeeded - 1 && bgIdx % 2 === 0) {
-              pSentences.push(deepBackground[bgIdx]);
-            }
+          pSentences.push("Nobody at the time questioned the real calculated motive behind what was taking place.");
+          let bgI = 0;
+          while (countWords(pSentences) < targetWords - 30 && bgI < deepBackground.length) {
+            pSentences.push(deepBackground[bgI]);
+            bgI += 2;
           }
           pSentences.push(factItem.part_1_suspense);
         } else if (isLast) {
-          pSentences.push(`Welcome back to the final Part ${pNum}. The shocking truth is finally revealed.`);
+          const bridge = CATEGORY_BRIDGES["Interesting Facts"][(pIdx - 1) % CATEGORY_BRIDGES["Interesting Facts"].length];
+          pSentences.push(bridge);
           pSentences.push(factItem.part_2_body);
-          for (let bgIdx = 0; bgIdx < deepBackground.length; bgIdx++) {
-            if (pSentences.length < sentencesNeeded - 2 && bgIdx % 2 === 1) {
-              pSentences.push(deepBackground[bgIdx]);
-            }
+          let bgI = 1;
+          while (countWords(pSentences) < targetWords - 25 && bgI < deepBackground.length) {
+            pSentences.push(deepBackground[bgI]);
+            bgI += 2;
           }
           pSentences.push(factItem.part_2_suspense);
           pSentences.push("This changed our world forever. Save this video and follow for more daily untold truths!");
         } else {
-          pSentences.push(`Welcome back to Part ${pNum}. The mystery deepens further.`);
+          const bridge = CATEGORY_BRIDGES["Interesting Facts"][(pIdx - 1) % CATEGORY_BRIDGES["Interesting Facts"].length];
+          pSentences.push(bridge);
           pSentences.push(factItem.part_2_body);
-          for (let bgIdx = 0; bgIdx < deepBackground.length; bgIdx++) {
-            if (pSentences.length < sentencesNeeded - 1 && bgIdx % 2 === (pIdx % 2)) {
-              pSentences.push(deepBackground[bgIdx]);
-            }
+          let bgI = (pIdx % 2);
+          while (countWords(pSentences) < targetWords - 30 && bgI < deepBackground.length) {
+            pSentences.push(deepBackground[bgI]);
+            bgI += 2;
           }
           pSentences.push(`Just when everyone believed the story was over, the real mastermind stepped forward. Follow right now for Part ${pNum + 1}!`);
         }
@@ -1448,15 +1642,17 @@ export async function generateStoryParts(params: {
       if (pNum === 1) {
         pSentences.push(hook);
       } else {
-        pSentences.push(`Welcome back to Part ${pNum}. The struggle only deepened, but the fire inside burned hotter...`);
+        const bridge = CATEGORY_BRIDGES["Motivational"][(pIdx - 1) % CATEGORY_BRIDGES["Motivational"].length];
+        pSentences.push(bridge);
       }
 
-      for (let sI = 0; sI < sentencesNeeded - 2; sI++) {
-        const devIdx = (pIdx * 3 + sI) % shuffledDevs.length;
-        const sent = shuffledDevs[devIdx];
+      let devIdx = 0;
+      while (countWords(pSentences) < targetWords - 25 && devIdx < shuffledDevs.length) {
+        const sent = shuffledDevs[(pIdx * 4 + devIdx) % shuffledDevs.length];
         if (!pSentences.includes(sent)) {
           pSentences.push(sent);
         }
+        devIdx++;
       }
 
       if (!isLast && clampedParts > 1) {
@@ -1509,7 +1705,6 @@ export async function generateStoryParts(params: {
   }
 
   // 3. OTHER GENRES (Horror, Adventure, Romance, Educational, Comedy, Music, Others)
-  // Check if a specific artistic/visual style preset was selected (e.g. Dark Fantasy, Mecha, Anime, Disney 3D, Retro Comic)
   const matchedStyleProfile = STYLE_NARRATIVE_PROFILES[sceneStyle] || STYLE_NARRATIVE_PROFILES["Realism"];
   const hasStyleOverride = matchedStyleProfile && matchedStyleProfile.hooks && matchedStyleProfile.hooks.length > 0;
 
@@ -1518,7 +1713,7 @@ export async function generateStoryParts(params: {
   const developments = hasStyleOverride ? matchedStyleProfile.developments : (genreData.developments || SUSPENSE_PATTERNS["Others"].developments);
   const cliffhangers = hasStyleOverride ? matchedStyleProfile.cliffhangers : (genreData.cliffhangers || SUSPENSE_PATTERNS["Others"].cliffhangers);
   const resolutions = hasStyleOverride ? matchedStyleProfile.resolutions : (genreData.resolutions || SUSPENSE_PATTERNS["Others"].resolutions);
-  const vStyle = matchedStyleProfile.visualDesc || genreData.visual_style || "cinematic hyperrealistic 8k masterpiece";
+  const vStyle = matchedStyleProfile.visualDesc || genreData.visual_style || "cinematic 8k visual storytelling masterpiece";
   const genreCtas = GENRE_CTA[catClean] || GENRE_CTA["Others"];
 
   const cleanPrompt = prompt.trim().toLowerCase();
@@ -1551,19 +1746,22 @@ export async function generateStoryParts(params: {
 
     if (pNum === 1) {
       pSentences.push(baseHook);
-      // First part sets up the suspense and initial development
-      const part1Devs = shuffledDevs.slice(0, Math.max(2, Math.floor(sentencesNeeded / 2)));
-      for (const sent of part1Devs) {
-        if (!pSentences.includes(sent)) pSentences.push(sent);
-      }
     } else {
-      // Subsequent parts divide the story across parts carefully, continuing rather than repeating
-      pSentences.push(`Welcome back to Part ${pNum}. Picking up right where the story left off...`);
-      const startIdx = ((pIdx - 1) * 2) % Math.max(1, shuffledDevs.length);
-      const remainingDevs = [...shuffledDevs.slice(startIdx), ...shuffledDevs.slice(0, startIdx)];
-      for (const sent of remainingDevs) {
-        if (!pSentences.includes(sent) && pSentences.length < sentencesNeeded - 1) {
-          pSentences.push(sent);
+      const styleBridges = matchedStyleProfile.partBridges;
+      const bridge = (styleBridges && styleBridges.length > 0)
+        ? styleBridges[(pIdx - 1) % styleBridges.length]
+        : (CATEGORY_BRIDGES[catClean] || CATEGORY_BRIDGES["Others"])[(pIdx - 1) % (CATEGORY_BRIDGES[catClean] || CATEGORY_BRIDGES["Others"]).length];
+      pSentences.push(bridge);
+    }
+
+    // Assemble developments dynamically until target words are reached
+    const startOffset = (pIdx * 4) % Math.max(1, shuffledDevs.length);
+    const rotatedDevs = [...shuffledDevs.slice(startOffset), ...shuffledDevs.slice(0, startOffset)];
+    for (const sent of rotatedDevs) {
+      if (!pSentences.includes(sent)) {
+        pSentences.push(sent);
+        if (countWords(pSentences) >= targetWords - 25 && pSentences.length >= minSentencesNeeded - 1) {
+          break;
         }
       }
     }

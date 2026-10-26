@@ -1016,8 +1016,8 @@ class AIVideoEngine:
                 # Background music ducked to low volume=0.08 (never louder than the voice!) with smooth 2s fade out
                 filter_complex = (
                     f"[0:v]{vf_str}[vout];"
-                    f"[1:a]volume=1.0[speech];"
-                    f"[2:a]volume=0.08,afade=t=out:st={total_duration - 2:.2f}:d=2[bgm];"
+                    f"[1:a]volume=1.0,apad=whole_dur={total_duration:.2f}[speech];"
+                    f"[2:a]volume=0.08,afade=t=out:st={max(0.1, total_duration - 2):.2f}:d=2[bgm];"
                     f"[speech][bgm]amix=inputs=2:duration=first:dropout_transition=2[aout]"
                 )
                 cmd = [
@@ -1039,7 +1039,7 @@ class AIVideoEngine:
                     str(output_mp4),
                 ]
             else:
-                filter_complex = f"[0:v]{vf_str}[vout];[1:a]volume=1.0[aout]"
+                filter_complex = f"[0:v]{vf_str}[vout];[1:a]volume=1.0,apad=whole_dur={total_duration:.2f}[aout]"
                 cmd = [
                     str(FFMPEG_BIN),
                     "-y",
@@ -1223,9 +1223,8 @@ class AIVideoEngine:
         dur_match = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", probe.stderr)
         if dur_match:
             audio_dur = int(dur_match.group(1)) * 3600 + int(dur_match.group(2)) * 60 + float(dur_match.group(3))
-            # Strictly synchronize video duration with narration audio (+0.4s breathing room).
-            # Eliminates idle frozen video and silent pauses before the outro.
-            total_dur = max(4.0, audio_dur + 0.4)
+            # Synchronize video duration with requested timer (e.g. 60s for 1 min video), or speech length if longer
+            total_dur = max(float(duration), audio_dur + 0.4)
         else:
             total_dur = float(duration)
 

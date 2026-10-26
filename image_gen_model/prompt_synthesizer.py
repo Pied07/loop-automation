@@ -127,34 +127,34 @@ CHARACTER_STYLE_PRESETS: Dict[str, Dict[str, str]] = {
         "suffix": "photorealistic 8k UHD, award-winning cinematic storytelling, wide establishing environmental composition, photoreal scene, masterpiece",
     },
     "Anime": {
-        "character_in_action": "anime hero protagonist in dynamic motion and action pose",
+        "character_in_action": "cohesive Japanese 2D anime hero in dynamic motion and action stance, expressive anime eyes and stylized anime facial features",
         "environment_vibe": "lush hand-painted anime landscape, Studio Ghibli and Makoto Shinkai aesthetic, gorgeous environmental scenery, deep sky vistas and floating particles",
         "lighting": "vibrant anime lighting, atmospheric god rays, glowing embers, dynamic wind",
-        "suffix": "Makoto Shinkai aesthetic, crisp line art, beautiful high quality Japanese animation scenery, 8k anime movie still",
+        "suffix": "Makoto Shinkai aesthetic, crisp clean line art, beautiful high quality Japanese animation scenery, unified anime movie still, no photo face",
     },
     "Disney 3D": {
-        "character_in_action": "expressive stylized 3D animated character in lively active motion",
+        "character_in_action": "expressive stylized 3D animated character in lively active motion, cohesive 3D feature animation facial anatomy",
         "environment_vibe": "lush Pixar 3D animated world, detailed storybook architecture, rich environmental scenery, immersive background world",
         "lighting": "subsurface scattering, warm studio 3d lighting, soft cinematic volumetric rim light",
-        "suffix": "Pixar 3D animation movie still, Unreal Engine 5 render, Octane render 8k, full wide animated scene",
+        "suffix": "Pixar 3D animation movie still, Unreal Engine 5 render, Octane render 8k, full wide animated scene, seamless 3D rendering",
     },
     "Mecha": {
-        "character_in_action": "cyberpunk operative in glowing high-tech mecha exoskeleton armor in dynamic combat action",
+        "character_in_action": "cyberpunk operative in sleek glowing high-tech mecha exoskeleton armor with integrated cyber helmet and glowing visor",
         "environment_vibe": "neon-lit rainy futuristic cyberpunk metropolis, towering holographic skyscrapers, wet reflective asphalt, cybernetic industrial machinery in background",
         "lighting": "neon reflections in the rain, atmospheric cyan and magenta haze, dramatic volumetric sci-fi lighting",
-        "suffix": "cinematic sci-fi mecha aesthetic, intricate mechanical armor, sharp focus, 8k wide angle scene",
+        "suffix": "cinematic sci-fi mecha concept art, intricate mechanical armor, sharp focus, 8k wide angle scene, cohesive sci-fi design",
     },
     "Dark Fantasy": {
-        "character_in_action": "epic medieval dark fantasy knight in dynamic battle stance with flowing cape and engraved armor",
+        "character_in_action": "epic medieval dark fantasy knight in ornate steel plate armor, sculpted helmet, cohesive dark fantasy concept art character",
         "environment_vibe": "crumbling gothic stone fortress ruins, burning torchlight, dark volumetric mist, swirling ember fog, towering ancient castle spires in deep background",
         "lighting": "volumetric dark mist, glowing magical runes, dramatic torchlight and moonlit deep shadows",
-        "suffix": "dark fantasy cinematic concept art, Elden Ring and Witcher aesthetic, ArtStation trending, 8k wide angle masterpiece",
+        "suffix": "dark fantasy cinematic digital concept art, Elden Ring and Witcher aesthetic, cohesive painterly illustration, ArtStation trending, seamless character rendering, no photorealistic face collage",
     },
     "Retro Comic": {
-        "character_in_action": "vintage graphic novel superhero in heroic dynamic action stance",
+        "character_in_action": "vintage graphic novel superhero in heroic dynamic action stance, stylized comic book facial rendering",
         "environment_vibe": "dramatic retro comic book cityscape background, stylized noir architecture, graphic halftone skyline, dynamic perspective lines",
         "lighting": "retro pop-art halftone colors, bold black contour lines, dramatic comic noir shadows",
-        "suffix": "classic superhero comic book action panel, detailed cross-hatching, vintage comic art, 8k wide action scene",
+        "suffix": "classic superhero comic book action panel, detailed cross-hatching, vintage comic art, 8k wide action scene, uniform comic illustration",
     },
 }
 
@@ -190,7 +190,12 @@ def synthesize_scene_prompt(
                 matched_preset = v
                 break
 
-    quality_anchor = "flawless anatomical symmetry, natural detailed eyes, sharp focused gaze, anatomically correct"
+    is_realism = style_preset and "realism" in style_preset.lower()
+    quality_anchor = (
+        "flawless anatomical symmetry, natural detailed eyes, sharp focused gaze, anatomically correct photoreal"
+        if is_realism
+        else "stylistically cohesive anatomy, expressive art features, seamless character rendering, no photo collage, no pasted face"
+    )
 
     if matched_preset:
         prompt_parts = [

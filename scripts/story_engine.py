@@ -44,8 +44,12 @@ def build_clean_visual_prompt(scene_text: str, fallback_subject: str, style_desc
         if len(clean) > 120:
             clean = clean[:120].rsplit(" ", 1)[0]
 
-    scene_composition = "cinematic wide-angle environmental establishing shot, dynamic action in full scene, deep background architecture and scenery, atmospheric environmental storytelling, natural anatomy"
-    return f"Cinematic scene of {clean}, {scene_composition}, {style_descriptor}, vertical 9:16 framing, photorealistic 8k"
+    is_realism = bool(re.search(r"realism|photoreal|35mm", style_descriptor, re.IGNORECASE))
+    if is_realism:
+        scene_composition = "cinematic wide-angle environmental establishing shot, dynamic action in full scene, deep background architecture and scenery, atmospheric environmental storytelling, natural human anatomy, photorealistic 8k"
+    else:
+        scene_composition = "cinematic wide-angle environmental establishing shot, dynamic action in full scene, deep background architecture and scenery, atmospheric environmental storytelling, unified artistic illustration, seamless character rendering, no photorealistic face collage"
+    return f"Cinematic scene of {clean}, {scene_composition}, {style_descriptor}, vertical 9:16 framing"
 
 # Curated, verified, real-world mind-blowing origin facts (No news, real history & psychological marketing anomalies)
 UNTOLD_INTERESTING_FACTS = [
@@ -1354,17 +1358,54 @@ def generate_story_parts(
         is_last = (p_num == num_parts)
         p_sentences = []
 
+        target_words = max(25, int(duration_per_part * 2.3))
         if p_num == 1:
             p_sentences.append(base_hook)
         else:
-            p_sentences.append(f"Welcome back to Part {p_num}. Picking up right where the story left off...")
+            category_bridges = {
+                "Horror": [
+                    "The cold air grew suffocating as the shadows lengthened across the hallway.",
+                    "A sudden metallic vibration rattled the doorframe from the locked room inside.",
+                ],
+                "Adventure": [
+                    "Every compass reading went wild as the expedition plunged deeper into the uncharted canyon.",
+                    "With the ropes straining under violent gusts of wind, the path ahead narrowed to a knife-edge.",
+                ],
+                "Romance": [
+                    "Under the quiet amber streetlights, the unspoken truth between them could no longer be denied.",
+                    "Every passing moment made the distance between their worlds feel smaller and smaller.",
+                ],
+                "Educational": [
+                    "Archival satellite logs and laboratory spectrometry revealed an anomaly that puzzled top researchers.",
+                    "When the mathematical model was simulated in reverse, a shocking correlation emerged.",
+                ],
+                "Comedy": [
+                    "And just when everyone thought the situation couldn't possibly get any worse, total chaos struck.",
+                    "The neighbors gathered on their porches with popcorn as the mechanical malfunction escalated.",
+                ],
+                "Action": [
+                    "With adrenaline surging through his veins and warning klaxons shrieking, there was only one way forward.",
+                    "Shattered glass rained down over the alleyway as the secondary ambush was triggered.",
+                ],
+                "Motivational": [
+                    "At the exact breaking point where ordinary people surrender, an unshakeable inner discipline took over.",
+                    "Through the sweat, exhaustion, and silence of an empty arena, the turning point was quietly forged.",
+                ],
+            }
+            bridges = category_bridges.get(cat_clean, [
+                "As the twilight deepened, the true nature of the mystery unfolded with unexpected clarity.",
+                "Every piece of evidence gathered over the preceding weeks pointed towards one astonishing conclusion.",
+            ])
+            p_sentences.append(bridges[(p_num - 2) % len(bridges)])
 
-        # Story development sentences based on duration
-        for s_i in range(sentences_needed - 2):
-            dev_idx = (p_idx * 3 + s_i) % len(shuffled_devs)
-            sent = shuffled_devs[dev_idx]
+        # Story development sentences dynamically assembled to meet target word count
+        start_off = (p_idx * 4) % max(1, len(shuffled_devs))
+        rotated = shuffled_devs[start_off:] + shuffled_devs[:start_off]
+        for sent in rotated:
             if sent not in p_sentences:
                 p_sentences.append(sent)
+                if len(" ".join(p_sentences).split()) >= target_words - 25:
+                    break
 
         # Cliffhanger or final resolution
         if not is_last and num_parts > 1:
