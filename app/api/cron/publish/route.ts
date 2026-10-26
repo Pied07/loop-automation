@@ -72,11 +72,58 @@ async function handleCronPublish(req: NextRequest) {
     // If AI Story mode is triggered: generate and auto-publish an AI video
     if (cronMode === "ai") {
       console.log("[Cron Auto-Pilot] Generating and auto-publishing fresh AI Story Video...");
+      let cronSelectionMode = "random";
+      let chosenCategory = "Interesting Facts";
+      let chosenVoice = "en-US-ChristopherNeural";
+      let chosenParts = 1;
+      let chosenDuration = 60;
+      let chosenCaption = "viral_yellow";
+      let chosenSceneStyle = "Realism";
+
+      if (database) {
+        try {
+          const autoSnap = await getDoc(doc(database, "app_config", "auto_pilot"));
+          if (autoSnap.exists()) {
+            const d = autoSnap.data();
+            if (d.cronSelectionMode) cronSelectionMode = d.cronSelectionMode;
+            if (d.chosenCategory) chosenCategory = d.chosenCategory;
+            if (d.chosenVoice) chosenVoice = d.chosenVoice;
+            if (d.chosenParts) chosenParts = Number(d.chosenParts) || 1;
+            if (d.chosenDuration) chosenDuration = Number(d.chosenDuration) || 60;
+            if (d.chosenCaption) chosenCaption = d.chosenCaption;
+            if (d.chosenSceneStyle) chosenSceneStyle = d.chosenSceneStyle;
+          }
+        } catch {}
+      }
+
+      // If random mode: select a completely random category, voice, caption style, and scene picture style
+      const ALL_CATEGORIES = ["Interesting Facts", "Horror", "Motivational", "Romance", "Adventure", "Educational", "Comedy", "Music", "Others"];
+      const ALL_VOICES = ["en-US-ChristopherNeural", "en-US-JennyNeural", "en-US-GuyNeural", "en-US-AriaNeural", "en-US-BrianNeural", "en-US-EmmaNeural"];
+      const ALL_CAPTIONS = ["viral_yellow", "clean_pill", "cinematic", "neon_glow", "soft_shadow_bar"];
+      const ALL_STYLES = ["Realism", "Anime", "Disney 3D", "Mecha", "Dark Fantasy", "Retro Comic"];
+
+      let effectiveCategory = chosenCategory;
+      let effectiveVoice = chosenVoice;
+      let effectiveCaption = chosenCaption;
+      let effectiveStyle = chosenSceneStyle;
+      let effectiveParts = chosenParts;
+
+      if (cronSelectionMode === "random") {
+        effectiveCategory = ALL_CATEGORIES[Math.floor(Math.random() * ALL_CATEGORIES.length)];
+        effectiveVoice = ALL_VOICES[Math.floor(Math.random() * ALL_VOICES.length)];
+        effectiveCaption = ALL_CAPTIONS[Math.floor(Math.random() * ALL_CAPTIONS.length)];
+        effectiveStyle = ALL_STYLES[Math.floor(Math.random() * ALL_STYLES.length)];
+        effectiveParts = Math.floor(Math.random() * 3) + 1; // 1 to 3 parts randomly
+      }
+
       const aiResult = await generateAiVideoAction({
-        category: "Interesting Facts",
+        category: effectiveCategory,
+        voice: effectiveVoice,
+        captionStyle: effectiveCaption,
+        stylePreset: effectiveStyle,
         numImages: 3,
-        duration: 60,
-        numParts: 1,
+        duration: chosenDuration,
+        numParts: effectiveParts,
         userId: ownerUserId,
         userEmail: ownerEmail,
         autoPublish: true,

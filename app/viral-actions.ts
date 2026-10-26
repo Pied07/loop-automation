@@ -1317,8 +1317,8 @@ export async function publishClipAndCleanup(params: {
 
             const creationId = createData.id;
             let containerError = "";
-            for (let i = 0; i < 20; i++) {
-              await new Promise((r) => setTimeout(r, 3000));
+            for (let i = 0; i < 30; i++) {
+              await new Promise((r) => setTimeout(r, 3500));
               const statusUrl = new URL(`${instagramApi}/${creationId}`);
               statusUrl.search = new URLSearchParams({
                 fields: "status_code,status",
@@ -1541,18 +1541,14 @@ export async function publishClipAndCleanup(params: {
     const apiKey = process.env.CLOUDINARY_API_KEY;
     const apiSecret = process.env.CLOUDINARY_API_SECRET;
 
-    const allRequestedPlatformsPublished =
-      (!platforms.includes("YouTube") || !!youtubeUrl || !!youtubeVideoId) &&
-      (!platforms.includes("Facebook") || !!facebookUrl || !!facebookVideoId) &&
-      (!platforms.includes("Instagram") || !!instagramUrl || !!instagramVideoId);
-
+    // As soon as uploaded, delete from Cloudinary immediately (no repost option preserved)
     let targetPublicId = params.cloudinaryPublicId || uploadedCloudinaryId;
     if (!targetPublicId && clipPath.includes("res.cloudinary.com")) {
       const match = clipPath.match(/\/video\/upload\/(?:v\d+\/)?([^.]+)/);
       if (match) targetPublicId = match[1];
     }
 
-    if (allRequestedPlatformsPublished && targetPublicId && cloudName && apiKey && apiSecret) {
+    if (targetPublicId && cloudName && apiKey && apiSecret) {
       try {
         const { deleteCloudinaryAsset } = await import("@/app/cloudinary-upload");
         const ok = await deleteCloudinaryAsset(targetPublicId, "video");

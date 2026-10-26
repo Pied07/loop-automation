@@ -602,6 +602,7 @@ export default function Home() {
   const [isPublishingAllAi, setIsPublishingAllAi] = useState(false);
   const [aiPlatforms, setAiPlatforms] = useState({ youtube: true, facebook: true, instagram: true });
   const [cronContentType, setCronContentType] = useState<"viral" | "ai" | "both">("viral");
+  const [cronSelectionMode, setCronSelectionMode] = useState<"random" | "chosen">("random");
   const [repostingKey, setRepostingKey] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const outroFileInputRef = useRef<HTMLInputElement>(null);
@@ -1776,6 +1777,26 @@ export default function Home() {
     } finally {
       setIsPublishingAllAi(false);
     }
+  }
+
+  async function updateCronSelectionMode(mode: "random" | "chosen") {
+    setCronSelectionMode(mode);
+    try {
+      localStorage.setItem("tvd-cron-selection-mode", mode);
+      if (database) {
+        await setDoc(doc(database, "app_config", "auto_pilot"), {
+          cronSelectionMode: mode,
+          chosenCategory: selectedCategory,
+          chosenVoice: aiVoice,
+          chosenParts: aiNumParts,
+          chosenDuration: aiDuration,
+          chosenCaption: selectedCaptionStyle,
+          chosenSceneStyle: selectedSceneStyle,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+    } catch (err) {}
+    notify(`Auto-Pilot Content Selection set to: ${mode === "random" ? "Random Video Types (Random Category, Voice, Style, Parts)" : "Chosen Type Only (Chosen Category, Voice, Style, Parts)"}`);
   }
 
   async function updateCronContentType(type: "viral" | "ai" | "both") {
@@ -4054,7 +4075,7 @@ export default function Home() {
               <span>Source</span>
             </a>
           )}
-          {video.youtube === 1 && Boolean(video.youtubeUrl) ? (
+          {video.youtube === 1 && Boolean(video.youtubeUrl) && (
             <a
               href={video.youtubeUrl}
               target="_blank"
@@ -4065,25 +4086,8 @@ export default function Home() {
               <FaYoutube size={12} />
               <span>Shorts</span>
             </a>
-          ) : (
-            <button
-              type="button"
-              disabled={repostingKey === `${video.id}-YouTube`}
-              onClick={() => handleRepostPlatform(video, "YouTube")}
-              className="platform-btn repost-btn repost-yt"
-              title={((video.youtube === 1 && video.youtubeUrl) || (video.facebook === 1 && video.facebookUrl) || (video.instagram === 1 && video.instagramUrl)) ? "Repost to YouTube Shorts" : "Publish to YouTube Shorts"}
-            >
-              <FaYoutube size={12} />
-              <span>
-                {repostingKey === `${video.id}-YouTube`
-                  ? "Posting..."
-                  : (((video.youtube === 1 && video.youtubeUrl) || (video.facebook === 1 && video.facebookUrl) || (video.instagram === 1 && video.instagramUrl))
-                      ? "Repost YT"
-                      : "Post Shorts")}
-              </span>
-            </button>
           )}
-          {video.facebook === 1 && Boolean(video.facebookUrl) ? (
+          {video.facebook === 1 && Boolean(video.facebookUrl) && (
             <a
               href={video.facebookUrl}
               target="_blank"
@@ -4094,25 +4098,8 @@ export default function Home() {
               <FaFacebookF size={11} />
               <span>FB Reel</span>
             </a>
-          ) : (
-            <button
-              type="button"
-              disabled={repostingKey === `${video.id}-Facebook`}
-              onClick={() => handleRepostPlatform(video, "Facebook")}
-              className="platform-btn repost-btn repost-fb"
-              title={((video.youtube === 1 && video.youtubeUrl) || (video.facebook === 1 && video.facebookUrl) || (video.instagram === 1 && video.instagramUrl)) ? "Repost to Facebook Reels" : "Publish to Facebook Reels"}
-            >
-              <FaFacebookF size={11} />
-              <span>
-                {repostingKey === `${video.id}-Facebook`
-                  ? "Posting..."
-                  : (((video.youtube === 1 && video.youtubeUrl) || (video.facebook === 1 && video.facebookUrl) || (video.instagram === 1 && video.instagramUrl))
-                      ? "Repost FB"
-                      : "Post FB")}
-              </span>
-            </button>
           )}
-          {video.instagram === 1 && Boolean(video.instagramUrl) ? (
+          {video.instagram === 1 && Boolean(video.instagramUrl) && (
             <a
               href={video.instagramUrl}
               target="_blank"
@@ -4123,23 +4110,6 @@ export default function Home() {
               <FaInstagram size={12} />
               <span>IG Reel</span>
             </a>
-          ) : (
-            <button
-              type="button"
-              disabled={repostingKey === `${video.id}-Instagram`}
-              onClick={() => handleRepostPlatform(video, "Instagram")}
-              className="platform-btn repost-btn repost-ig"
-              title={((video.youtube === 1 && video.youtubeUrl) || (video.facebook === 1 && video.facebookUrl) || (video.instagram === 1 && video.instagramUrl)) ? "Repost to Instagram Reels" : "Publish to Instagram Reels"}
-            >
-              <FaInstagram size={12} />
-              <span>
-                {repostingKey === `${video.id}-Instagram`
-                  ? "Posting..."
-                  : (((video.youtube === 1 && video.youtubeUrl) || (video.facebook === 1 && video.facebookUrl) || (video.instagram === 1 && video.instagramUrl))
-                      ? "Repost IG"
-                      : "Post IG")}
-              </span>
-            </button>
           )}
         </div>
         <div className="card-footer-meta">

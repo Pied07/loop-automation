@@ -60,7 +60,141 @@ export function buildCleanVisualPrompt(
   return `Cinematic scene of ${clean}, ${sceneComposition}, ${styleDescriptor}, vertical 9:16 framing, photorealistic 8k`;
 }
 
+
+export const STYLE_NARRATIVE_PROFILES: Record<string, { genreTag: string; visualDesc: string; narrativeVibe: string; hooks: string[]; developments: string[]; cliffhangers: string[]; resolutions: string[] }> = {
+  "Dark Fantasy": {
+    genreTag: "Dark Fantasy",
+    visualDesc: "dark fantasy masterpiece, steel plate knight armor, glowing mystical runes, ominous atmospheric mist, blood red moonlight, Elden Ring and Witcher aesthetics, photorealistic 8k",
+    narrativeVibe: "dark grimdark fantasy with ancient curses and eldritch secrets",
+    hooks: [
+      "In the cursed ashlands of the Forgotten Kingdom, no mortal dared kindle an open fire after dusk.",
+      "The ancient obsidian gate had remained sealed for six centuries beneath the cathedral of bones.",
+      "Carrying a broken rune-forged greatsword, the lone knight walked into the shadow of the weeping fortress.",
+    ],
+    developments: [
+      "Whispers echoed from the hollow stones, speaking of an ancient blood pact sealed in silence.",
+      "A storm of black ash began to descend, extinguishing the last remaining torchlight across the valley.",
+      "Carved into the crypt walls were the glowing glyphs of the immortal dragon lords who ruled before mankind.",
+      "Every step deeper into the citadel revealed the petrified remains of heroes who came before.",
+    ],
+    cliffhangers: [
+      "As the black steel door groaned open, two glowing crimson eyes pierced through the void. Follow for Part {next_part}!",
+      "The runes etched upon his blade suddenly flared with blinding red flame. Check Part {next_part} for the final clash!",
+    ],
+    resolutions: [
+      "With one final surge of ancestral power, the eldritch curse was broken, bathing the ashlands in dawn.",
+      "The knight stood victorious over the fallen throne, claiming the forbidden relic that would reshape the realm.",
+    ],
+  },
+  "Mecha": {
+    genreTag: "Futuristic Mecha",
+    visualDesc: "futuristic mecha sci-fi masterpiece, giant bipedal battle robots, glowing cyber exoskeleton armor, neon HUD reflections, hydraulic thrusters, cyberpunk neon city rain, ultra detailed 8k",
+    narrativeVibe: "futuristic high-tech mecha combat and cybernetic warfare",
+    hooks: [
+      "Deep beneath Neo-Tokyo in Hangar 07, the forbidden Titan-Class Mecha was powered on for the first time in thirty years.",
+      "When the orbital defense grid collapsed, only one experimental cybernetically linked robot stood between humanity and total annihilation.",
+      "The neural synchronization gauge flashed warning red as pilot Eva locked her consciousness into the mechanical war engine.",
+    ],
+    developments: [
+      "Hydraulic valves hissed with superheated plasma as the dual shoulder-mounted particle cannons charged to maximum yield.",
+      "The enemy fleet dropped through the ionosphere, deploying hundreds of autonomous combat drones over the burning skyline.",
+      "Overclocking the core reactor to two hundred percent, the mecha leaped across the skyscraper rooftops at Mach 3.",
+      "Internal telemetry sensors detected an unknown cybernetic virus attempting to hijack the central pilot neural link.",
+    ],
+    cliffhangers: [
+      "A colossal mothership descended through the neon clouds, targeting the city core. Follow right now for Part {next_part}!",
+      "The core reactor began its critical 30-second meltdown countdown. See what happened in Part {next_part}!",
+    ],
+    resolutions: [
+      "Unleashing a devastating synchronized EMP wave, the Titan Mecha eradicated the hostile armada and saved the metropolis.",
+      "Standing amidst the smoking battlefield, the lone steel warrior raised its plasma blade in decisive victory.",
+    ],
+  },
+  "Anime": {
+    genreTag: "Anime Hero",
+    visualDesc: "Studio Ghibli and Makoto Shinkai inspired anime aesthetic, expressive vibrant anime hero, glowing energy aura, luminous sky, crisp clean outlines, masterpiece anime visual",
+    narrativeVibe: "epic anime adventure with supernatural power awakenings",
+    hooks: [
+      "Born without a single trace of elemental spiritual energy, everyone in the academy called him an outcast.",
+      "On the night of the crimson lunar eclipse, the forbidden ancient seal on his right arm shattered.",
+      "Standing alone on the mountain peak under starry skies, he unlocked the legendary lost technique.",
+    ],
+    developments: [
+      "A blazing golden aura exploded around his body, defying the laws of the spirit realm.",
+      "The grandmaster stared in disbelief as the supposedly talentless student deflected the ultimate technique.",
+      "Remembering the promise he made to his fallen mentor, he refused to take a single step backward.",
+      "Energy rippled across the battlefield as the two greatest prodigies of the era met at supersonic speed.",
+    ],
+    cliffhangers: [
+      "Drawing his blade to reveal its true spiritual form, the arena went completely silent. Follow for Part {next_part}!",
+      "An unexpected challenger emerged from the shadows of the arena. Don't miss Part {next_part}!",
+    ],
+    resolutions: [
+      "He surpassed every limit set by the ancient masters, establishing a legendary new era of heroes.",
+      "With an unstoppable burst of radiant light, he secured victory and proved that will triumphs over destiny.",
+    ],
+  },
+  "Disney 3D": {
+    genreTag: "Pixar 3D",
+    visualDesc: "Pixar and Disney 3D style character animation, charming stylized facial features, warm 3D studio lighting, subsurface scattering, colorful magical atmosphere, 8k render",
+    narrativeVibe: "heartwarming animated adventure with wonder and whimsical discovery",
+    hooks: [
+      "In a whimsical clockwork village tucked between rolling green hills, a curious apprentice made an extraordinary discovery.",
+      "Every animal in the enchanted forest possessed a magical talent—except for Barnaby the little red fox.",
+      "Hidden inside grandmother's attic was a miniature golden compass that didn't point north—it pointed to adventure.",
+    ],
+    developments: [
+      "With a joyful spark and a twirl of gears, the little brass automaton sprang to life and blinked happily.",
+      "They journeyed past floating rainbow waterfalls and glowing crystal caves that nobody had ever seen.",
+      "When a sudden gust of wind scattered the village's prized starlight festival balloons, Barnaby knew what he had to do.",
+      "Working together with a quirky band of friendly forest creatures, they devised the most creative rescue plan.",
+    ],
+    cliffhangers: [
+      "Reaching into the hollow glowing oak tree, Barnaby discovered the missing golden key. Follow for Part {next_part}!",
+      "A giant friendly shadow stepped out from the magical mist. See who it was in Part {next_part}!",
+    ],
+    resolutions: [
+      "The entire village cheered as the festival lights illuminated the night sky in breathtaking beauty.",
+      "Barnaby discovered that the greatest magic of all wasn't spells or potions—it was having the courage to be yourself.",
+    ],
+  },
+  "Retro Comic": {
+    genreTag: "Pop-Art Comic",
+    visualDesc: "vintage 1970s comic book pop-art style, bold black ink outlines, dynamic halftone dot shading, vibrant saturated colors, dramatic superhero pose, retro aesthetic",
+    narrativeVibe: "golden age comic book heroics with dynamic cliffhanger drama",
+    hooks: [
+      "By day, mild-mannered photojournalist Jack Miller was invisible—but when the city sirens wailed, justice answered.",
+      "The nefarious Doctor Chronos had just frozen the downtown financial district inside a temporal stasis field.",
+      "High above the gargoyles of Empire City, the masked guardian watched the midnight bank heist unfold.",
+    ],
+    developments: [
+      "Leaping across steel suspension cables, our hero intercepted the hypersonic getaway flyer in mid-air.",
+      "With a thundering punch that rattled the city grid, the villain's sonic disruptor was shattered into pieces.",
+      "The city police were trapped inside the vault, leaving only seconds before the countdown hit zero.",
+      "Using every ounce of enhanced superhuman strength, he lifted the collapsing bridge beam to safety.",
+    ],
+    cliffhangers: [
+      "Just as the villain seemed cornered, a smoke grenade detonated on the rooftop! Follow for Part {next_part}!",
+      "The timer on the temporal device dropped to three seconds! Check Part {next_part} for the thrilling climax!",
+    ],
+    resolutions: [
+      "With the mastermind in handcuffs and the city saved, the masked hero vanished into the moonlit skyline.",
+      "Once again, the forces of justice prevailed, proving that good will always triumph over darkness.",
+    ],
+  },
+  "Realism": {
+    genreTag: "Photorealism",
+    visualDesc: "cinematic 35mm photography, natural human skin texture and lifelike eyes, dramatic film lighting, shallow depth of field, photorealistic 8k",
+    narrativeVibe: "cinematic photorealistic narrative grounded in realism",
+    hooks: [],
+    developments: [],
+    cliffhangers: [],
+    resolutions: [],
+  },
+};
+
 export const UNTOLD_INTERESTING_FACTS = [
+
   {
     id: "tobacco_marketing",
     keywords: ["tobacco", "cigarette", "marketing", "smoke", "advertising", "pr", "edward bernays"],
@@ -1012,6 +1146,7 @@ export async function generateStoryParts(params: {
   numImages?: number;
   numParts?: number;
   excludeId?: string;
+  sceneStyle?: string;
 }): Promise<StoryResult> {
   const {
     category,
@@ -1021,6 +1156,7 @@ export async function generateStoryParts(params: {
     numImages = 3,
     numParts = 1,
     excludeId = "",
+    sceneStyle = "Realism",
   } = params;
 
   let catClean = category.trim();
@@ -1373,12 +1509,16 @@ export async function generateStoryParts(params: {
   }
 
   // 3. OTHER GENRES (Horror, Adventure, Romance, Educational, Comedy, Music, Others)
+  // Check if a specific artistic/visual style preset was selected (e.g. Dark Fantasy, Mecha, Anime, Disney 3D, Retro Comic)
+  const matchedStyleProfile = STYLE_NARRATIVE_PROFILES[sceneStyle] || STYLE_NARRATIVE_PROFILES["Realism"];
+  const hasStyleOverride = matchedStyleProfile && matchedStyleProfile.hooks && matchedStyleProfile.hooks.length > 0;
+
   const genreData = SUSPENSE_PATTERNS[catClean] || SUSPENSE_PATTERNS["Others"];
-  const hooks = genreData.hooks || SUSPENSE_PATTERNS["Others"].hooks;
-  const developments = genreData.developments || SUSPENSE_PATTERNS["Others"].developments;
-  const cliffhangers = genreData.cliffhangers || SUSPENSE_PATTERNS["Others"].cliffhangers;
-  const resolutions = genreData.resolutions || SUSPENSE_PATTERNS["Others"].resolutions;
-  const vStyle = genreData.visual_style || "cinematic hyperrealistic 8k masterpiece";
+  const hooks = (hasStyleOverride && (!prompt || catClean === "Others")) ? matchedStyleProfile.hooks : (genreData.hooks || SUSPENSE_PATTERNS["Others"].hooks);
+  const developments = hasStyleOverride ? matchedStyleProfile.developments : (genreData.developments || SUSPENSE_PATTERNS["Others"].developments);
+  const cliffhangers = hasStyleOverride ? matchedStyleProfile.cliffhangers : (genreData.cliffhangers || SUSPENSE_PATTERNS["Others"].cliffhangers);
+  const resolutions = hasStyleOverride ? matchedStyleProfile.resolutions : (genreData.resolutions || SUSPENSE_PATTERNS["Others"].resolutions);
+  const vStyle = matchedStyleProfile.visualDesc || genreData.visual_style || "cinematic hyperrealistic 8k masterpiece";
   const genreCtas = GENRE_CTA[catClean] || GENRE_CTA["Others"];
 
   const cleanPrompt = prompt.trim().toLowerCase();
@@ -1411,15 +1551,20 @@ export async function generateStoryParts(params: {
 
     if (pNum === 1) {
       pSentences.push(baseHook);
+      // First part sets up the suspense and initial development
+      const part1Devs = shuffledDevs.slice(0, Math.max(2, Math.floor(sentencesNeeded / 2)));
+      for (const sent of part1Devs) {
+        if (!pSentences.includes(sent)) pSentences.push(sent);
+      }
     } else {
+      // Subsequent parts divide the story across parts carefully, continuing rather than repeating
       pSentences.push(`Welcome back to Part ${pNum}. Picking up right where the story left off...`);
-    }
-
-    for (let sI = 0; sI < sentencesNeeded - 2; sI++) {
-      const devIdx = (pIdx * 3 + sI) % shuffledDevs.length;
-      const sent = shuffledDevs[devIdx];
-      if (!pSentences.includes(sent)) {
-        pSentences.push(sent);
+      const startIdx = ((pIdx - 1) * 2) % Math.max(1, shuffledDevs.length);
+      const remainingDevs = [...shuffledDevs.slice(startIdx), ...shuffledDevs.slice(0, startIdx)];
+      for (const sent of remainingDevs) {
+        if (!pSentences.includes(sent) && pSentences.length < sentencesNeeded - 1) {
+          pSentences.push(sent);
+        }
       }
     }
 

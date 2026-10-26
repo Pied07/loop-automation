@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
     const numImages = body.numImages ? Math.max(1, Math.min(5, Number(body.numImages))) : 3;
     const numParts = body.numParts ? Math.max(1, Math.min(5, Number(body.numParts))) : 1;
     const excludeId = typeof body.excludeId === "string" ? body.excludeId.trim() : "";
+    const sceneStyle = typeof body.sceneStyle === "string" ? body.sceneStyle.trim() : "Realism";
 
     const result = await generateStoryParts({
       category,
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest) {
       numImages,
       numParts,
       excludeId,
+      sceneStyle,
     });
 
     return NextResponse.json({ success: true, ...result });

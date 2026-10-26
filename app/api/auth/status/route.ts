@@ -26,10 +26,7 @@ export async function GET() {
           }
         }
       } catch (ytErr: any) {
-        if (!ytErr?.message?.includes("invalid_grant") && !ytErr?.message?.includes("revoked")) {
-          // Network hiccup or quota limit: keep YouTube if credentials exist
-          connections.push("YouTube");
-        }
+        console.warn("YouTube token validation warning:", ytErr?.message);
       }
     }
 
@@ -70,8 +67,27 @@ export async function GET() {
         connections.push("Instagram");
       }
     }
-    if (tokens.gmail?.access_token || tokens.gmail?.refresh_token) {
-      connections.push("Gmail");
+
+    // Verify Gmail token validity
+    if (tokens.gmail?.refresh_token || tokens.gmail?.access_token) {
+      try {
+        const { google } = require("googleapis");
+        const client = new google.auth.OAuth2(
+          process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+          process.env.GOOGLE_CLIENT_SECRET
+        );
+        client.setCredentials(tokens.gmail);
+        const { token } = await client.getAccessToken();
+        if (token) {
+          connections.push("Gmail");
+          if (token !== tokens.gmail.access_token) {
+            tokens.gmail.access_token = token;
+            await writeTokens(tokens);
+          }
+        }
+      } catch (gmErr: any) {
+        console.warn("Gmail token validation warning:", gmErr?.message);
+      }
     }
 
     return NextResponse.json({ success: true, connections });
