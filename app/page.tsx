@@ -1169,10 +1169,10 @@ export default function Home() {
     if (!aiVoice) {
       return "Please select an AI narrator voice first.";
     }
-    if (!aiDuration || aiDuration < 10 || aiDuration > 120) {
-      return "Please select a video duration timer between 10s and 120s.";
+    if (!aiDuration || aiDuration < 10 || aiDuration > 600) {
+      return "Please select a video duration timer between 1 minute (60s) and 10 minutes (600s).";
     }
-    if (!aiNumImages || aiNumImages < 1 || aiNumImages > 5) {
+    if (!aiNumImages || aiNumImages < 1 || aiNumImages > 20) {
       return "Please select the number of AI scene images (1 to 20).";
     }
     if (!aiNumParts || aiNumParts < 1 || aiNumParts > 5) {
