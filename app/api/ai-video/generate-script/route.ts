@@ -10,8 +10,8 @@ export async function POST(req: NextRequest) {
     const category = typeof body.category === "string" ? body.category.trim() : "Interesting Facts";
     const customTag = typeof body.customTag === "string" ? body.customTag.trim() : "";
     const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
-    const duration = body.duration ? Math.max(10, Math.min(120, Number(body.duration))) : 20;
-    const numImages = body.numImages ? Math.max(1, Math.min(5, Number(body.numImages))) : 3;
+    const duration = body.duration ? Math.max(60, Math.min(600, Number(body.duration))) : 60;
+    const numImages = body.numImages ? Math.max(1, Math.min(20, Number(body.numImages))) : 5;
     const numParts = body.numParts ? Math.max(1, Math.min(5, Number(body.numParts))) : 1;
     const excludeId = typeof body.excludeId === "string" ? body.excludeId.trim() : "";
     const sceneStyle = typeof body.sceneStyle === "string" ? body.sceneStyle.trim() : "Realism";

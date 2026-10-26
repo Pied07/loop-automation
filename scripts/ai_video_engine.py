@@ -1078,7 +1078,41 @@ class AIVideoEngine:
             ]
             subprocess.run(cmd_fb, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        # Pure AI Engine output: No hardcoded outro or intro attached. The AI engine generates 100% of the video dynamically.
+        # Append Outro Video if present (public/assets/video-outro.mp4)
+        outro_path = ROOT_DIR / "public" / "assets" / "video-outro.mp4"
+        if outro_path.exists() and output_mp4.exists():
+            temp_pre_outro = output_mp4.parent / f"pre_outro_{output_mp4.name}"
+            try:
+                shutil.move(str(output_mp4), str(temp_pre_outro))
+                filter_str = (
+                    "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v0];"
+                    "[1:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v1];"
+                    "[0:a]aformat=sample_rates=48000:channel_layouts=stereo[a0];"
+                    "[1:a]aformat=sample_rates=48000:channel_layouts=stereo[a1];"
+                    "[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]"
+                )
+                merge_cmd = [
+                    str(FFMPEG_BIN), "-y",
+                    "-i", str(temp_pre_outro),
+                    "-i", str(outro_path),
+                    "-filter_complex", filter_str,
+                    "-map", "[v]",
+                    "-map", "[a]",
+                    "-c:v", "libx264",
+                    "-preset", "veryfast",
+                    "-pix_fmt", "yuv420p",
+                    "-c:a", "aac",
+                    "-b:a", "192k",
+                    "-movflags", "+faststart",
+                    str(output_mp4),
+                ]
+                subprocess.run(merge_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                print("🎬 Appended video outro successfully to AI video!")
+            except Exception as e:
+                print(f"Notice: Outro concatenation notice ({e}), keeping original cut.")
+                if temp_pre_outro.exists():
+                    shutil.move(str(temp_pre_outro), str(output_mp4))
+
         # Thumbnail extraction at 1.5s
         thumb_cmd = [
             str(FFMPEG_BIN),
@@ -1110,8 +1144,8 @@ class AIVideoEngine:
     ) -> Dict[str, Any]:
         """Main entry point: Generate complete AI animated video with custom scenes, timer, and voice."""
         self.colab_gpu_url = colab_gpu_url.strip() if colab_gpu_url else ""
-        num_images = max(1, min(5, int(num_images)))
-        duration = max(10, min(120, int(duration)))
+        num_images = max(1, min(20, int(num_images)))
+        duration = max(60, min(600, int(duration)))
         num_parts = max(1, min(5, int(num_parts)))
         part_number = max(1, min(num_parts, int(part_number)))
 

@@ -28,9 +28,9 @@ export interface StoryResult {
 
 /**
  * Synthesizes a clean, high-fidelity visual prompt for a scene image,
- * systematically stripping conversational filler and quantity multipliers (e.g. 'eighteen times', '300 doors')
+ * systematically stripping conversational filler and quantity multipliers
  * that trigger facial warping or feature duplication in diffusion models,
- * and anchoring anatomical symmetry and stylized aesthetic cohesion.
+ * and anchoring anatomical symmetry.
  */
 export function buildCleanVisualPrompt(
   sceneText: string,
@@ -39,7 +39,6 @@ export function buildCleanVisualPrompt(
 ): string {
   let clean = sceneText
     .replace(/\b(?:Part\s+\d+|Welcome back to Part\s+\d+|Follow for Part\s+\d+|Watch Part\s+\d+|Save this video|follow for your daily drive|follow for more|subscribe|share this|comment below)[^.]*/gi, "")
-    // Strip quantity multipliers like 'eighteen times', '300 doors' that confuse cross-attention into duplicating eyes/limbs
     .replace(/\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|eighteen|twenty|thirty|forty|fifty|hundred|thousand|million)\s+(?:times|doors|days|hours|years|copies|rejections)\b/gi, "")
     .replace(/["'*_#`~]/g, " ")
     .replace(/[^a-zA-Z0-9\s,.-]/g, " ")
@@ -64,1208 +63,654 @@ export function buildCleanVisualPrompt(
   return `Cinematic scene of ${clean}, ${sceneComposition}, ${styleDescriptor}, vertical 9:16 framing`;
 }
 
-export const STYLE_NARRATIVE_PROFILES: Record<string, {
-  genreTag: string;
-  visualDesc: string;
-  narrativeVibe: string;
-  hooks: string[];
-  developments: string[];
-  cliffhangers: string[];
-  resolutions: string[];
-  partBridges?: string[];
-}> = {
+export const CHARACTER_ENSEMBLES = [
+  {
+    "id": "realism_evelyn_marcus",
+    "genre": "Realism",
+    "category": "Others",
+    "keywords": [
+      "corporate",
+      "investigation",
+      "whistleblower",
+      "financial",
+      "boardroom",
+      "realism",
+      "detective",
+      "thriller",
+      "truth"
+    ],
+    "title": "The Sovereign Ledger Conspiracy",
+    "char1": "Dr. Evelyn Reed, a relentless forensic auditor",
+    "char2": "Marcus Vance, an investigative journalist",
+    "enemy": "Arthur Sterling, billionaire chairman of Sovereign Capital",
+    "setting": "the rain-slicked glass towers of the financial district",
+    "visual_style": "cinematic wide-angle environmental establishing shot, photorealistic 8k, dramatic 35mm film grain, moody corporate boardroom and rain-slicked streets, natural human anatomy",
+    "chapters": [
+      {
+        "chapter_num": 1,
+        "hook": "Dr. Evelyn Reed, a relentless forensic auditor, and Marcus Vance, an investigative journalist, sat inside a darkened surveillance van overlooking the glass monolith of Sovereign Capital.",
+        "core_beats": [
+          "With calm precision and years of discipline, Evelyn decoded the encrypted flash drive recovered from the offshore safety deposit box.",
+          "'Keep your eyes on the entrance, Marcus,' Evelyn whispered, noting the irregular shell company transfers funneled through Zurich.",
+          "Marcus adjusted his telephoto lens, capturing Arthur Sterling exiting the private garage flanked by three security operatives.",
+          "Every transaction log pointed to a coordinated liquidity siphon executed over thirty-six consecutive months.",
+          "The boardroom on the forty-second floor remained illuminated, casting long shadows across rows of vacant leather chairs.",
+          "A sudden chime on Evelyn's terminal indicated that someone on the internal server had initiated a remote data wipe.",
+          "'They know we have the files,' Marcus said, his grip tightening on the steering wheel as headlights turned into the alley."
+        ],
+        "expansion_beats": [
+          "Rain continued to beat against the windshield as the clock on the dashboard inched closer to midnight.",
+          "Under the warm amber streetlamps, city couriers rushed past, oblivious to the high-stakes financial war playing out above them.",
+          "Evelyn cross-referenced the flight manifests with the offshore bank accounts, uncovering an undeniable pattern.",
+          "Walking through the crowded financial district, every passerby had seemed like an observer in an invisible chess match.",
+          "The tension inside the vehicle grew suffocating as boots echoed down the wet concrete stairs outside.",
+          "Arthur Sterling had spent twenty years building an untouchable reputation as a philanthropic venture capitalist.",
+          "Yet beneath the polished press releases lay billions in redirected pension funds and illicit offshore covenants.",
+          "Marcus keyed in the secondary emergency backup frequency, uploading duplicate partitions to their secure cloud proxy.",
+          "'If we lose this uplink now, twenty thousand pensioners lose everything by morning,' Evelyn stated without looking up.",
+          "The forensic algorithm completed its pass, revealing Arthur Sterling's personal digital signature on the authorizing wire.",
+          "Evelyn examined the hash keys, confirming that the transfer codes originated from Sterling's penthouse IP address.",
+          "Marcus locked the surveillance van's secondary blast doors, his hand resting near the emergency GPS beacon.",
+          "In the distance, the muffled rumble of approaching security patrol vehicles resonated off the granite facades.",
+          "Every second of delay increased the probability of their signal being triangulated by corporate countermeasures."
+        ],
+        "cliffhanger": "Just as the final encrypted audit trail synchronized, a laser targeting beam painted the dashboard, and a gloved hand banged violently against the van door... Follow right now for Part 2!"
+      },
+      {
+        "chapter_num": 2,
+        "hook": "Picking up immediately from the alley ambush, Dr. Evelyn Reed and Marcus Vance slammed the van into reverse as high-velocity rounds shattered the side mirror.",
+        "core_beats": [
+          "'Hold on!' shouted Marcus, spinning the steering wheel and tires screeching across wet asphalt into the main boulevard.",
+          "Evelyn held the laptop steady against her chest, watching the upload progress bar freeze at eighty-nine percent.",
+          "Two black SUVs surged out of the corporate garage, cutting through late-night taxi traffic in relentless pursuit.",
+          "'Arthur Sterling didn't just authorize the wire, Marcus,' Evelyn gasped, reading the unmasked account holders.",
+          "'The receiving accounts don't belong to offshore banks\u2014they belong to members of the federal oversight committee.'",
+          "Marcus glanced at the rearview mirror as the lead pursuit vehicle nudged their rear bumper with a sickening metallic crunch.",
+          "'We can't go to the police station,' Marcus said grimly. 'The entire chain of command has been bought.'"
+        ],
+        "expansion_beats": [
+          "Sirens began to wail in the distance, but not to help them\u2014to corner them before the broadcast could go live.",
+          "Evelyn redirected the transmission through an encrypted mesh network established across decentralized servers.",
+          "The neon reflections of the downtown theater district blurred past in a kaleidoscope of rain and amber light.",
+          "Marcus executed a sharp handbrake turn down an access ramp leading into the subterranean municipal transit tunnels.",
+          "The concrete tunnel walls amplified the roar of pursuing engines as exhaust fumes filled the narrow subterranean corridor.",
+          "'If we reach the broadcast tower at Pier 4, we can override the public satellite feed directly,' Marcus shouted.",
+          "Evelyn bypassed the firewall of the city communications array, using Sterling's own stolen cryptographic key.",
+          "Her hands moved across the keyboard with surgical precision despite the violent rattling of the suspension.",
+          "Every document in the dossier was now verified, containing sworn affidavits, audio intercepts, and forensic ledgers.",
+          "Behind them, the pursuit vehicle clipped a concrete barrier, spinning across the wet tracks in a shower of sparks.",
+          "Marcus swerved around an abandoned maintenance tram, cutting the headlights to navigate solely by thermal sensors.",
+          "Evelyn confirmed that the secondary satellite dish was powered on and awaiting the direct optical injection.",
+          "The damp subterranean air carried the pungent smell of ozone and burning rubber as they neared the harbor exit."
+        ],
+        "cliffhanger": "As the van skidded onto the pier, the automated security gates slammed shut, trapping them against the dark harbor water with headlights closing in... Follow for Part 3 to witness the showdown!",
+        "resolution": "Marcus and Evelyn broke through the perimeter and delivered the verified evidence directly to international prosecutors.",
+        "cta": "Justice always prevails when the truth is brought into the light. Save this video and follow for more gripping investigative thrillers!"
+      },
+      {
+        "chapter_num": 3,
+        "hook": "Trapped against the freezing waters of Pier 4, Dr. Evelyn Reed and Marcus Vance grabbed the hard drives and bolted for the maintenance ladder of the transmission tower.",
+        "core_beats": [
+          "Wind whipped off the bay as Marcus shoved the steel security door open and bolted the heavy crossbar from the inside.",
+          "'We have four minutes before they breach that door,' Evelyn said, her fingers numb as she plugged the terminal into the transmitter.",
+          "Below them, sledgehammers pounded against the reinforced iron, rattling the entire steel staircase.",
+          "Marcus calibrated the microwave dish, aligning the broadcast beam toward the regional television antennas.",
+          "'Arthur Sterling is live on national television right now at his annual charity gala,' Marcus said, checking his phone.",
+          "'Then let's give his guests a presentation they will never forget,' Evelyn replied, initiating the satellite hijack.",
+          "On thousands of screens across the nation, the live gala feed flickered and replaced Sterling's speech with the incriminating ledger."
+        ],
+        "expansion_beats": [
+          "The silence that fell over the high-society gala ballroom across town was captured live on every national network.",
+          "Every guest, investor, and television viewer watched in stunned disbelief as forensic evidence proved the multi-billion fraud.",
+          "Below the tower, the sound of sledgehammers abruptly ceased as federal law enforcement sirens converged on the pier.",
+          "Marcus and Evelyn stood together on the gantry, looking out over the illuminated skyline as the truth echoed worldwide.",
+          "Decades of systemic corruption had been disassembled in thirty seconds of undeniable mathematical proof.",
+          "Arthur Sterling had believed money could purchase silence forever, but he underestimated the relentless pursuit of truth.",
+          "The morning sun broke through the storm clouds, painting the harbor in brilliant shades of gold and amber.",
+          "Evelyn closed the laptop with a quiet, triumphant breath, knowing the victims of the fraud would finally receive justice."
+        ],
+        "cliffhanger": "Arthur Sterling attempted to board his private jet at dawn, but federal marshals were already waiting on the tarmac... Follow for the final aftermath!",
+        "resolution": "Arthur Sterling was arrested on live television at dawn, and every stolen dollar was returned to the pension funds.",
+        "cta": "Justice always prevails when the truth is brought into the light. Save this video and follow for more gripping investigative thrillers!"
+      }
+    ]
+  },
+  {
+    "id": "dark_fantasy_gabriel_morwenna",
+    "genre": "Dark Fantasy",
+    "category": "Horror",
+    "keywords": [
+      "dark fantasy",
+      "knight",
+      "sword",
+      "magic",
+      "curse",
+      "elden ring",
+      "witcher",
+      "gargoyle",
+      "citadel",
+      "ruins"
+    ],
+    "title": "The Obsidian Bell of the Cursed Citadel",
+    "char1": "Sir Gabriel Thorne, exiled paladin of the Sun Order",
+    "char2": "Lady Morwenna, renegade blood alchemist",
+    "enemy": "Malakor the Undying, lord of the ash wasteland",
+    "setting": "the petrified ruins of the Eclipse Citadel",
+    "visual_style": "dark fantasy concept art masterpiece, sculpted dark steel plate knight armor, glowing mystical runes, ominous atmospheric mist, blood red moonlight, Elden Ring and Witcher aesthetics, painterly digital illustration, seamless character rendering",
+    "chapters": [
+      {
+        "chapter_num": 1,
+        "hook": "Sir Gabriel Thorne, exiled paladin of the Sun Order, and Lady Morwenna, a renegade blood alchemist, stood before the sealed obsidian gates of the Eclipse Citadel under a blood-red moon.",
+        "core_beats": [
+          "Gabriel unclasped his rune-forged greatsword, the blackened steel pulsating with pale crimson fire against the suffocating mist.",
+          "'The ancient blood seals were never meant to be broken by living hands, Gabriel,' Morwenna warned, tracing the petrified gargoyles.",
+          "Beneath their armored sabatons, subterranean chains groaned as an ancient unholy bell tolled for the first time in six centuries.",
+          "A suffocating storm of black ash descended over the courtyard, extinguishing Gabriel's enchanted torch in a single heartbeat.",
+          "'They are already waking,' Gabriel muttered, raising his heavy dragonscale shield as hollow whispers echoed from the stone walls.",
+          "Morwenna crushed an alchemical vial of powdered star-metal, igniting a ring of azure flame that illuminated the grand hall.",
+          "Before them sat the shattered throne of king Malakor, where dozens of petrified guardians slowly turned their horned helms."
+        ],
+        "expansion_beats": [
+          "No mortal had kindled an open flame within these ashlands since the celestial war shattered the sun into dying embers.",
+          "Every stone carving along the vaulted ceiling depicted a forgotten massacre sealed in silence by the dragon lords.",
+          "Gabriel tightened the leather straps of his gauntlets, feeling the cold weight of the curse gnawing at his immortal soul.",
+          "'If Malakor claims the Eclipse Core tonight, the blight will spread beyond the mountain passes,' Morwenna whispered.",
+          "She drew intricate alchemical sigils into the frost-covered flagstones, chanting verses in the dead tongue of the First Kings.",
+          "Spectral phantoms swirled around the shattered pillars, their hollow eye sockets burning with malevolent emerald embers.",
+          "The air grew dense with the stench of ozone, petrified bone, and ancient scorched iron as the shadows lengthened.",
+          "Gabriel stepped forward into the center of the nave, his greatsword carving glowing arcs through the gathering mist.",
+          "Visions of his fallen brothers flashed before his eyes\u2014their souls trapped within the obsidian walls of this godless tomb.",
+          "He knew that once they crossed the inner threshold, neither prayer nor armor could guarantee their return to the sunlight."
+        ],
+        "cliffhanger": "As the throne room doors collapsed inward, an colossal shadow crowned in jagged obsidian stepped from the abyss, raising a cursed black cleaver... Drop a like and follow for Part 2!"
+      },
+      {
+        "chapter_num": 2,
+        "hook": "Picking up right after the throne room breach, Sir Gabriel Thorne intercepted Malakor's colossal black cleaver with his shield, sparks showering across the dark flagstones.",
+        "core_beats": [
+          "The shockwave knocked Lady Morwenna backward into the rune circle as Gabriel was driven to one knee by the monstrous blow.",
+          "'Gabriel, strike at the soul prism embedded in his chest!' Morwenna screamed, hurling two flasks of volatile alchemical fire.",
+          "The azure explosion engulfed Malakor in blinding light, exposing the pulsing crimson crystal fused to his necrotic ribcage.",
+          "Malakor roared with the fury of a thousand damned souls, the sound shattering the ancient stained glass of the cathedral.",
+          "Gabriel rolled beneath a sweeping counterstrike, his blade slicing through the armor joints of the undead titan.",
+          "Dark ichor hissed like acid against the stone as Gabriel channeled the last ember of the sacred Sun fire through his hilt.",
+          "'You fought for a kingdom that betrayed you, paladin,' Malakor's hollow voice echoed inside Gabriel's mind."
+        ],
+        "expansion_beats": [
+          "The obsidian pillars groaned under the violent tremors of their duel, raining chunks of ancient masonry onto the altar.",
+          "Morwenna chanted frantically, drawing upon her own vitality to weave shimmering spectral chains around Malakor's limbs.",
+          "The chains pulled taut with a deafening screech of stressed iron, momentarily anchoring the monstrosity to the altar floor.",
+          "'Now, Gabriel! The prism is exposed!' she cried out, blood trickling from her lips under the strain of the spell.",
+          "Gabriel lunged forward with everything he had left, vaulting over the shattered dais and driving his greatsword into the crystal.",
+          "A blinding fracture of white energy ripped through the citadel, cracking the obsidian walls from the foundation to the spires.",
+          "The curse that had held the Forgotten Kingdom in torment for six hundred years began to dissolve into silver ash.",
+          "Malakor's physical form collapsed into a pile of lifeless blackened plate armor, leaving only the shattered core.",
+          "Gabriel stood breathing heavily amidst the silence of the dawn, offering a hand to pull Morwenna from the stone floor.",
+          "Through the shattered cathedral rose-window, the first rays of true sunlight in six centuries touched the ashlands."
+        ],
+        "cliffhanger": "As they picked up the remains of the core, a faint heartbeat throbbed within the stone... Follow right now for Part 3!",
+        "resolution": "Malakor was vanquished, and the curse over the Forgotten Kingdom was broken forever as sunlight returned to the realm.",
+        "cta": "Darkness can never conquer true courage. Save this story if you dare, and follow for more epic dark fantasy sagas!"
+      }
+    ]
+  },
+  {
+    "id": "mecha_ren_maya",
+    "genre": "Mecha",
+    "category": "Action",
+    "keywords": [
+      "mecha",
+      "robot",
+      "sci-fi",
+      "anime",
+      "futuristic",
+      "cockpit",
+      "pilot",
+      "plasma",
+      "space",
+      "cybernetic"
+    ],
+    "title": "The Titan Vanguard Defense",
+    "char1": "Commander Ren Chen, ace pilot of Vanguard-01",
+    "char2": "Dr. Maya Lin, chief quantum cybernetics officer",
+    "enemy": "The Nexus Swarm Carrier",
+    "setting": "the shattered orbital defense ring above Neo-Tokyo",
+    "visual_style": "giant mecha battle anime concept art, intricate mechanical joints, glowing blue energy thrusters, shattered orbital sky, cinematic 8k, seamless mecha rendering, vertical 9:16 framing",
+    "chapters": [
+      {
+        "chapter_num": 1,
+        "hook": "Commander Ren Chen, ace pilot of the Vanguard-01 Titan mech, and Dr. Maya Lin, chief cybernetics officer, monitored the red tactical radar as Sector 9 orbital defenses collapsed.",
+        "core_beats": [
+          "'Neural link synchronization at ninety-eight percent, Commander,' Dr. Maya Lin announced through the cockpit comms.",
+          "Vanguard-01 stepped onto the launch catapult, seventy tons of reinforced alloy vibrating as twin ion thrusters roared to life.",
+          "Through the panoramic heads-up display, Ren watched the ominous red swarm of autonomous drone carriers blot out the moon.",
+          "'They bypassed the outer perimeter mines in less than two minutes,' Ren noted, charging the plasma railcannon on his right arm.",
+          "'The Nexus mothership is transmitting a localized EMP,' Maya warned. 'If you take a direct blast, your neural harness will overload.'",
+          "The catapult released with explosive force, launching Vanguard-01 into the stratosphere amidst a storm of hypersonic flak.",
+          "Ren engaged the vernier thrusters, dodging a volley of plasma missiles before locking targets on the swarm vanguard."
+        ],
+        "expansion_beats": [
+          "Below them, the neon skyline of Neo-Tokyo stretched out like a glowing circuit board under siege.",
+          "Maya worked the telemetry consoles inside the command bunker, rerouting auxiliary coolant to Vanguard's primary core.",
+          "Every neural feedback impulse felt like electric needles along Ren's spine, but his breathing remained steady and calm.",
+          "The tactical computer tagged over three hundred incoming robotic signatures descending through the ionosphere.",
+          "'Target lock established,' Ren said coldly, discharging the railcannon in a brilliant lance of violet particle fire.",
+          "The blast cleaved through the lead destroyer, triggering a chain reaction of fiery secondary explosions across the clouds.",
+          "Debris rained down over the sea as Ren ignited the high-frequency vibro-blade to engage the secondary interceptors.",
+          "'Commander, seismic sensors show a colossal anomaly emerging from the clouds directly beneath you!' Maya shouted.",
+          "Ren looked down as the clouds parted to reveal a mechanical leviathan the size of an aircraft carrier rising into firing range.",
+          "Its primary particle accelerator was charging directly toward the city center below."
+        ],
+        "cliffhanger": "Vanguard-01's thruster fuel gauge flashed red just as the titan leviathan fired its main orbital cannon directly at the cockpit... Follow for Part 2 to witness the dogfight!"
+      },
+      {
+        "chapter_num": 2,
+        "hook": "Diving at Mach 4 through the particle beam, Commander Ren Chen overcharged Vanguard-01's kinetic energy shield as Dr. Maya Lin pushed the core past maximum safety limits.",
+        "core_beats": [
+          "The kinetic shield flared into blinding blue fury, deflecting the particle cannon's core into the upper atmosphere.",
+          "'Core temperature is at four hundred percent, Ren! You have thirty seconds before a full reactor meltdown!' Maya screamed.",
+          "'Thirty seconds is all I need,' Ren replied, deploying the emergency booster rockets directly toward the leviathan's bridge.",
+          "Swarm drones pelted Vanguard's armor plate, but Ren carved straight through them with sweeping arcs of his vibro-blade.",
+          "He drove the blade deep into the leviathan's central quantum processor, triggering a catastrophic cascading failure.",
+          "Ren ejected the spent thruster pods and pushed the titan mech into a high-G climb away from the detonation.",
+          "The leviathan exploded in a brilliant supernova of white light that turned the night sky into noon across three continents."
+        ],
+        "expansion_beats": [
+          "The shockwave tossed Vanguard-01 through the upper atmosphere before Ren successfully deployed the deceleration parachutes.",
+          "Inside the command bunker, cheers erupted across all frequencies as the radar screens cleared of enemy hostiles.",
+          "Maya slumped into her chair with tears of relief, listening to Ren's steady heartbeat on the biometric telemetry monitor.",
+          "'Neo-Tokyo is secure, Commander,' Maya whispered into the comms with an exhausted smile.",
+          "'Copy that, Command. Vanguard-01 returning to base,' Ren replied, watching the dawn rise over the Pacific Ocean.",
+          "The city lights below shone brighter than ever, saved by the courage of two souls who refused to let humanity fall.",
+          "Across the globe, emergency shelters opened their doors as families looked up at the victorious lone titan descending.",
+          "Humanity had survived the greatest synthetic incursion in history, proving that mortal resolve can never be conquered."
+        ],
+        "cliffhanger": "Deep beneath the ocean floor, an unmapped secondary server woke up and began transmitting... Follow for Part 3!",
+        "resolution": "Commander Ren Chen and Dr. Maya Lin destroyed the Nexus Leviathan, saving Neo-Tokyo and securing global peace.",
+        "cta": "Honor the brave who stand on the front lines. Double tap, save this video, and follow for more pulse-pounding mecha battles!"
+      }
+    ]
+  },
+  {
+    "id": "horror_lucas_clara",
+    "genre": "Horror",
+    "category": "Horror",
+    "keywords": [
+      "horror",
+      "haunted",
+      "asylum",
+      "ghost",
+      "paranormal",
+      "creepy",
+      "monstrous",
+      "nightmare",
+      "demon"
+    ],
+    "title": "The Haunting of Blackwood Asylum",
+    "char1": "Detective Lucas Drake, paranormal investigator",
+    "char2": "Dr. Clara Bell, archivist of occult antiquities",
+    "enemy": "The Unbound Entity of Ward 4",
+    "setting": "an abandoned Victorian asylum sealed since 1923",
+    "visual_style": "dark eerie cinematic shadows, mist, foggy abandoned asylum hallway, volumetric lighting, 8k octane render, natural human anatomy, unified artistic rendering",
+    "chapters": [
+      {
+        "chapter_num": 1,
+        "hook": "Detective Lucas Drake, a seasoned paranormal investigator, and Dr. Clara Bell, an archivist of occult antiquities, forced open the chained iron doors of Blackwood Asylum at exactly 3:17 AM.",
+        "core_beats": [
+          "The floorboards beneath their heavy boots hummed with a low, sickening vibrational frequency that vibrated their teeth.",
+          "'The facility was officially abandoned in 1923, Lucas,' Clara whispered, holding her brass electromagnetic sensor forward.",
+          "The sensor needle pegged instantly into the red zone, letting out an erratic, shrieking burst of static feedback.",
+          "Lucas clicked on his high-powered flashlight, revealing rows of rusted iron patient beds covered in decayed restraint straps.",
+          "On the peeling plaster wall directly ahead, fresh handprints were pressed deeply into the concrete\u2014facing downward from the ceiling.",
+          "A faint, rhythmic scratching sound emerged from inside the drywall, moving systematically from left to right.",
+          "'Lucas... look at the camera feed from the hallway we just walked through,' Clara said, her voice trembling."
+        ],
+        "expansion_beats": [
+          "The infrared monitor showed a tall, faceless silhouette standing motionless at the end of the corridor, watching them breathe.",
+          "Lucas pulled his service revolver, though both of them knew lead could do nothing against what inhabited these walls.",
+          "A heavy music box on the nurse's station began playing a warped, slow lullaby without any winding key attached.",
+          "The air temperature plummeted forty degrees in a matter of seconds, turning their breath into thick plumes of white vapor.",
+          "Lucas shined the beam down the central corridor of Ward 4, where every cell door hung open on rusted hinges.",
+          "Archival files lay scattered across the linoleum floor, detailing experimental procedures performed on patients who never left.",
+          "'The director attempted to summon an entity from the lower catacombs,' Clara murmured, reading a blood-stained ledger.",
+          "'He believed he could harness eternal memory, but whatever came through the portal consumed everyone inside in a single night.'",
+          "A sudden thud resonated from the ceiling directly above their heads, followed by the sound of rapid, crawling footsteps.",
+          "Lucas stepped in front of Clara, his knuckles white around the flashlight as the hallway lights began to flicker and burst one by one."
+        ],
+        "cliffhanger": "Then the heavy iron doors at both ends of the ward slammed shut simultaneously, plunging them into total darkness as something whispered Clara's name... Follow right now for Part 2!"
+      },
+      {
+        "chapter_num": 2,
+        "hook": "Picking up immediately from the total blackout in Ward 4, Detective Lucas Drake ignited an emergency magnesium flare as a clawed shadow lunged from the ceiling.",
+        "core_beats": [
+          "The blinding white flare illuminated a distorted silhouette with hollow obsidian eyes recoiling into the shadows with a screech.",
+          "'The ritual circle in the basement, Clara! We have to sever the tether before the flare burns out!' Lucas shouted.",
+          "Clara grabbed the antique iron seal from her satchel, leading the way down the crumbling spiral staircase.",
+          "The walls of the staircase wept black, sulfurous condensation that sizzled whenever it touched the flare's flame.",
+          "Beneath them in the basement flooded with two feet of murky water lay the submerged occult altar of Solomon.",
+          "Lucas fired two rounds into the shadows as phantom arms reached out from the walls trying to pull them into the masonry.",
+          "'Place the seal in the center of the keystone!' Lucas commanded, holding off the advancing horde of apparitions."
+        ],
+        "expansion_beats": [
+          "Clara waded through the icy water to the center altar, chanting the binding verses inscribed on the ancient parchment.",
+          "The water around her began to boil violently, releasing plumes of noxious steam that filled the stone crypt.",
+          "The entity shrieked in deafening rage, its physical manifestation thrashing against the encroaching holy ward.",
+          "With a final strike of his boot, Lucas hammered the iron seal into the altar's groove, locking it in place.",
+          "A blinding pulse of golden light erupted from the altar floor, vaporizing the shadows and shattering every mirror in the building.",
+          "The suffocating pressure in their chests lifted instantly as the natural silence of the night returned.",
+          "Lucas lowered his weapon, his breath ragged, and helped Clara climb out of the flooded chamber onto dry concrete.",
+          "Through the shattered basement grates, the calm moonlight of 4:00 AM illuminated the quiet suburban woods outside.",
+          "Blackwood Asylum had finally relinquished its captive souls, ending a century of unholy torment.",
+          "They stepped out into the crisp autumn air, leaving the sealed horrors behind in the dark where they belonged."
+        ],
+        "cliffhanger": "As Lucas locked the exterior chains, Clara noticed one fresh set of footprints leading out toward the highway... Follow for Part 3!",
+        "resolution": "Lucas and Clara successfully bound the Blackwood Entity, sealing the cursed asylum forever.",
+        "cta": "Some secrets are better left undisturbed in the dark. Save this video if you survived, and follow for more terrifying horror investigations!"
+      }
+    ]
+  },
+  {
+    "id": "adventure_nathan_elena",
+    "genre": "Adventure",
+    "category": "Adventure",
+    "keywords": [
+      "adventure",
+      "ancient",
+      "temple",
+      "treasure",
+      "archaeology",
+      "jungle",
+      "expedition",
+      "explorer",
+      "lost"
+    ],
+    "title": "The Lost Obsidian Temple of Ur-Galan",
+    "char1": "Nathan Cross, rogue archaeologist",
+    "char2": "Elena Rostova, extreme survivalist",
+    "enemy": "The Guardians of the Sunken Cenote",
+    "setting": "a subterranean prehistoric chasm beneath the Yucatan jungle",
+    "visual_style": "cinematic adventure concept art, bioluminescent jungle vines, ancient stone statues, cascading underground waterfalls, 8k, natural human anatomy, atmospheric environmental storytelling",
+    "chapters": [
+      {
+        "chapter_num": 1,
+        "hook": "Nathan Cross, a rogue archaeologist, and Elena Rostova, an extreme survival specialist, rappelled into the subterranean abyss beneath the Yucatan jungle where no map had ever recorded a passage.",
+        "core_beats": [
+          "Their boots touched down on an immense platform of polished black obsidian that mirrored the bioluminescent vines hanging above.",
+          "'Every compass reading went wild the moment we crossed the limestone cavern threshold, Nathan,' Elena warned.",
+          "She checked her geological spectrometer, which indicated an unnatural magnetic resonance emanating from a colossal pyramid below.",
+          "Nathan brushed centuries of petrified moss from a carved stone tablet, revealing the forgotten glyphs of Ur-Galan.",
+          "'The conquistadors wrote that this city was swallowed whole by the earth in a single night,' Nathan whispered with awe.",
+          "Before them stretched a stone bridge spanning a chasm so deep that dropped flare torches disappeared into endless blackness.",
+          "As Nathan stepped onto the first paving stone, ancient brass counterweights groaned within the chasm walls."
+        ],
+        "expansion_beats": [
+          "The humid cavern air smelled of ancient crushed minerals, ozone, and damp jungle flora untouched by the sun.",
+          "Elena tested the tension of their safety lines, securing the anchors deeply into the solid basalt rock face.",
+          "High above in the cavern ceiling, thousands of bioluminescent crystals cast an eerie celestial glow over the ruins.",
+          "Nathan traced the astronomical calendar carved into the bridge parapet, noticing alignments that predated Mayan civilization.",
+          "'This wasn't built as a temple, Elena,' Nathan realized. 'This was built as a subterranean vault to preserve ancestral knowledge.'",
+          "A gust of subterranean wind surged up from the chasm, carrying the distant sound of cascading underground waterfalls.",
+          "Across the bridge stood the towering double gates of the inner sanctum, adorned with golden sun dials.",
+          "Elena scanned the perimeter with thermal binoculars, detecting faint heat signatures moving along the upper ledges.",
+          "'We are definitely not alone down here,' Elena said quietly, unholstering her tactical machete and flare pistol.",
+          "Nathan smiled despite the danger, his curiosity far outweighing any sense of self-preservation."
+        ],
+        "cliffhanger": "Suddenly, the center span of the stone bridge began to retract into the cavern walls, cutting off their retreat as stone sentinels awoke on the opposite ledge... Follow for Part 2 to see the escape!"
+      },
+      {
+        "chapter_num": 2,
+        "hook": "Picking up immediately from the collapsing bridge, Nathan Cross hurled his grappling hook across the chasm, catching the golden gate archway just as the stones fell away.",
+        "core_beats": [
+          "'Jump, Elena!' Nathan yelled, catching her arm mid-air as they swung across the yawning void into the inner sanctum.",
+          "They slammed onto the polished stone floor of the temple just as the bridge plummeted into the abyss behind them.",
+          "The massive golden gates slammed shut with an earth-shattering boom, locking them inside the treasury of Ur-Galan.",
+          "In the center of the illuminated rotunda rested the Celestial Orrery\u2014a clockwork solar system forged from pure platinum.",
+          "'It's still turning,' Elena whispered in stunned disbelief. 'It has been running on subterranean geothermal power for three thousand years.'",
+          "Nathan carefully recovered the golden star chart cylinder that held the recorded coordinates of four other forgotten lost cities.",
+          "'This rewrites the entire history of human civilization on this continent,' Nathan said, placing the relic in his waterproof pack."
+        ],
+        "expansion_beats": [
+          "Elena located an ancient drainage aqueduct that led upward toward the subterranean cenote lake.",
+          "They inflated their emergency raft as subterranean pressure released gallons of crystal-clear spring water into the flume.",
+          "The current carried them through illuminated limestone grottos at breakneck speed, dodging stalactites with expert oarsmanship.",
+          "Nathan looked back one last time at the glowing jewel of Ur-Galan disappearing into the mist of the underworld.",
+          "With a tremendous surge of whitewater, their raft burst through the surface of a breathtaking jungle cenote under the blazing midday sun.",
+          "Exhausted, soaked, and triumphant, Elena and Nathan collapsed onto the warm white sand of the cenote shore.",
+          "The expedition that everyone in academia had declared impossible had uncovered the greatest archaeological discovery of the century.",
+          "Nathan held up the platinum cylinder to the sunlight, grinning as Elena radioed their rescue helicopter coordinates."
+        ],
+        "cliffhanger": "The cylinder clicked open automatically in Nathan's hands, revealing a map pointing to the Antarctic ice sheet... Follow for Part 3!",
+        "resolution": "Nathan Cross and Elena Rostova escaped the Obsidian Temple with the Celestial Orrery, rewriting world history.",
+        "cta": "The world still holds mysteries waiting for those daring enough to explore. Save this video and follow for more uncharted adventures!"
+      }
+    ]
+  },
+  {
+    "id": "motivational_maya_thomas",
+    "genre": "Motivational",
+    "category": "Motivational",
+    "keywords": [
+      "motivation",
+      "discipline",
+      "champion",
+      "athlete",
+      "grit",
+      "success",
+      "workout",
+      "mindset",
+      "overcome"
+    ],
+    "title": "The Broken Champion's Return",
+    "char1": "Maya Lin, injured world-record marathon runner",
+    "char2": "Coach Thomas Vance, veteran athletic mentor",
+    "enemy": "The medical diagnosis that claimed she would never walk without crutches",
+    "setting": "an empty frozen athletic stadium at 5:00 AM",
+    "visual_style": "cinematic sports documentary aesthetic, cold breath in winter air, intense focused gaze, dramatic stadium spotlight, photorealistic 8k, inspirational atmosphere",
+    "chapters": [
+      {
+        "chapter_num": 1,
+        "hook": "Maya Lin, an undeterred marathon runner who lost her sponsors and spinal mobility in a highway crash, stood on the frozen stadium track with Coach Thomas Vance at 5:00 AM.",
+        "core_beats": [
+          "The orthopedic surgeons had signed paperwork six months ago declaring she would spend the rest of her life walking with assistance.",
+          "Her former sponsors had terminated every contract before she even checked out of the rehabilitation hospital.",
+          "'Nobody expects you to run today, Maya,' Coach Thomas Vance said quietly, handing her a stopwatch. 'The only person you have to prove anything to is yourself.'",
+          "She exhaled a plume of white steam into the freezing morning air, adjusting the carbon-fiber braces strapped to her knees.",
+          "Every step during the first lap sent sharp waves of agony through her lower back, tempting her to surrender to the cold.",
+          "Her fingers trembled as she looked down at the empty red lanes where she had once broken national records.",
+          "'Discipline isn't built when everyone is cheering in the stands,' Thomas reminded her. 'It is forged in the silence when nobody believes you will make it.'"
+        ],
+        "expansion_beats": [
+          "She closed her eyes, remembering the hospital ceiling and the monitor beeps that had felt like a death sentence.",
+          "She rejected the comfort of excuses and the pity of those who told her to accept a diminished reality.",
+          "With grit clenched between her teeth, Maya dug her running flats into the rubber and launched into a steady stride.",
+          "One kilometer turned into five, then ten, through the biting wind and the burning ache in her scarred muscles.",
+          "The stadium floodlights hummed softly above, illuminating a solitary warrior refusing to bend to circumstance.",
+          "Thomas watched with quiet pride, checking the split times on his vintage chronometer as her pace steadily accelerated.",
+          "The doubt that had weighed down her mind for months began to incinerate under the heat of pure determination.",
+          "She realized that pain was temporary, but quitting would remain a permanent stain on her soul.",
+          "When ordinary people would have thrown in the towel and walked away, she dug deeper into her spiritual reservoir.",
+          "The sun began to peek over the stadium bleachers, casting a long golden shadow across the final hundred meters."
+        ],
+        "cliffhanger": "As she crossed the finish line of her twentieth lap, the stopwatch display showed a time that shocked Coach Vance to his core... Follow for Part 2 to see the world championship comeback!"
+      },
+      {
+        "chapter_num": 2,
+        "hook": "Picking up six months later at the Olympic trials, Maya Lin lined up in Lane 4 against the world's top athletes, wearing the same carbon knee brace.",
+        "core_beats": [
+          "Commentators on national television openly questioned why an athlete recovering from spinal reconstruction was allowed on the track.",
+          "Maya tuned out forty thousand screaming fans, locking her eyes onto the straightaway ahead as Coach Thomas gave her a silent nod.",
+          "The starting gun cracked, and the pack surged forward at a blistering world-record pace.",
+          "At the halfway mark, the lead runners opened up a twenty-meter gap, betting that Maya's body would collapse under the sustained speed.",
+          "'Hold your rhythm, Maya!' Thomas's voice echoed in her mind across the roar of the arena.",
+          "With four hundred meters remaining, Maya initiated an ungodly kick that defied all physiological logic.",
+          "She blew past the bronze medalist on the final curve, her stride powerful, fluid, and completely unshakeable."
+        ],
+        "expansion_beats": [
+          "The entire stadium rose to its feet in deafening thunder as Maya drew shoulder-to-shoulder with the defending world champion.",
+          "In those final fifty meters, all the hospital nights, the tears, the sweat, and the solitary frozen mornings converged into pure triumph.",
+          "With a final desperate lean at the tape, Maya crossed the finish line in first place by a hundredth of a second.",
+          "The scoreboard flashed the new national record as Maya fell to her knees, crying tears of pure, hard-fought redemption.",
+          "Coach Thomas Vance walked onto the track, wrapping her in the national flag as the commentators went speechless.",
+          "She had proved to eight billion people that the human spirit cannot be broken by injury, failure, or doubt.",
+          "Your current circumstances do not determine your final destination\u2014your resilience and work ethic do.",
+          "Every setback is merely the setup for the greatest comeback the world has ever witnessed."
+        ],
+        "cliffhanger": "Next year she takes on the ultimate world record in Berlin... Follow for Part 3 to witness the historic training camp!",
+        "resolution": "Maya Lin broke the national record and won the championship, proving that no obstacle can defeat unyielding human spirit.",
+        "cta": "Never let anyone tell you what you cannot achieve. Double tap, save this video for daily motivation, and follow for your daily drive to greatness!"
+      }
+    ]
+  },
+  {
+    "id": "facts_edward_bernays",
+    "genre": "Interesting Facts",
+    "category": "Interesting Facts",
+    "keywords": [
+      "tobacco",
+      "marketing",
+      "pr",
+      "edward bernays",
+      "freud",
+      "easter parade",
+      "advertising",
+      "torches of freedom"
+    ],
+    "title": "The Secret Psychological Trick That Hooked the World on Cigarettes",
+    "char1": "Edward Bernays, master publicist and nephew of Sigmund Freud",
+    "char2": "Mary Frances Gerety, undercover psychological copywriter",
+    "enemy": "Societal taboos turned into commercial traps",
+    "setting": "5th Avenue Manhattan Easter Parade, 1929",
+    "visual_style": "1920s historic vintage documentary photography, monochrome with selective sepia tones, authentic historic period detail, 8k",
+    "chapters": [
+      {
+        "chapter_num": 1,
+        "hook": "Have you ever wondered how corporate advertising convinced billions of people to inhale smoke? In 1929, women smoking in public was strictly forbidden by law and social taboo.",
+        "core_beats": [
+          "Tobacco magnate George Washington Hill realized that half of the adult human population was completely untapped as a market.",
+          "So he hired Edward Bernays, the Austrian-American nephew of psychoanalysis pioneer Sigmund Freud, to execute a covert social experiment.",
+          "Bernays consulted prominent psychoanalysts, who concluded that cigarettes represented power and male independence in the sub-conscious mind.",
+          "Instead of buying standard newspaper advertisements, Bernays devised a calculated public relations stunt that changed culture forever.",
+          "He hired ten wealthy young debutantes to march in the prestigious 1929 New York Easter Sunday Parade down Fifth Avenue.",
+          "Bernays secretly instructed the women to hide cigarettes inside their coats until they reached the center of the press grandstand.",
+          "He informed the national press that a band of suffragettes would be lighting a historic protest symbol known as 'Torches of Freedom'."
+        ],
+        "expansion_beats": [
+          "On that sunny April morning, thousands of spectators and dozens of press photographers lined the avenue outside St. Patrick's Cathedral.",
+          "At Bernays's prearranged signal, the women stopped in unison, withdrew lucky strike cigarettes, and lit them for the cameras.",
+          "Flashbulbs erupted as photographers jostled to capture the first public spectacle of high-society women smoking on camera.",
+          "Bernays did not mention the tobacco company once in his press releases\u2014he framed it entirely as a triumph of modern women's rights.",
+          "The psychological association was brilliant and diabolical: smoking was no longer an unhealthy habit, it was the ultimate badge of liberty.",
+          "Within hours, telegraph wires carried the phrase 'Torches of Freedom' to front pages across Europe, America, and Asia.",
+          "The American Tobacco Company watched its sales to women surge by hundreds of percent over the subsequent twelve months.",
+          "Every modern marketing agency today still uses this exact Bernays formula: never sell the physical product, sell the buyer's desired identity."
+        ],
+        "cliffhanger": "Wait until you see how Bernays used the exact same trick to overturn a Central American government... Follow right now for Part 2!",
+        "resolution": "Edward Bernays permanently transformed global marketing by exploiting subconscious desire rather than logical utility.",
+        "cta": "Now you know the hidden psychological origin behind modern marketing. Save this video right now and follow for more untold daily truths!"
+      },
+      {
+        "chapter_num": 2,
+        "hook": "Welcome back to Part 2. When the Easter Parade ended, Edward Bernays didn't stop with cigarettes\u2014he turned his psychological formulas toward bananas and national governments.",
+        "core_beats": [
+          "In the 1950s, the United Fruit Company was facing land reform in Guatemala that threatened their multi-million dollar plantation monopoly.",
+          "They hired Edward Bernays to manipulate the entire American populace into believing Guatemala had become a hostile communist threat.",
+          "Bernays created fake news agencies, sponsored junkets for top journalists, and manufactured sensational headlines across mainstream newspapers.",
+          "His manufactured propaganda successfully convinced the US government and the CIA to orchestrate the 1954 Guatemalan coup d'\u00e9tat.",
+          "A democratically elected president was overthrown and replaced by a military dictatorship, all to protect the profit margins of a fruit corporation.",
+          "Bernays later authored the foundational book 'Propaganda', famously stating that conscious manipulation of the masses is an invisible government.",
+          "Today, whether you are scrolling social media feeds, viewing political campaigns, or shopping online, you are living in the world Bernays built."
+        ],
+        "expansion_beats": [
+          "Historians now consider Bernays the undisputed father of modern public relations and consumer engineering.",
+          "He lived to the age of 103, quietly observing how the psychological triggers he invented came to dominate modern digital algorithms.",
+          "Whenever you find yourself desiring a luxury item you do not need, remember that a century of calculated psychology made you want it.",
+          "True freedom begins when you become aware of the unseen hands shaping your daily choices and desires.",
+          "Save this knowledge so you never fall victim to manufactured emotional manipulation."
+        ],
+        "cliffhanger": "Wait until you hear the secret origin of the 40-hour work week... Follow for Part 3!",
+        "resolution": "Edward Bernays proved that narrative control is the most powerful weapon on Earth.",
+        "cta": "Knowledge is power. Double tap, save this video, and follow for more eye-opening historical secrets every single day!"
+      }
+    ]
+  }
+];
+
+export const STYLE_NARRATIVE_PROFILES: Record<string, any> = {
   "Dark Fantasy": {
     genreTag: "Dark Fantasy",
     visualDesc: "dark fantasy concept art masterpiece, sculpted dark steel plate knight armor, glowing mystical runes, ominous atmospheric mist, blood red moonlight, Elden Ring and Witcher aesthetics, cohesive painterly digital illustration, seamless character anatomy",
-    narrativeVibe: "dark grimdark fantasy with ancient curses and eldritch secrets",
-    hooks: [
-      "In the cursed ashlands of the Forgotten Kingdom, no mortal dared kindle an open flame after dusk.",
-      "The ancient obsidian gate had remained sealed for six centuries beneath the cathedral of weeping bones.",
-      "Carrying a rune-forged greatsword pulsing with ancient blood magic, the lone knight entered the shadow of the crying fortress.",
-      "Beneath the petrified gargoyles of the fallen kingdom, an unholy bell tolled for the first time in a thousand years.",
-      "They whispered that whoever entered the Eclipse Citadel would trade their mortal soul for forbidden ancestral power.",
-    ],
-    developments: [
-      "Whispers echoed from the hollow stone walls, reciting an ancient blood pact sealed in silence by the dragon lords.",
-      "A suffocating storm of black ash descended across the valley, extinguishing the last remaining torchlight in an instant.",
-      "Carved into the deep crypt walls were the glowing crimson glyphs of immortal sorcerer kings who ruled before the age of man.",
-      "Every step deeper into the citadel revealed the petrified remains of fallen champions who had dared challenge the silence.",
-      "The ground beneath his armored sabatons trembled as subterranean chains groaned, hoisting an obsidian altar from the depths.",
-      "Visions of forgotten wars flooded his mind, depicting a celestial rebellion that shattered the sun into dying embers.",
-      "Cold ethereal fog swirled around the shattered throne, taking the spectral form of an ancient monarch clutching an unholy crest.",
-      "The air grew dense with ozone and ancient iron as the rune carvings upon the greatsword flared with blinding scarlet fire.",
-      "Drawing upon forbidden necromantic oaths, the knight braced his shield against the onslaught of shadowy phantoms.",
-      "Across the ruined grand cathedral, broken stained-glass windows mirrored a blood-red eclipse bleeding light over the realm.",
-      "He discovered a leather-bound chronicle stained with dark ichor, warning that the gatekeeper was once a king sworn to protect mankind.",
-      "With every heartbeat, the dark aura emanating from the central chamber grew heavier, testing the absolute limits of mortal will.",
-    ],
-    partBridges: [
-      "The blood moon rose higher over the weeping fortress as the true trial of shadows began.",
-      "Deep inside the subterranean crypt, an ancient omen awakened from its six-century slumber.",
-      "With his runic greatsword vibrating violently against the darkness, the knight pressed deeper into the forbidden sanctum.",
-      "The silence shattered as the cathedral foundations groaned under the weight of an awakening eldritch titan.",
-    ],
-    cliffhangers: [
-      "As the black steel door groaned open, two glowing crimson eyes pierced through the endless void. Follow for Part {next_part}!",
-      "The runes etched upon his blade suddenly flared with blinding crimson flame as the shadow leaped. Check Part {next_part} for the final clash!",
-      "A deafening battle horn sounded from beneath the floorboards, awakening the army of petrified guardians. Follow now for Part {next_part}!",
-    ],
-    resolutions: [
-      "With one final surge of ancestral power, the eldritch curse was broken, bathing the ashlands in the radiant light of dawn.",
-      "The knight stood victorious over the fallen throne, claiming the forbidden relic that would reshape the fate of the realm.",
-      "Planting his blade into the obsidian pedestal, the dark eclipse faded and eternal warmth returned to the forgotten kingdom.",
-    ],
+    narrativeVibe: "dark grimdark fantasy with ancient curses and eldritch secrets"
   },
   "Mecha": {
-    genreTag: "Futuristic Mecha",
-    visualDesc: "futuristic mecha sci-fi concept art masterpiece, giant bipedal battle robots, sleek cybernetic exoskeleton armor, glowing neon visor, HUD reflections, hydraulic thrusters, cyberpunk neon city rain, sharp focus, cohesive sci-fi design",
-    narrativeVibe: "futuristic high-tech mecha combat and cybernetic warfare",
-    hooks: [
-      "Deep beneath Neo-Tokyo in Hangar 07, the forbidden Titan-Class Mecha was powered on for the first time in thirty years.",
-      "When the orbital defense grid collapsed, only one experimental cybernetically linked robot stood between humanity and total annihilation.",
-      "The neural synchronization gauge flashed warning red as pilot Eva locked her consciousness into the mechanical war engine.",
-      "A rogue artificial intelligence breached the planetary perimeter, deploying thousands of hunter-killer drones across the neon skyline.",
-      "High above the smog-choked stratosphere, an abandoned military orbital platform fired its orbital particle cannon at the city below.",
-    ],
-    developments: [
-      "Hydraulic valves hissed with superheated plasma as the dual shoulder-mounted particle cannons charged to maximum yield.",
-      "The enemy fleet dropped through the ionosphere, deploying hundreds of autonomous combat drones over the burning skyline.",
-      "Overclocking the core reactor to two hundred percent, the mecha leaped across the skyscraper rooftops at Mach 3.",
-      "Internal telemetry sensors detected an unknown cybernetic virus attempting to hijack the central pilot neural link.",
-      "The pilot manually rerouted the backup cooling conduits, pushing the quantum turbine past safe thermodynamic thresholds.",
-      "Shockwaves from the supersonic boosters shattered the reinforced glass of towering corporate skyscrapers below.",
-      "Tactical holographic overlays illuminated the rain-slicked battlefield, calculating microsecond evasion trajectories against incoming laser barrages.",
-      "A direct kinetic strike detonated against the left titanium shoulder plate, sending warning sirens blaring through the cockpit.",
-      "Synchronizing the neural link to ninety-nine percent, the boundary between human intuition and machine reflex vanished entirely.",
-      "The city power grid below flickered and died as the Titan drew emergency wattage to charge its ultimate electromagnetic railgun.",
-      "Hostile electronic counter-measures jammed all satellite communication, leaving the pilot alone against an invading armada.",
-      "Flames and electrical sparks trailed from the mecha's back thrusters as it stabilized from a near-fatal atmospheric descent.",
-    ],
-    partBridges: [
-      "With city sirens wailing and the skyline engulfed in plasma fire, the decisive counterattack commenced.",
-      "The neural gauge reached critical redline as the mothership descended through the burning neon clouds.",
-      "Overriding every safety limit on the quantum reactor, the steel titan prepared to make its final stand.",
-      "As emergency coolant vented into the midnight rain, an ominous seismic signature registered on the radar.",
-    ],
-    cliffhangers: [
-      "A colossal mothership descended through the neon clouds, targeting the city core. Follow right now for Part {next_part}!",
-      "The core reactor began its critical 30-second meltdown countdown with enemy missiles locked on. See what happened in Part {next_part}!",
-      "An unexpected secondary signature powered up behind the smoke—a mecha identical to his own. Follow for Part {next_part}!",
-    ],
-    resolutions: [
-      "Unleashing a devastating synchronized EMP wave, the Titan Mecha eradicated the hostile armada and saved the metropolis.",
-      "Standing amidst the smoking battlefield as the morning sun rose, the lone steel warrior raised its plasma blade in decisive victory.",
-      "The pilot disconnected from the neural dock, having permanently rewritten the history of modern cybernetic warfare.",
-    ],
-  },
-  "Anime": {
-    genreTag: "Anime Hero",
-    visualDesc: "Studio Ghibli and Makoto Shinkai inspired anime aesthetic, expressive vibrant anime hero, glowing energy aura, luminous sky, crisp clean outlines, seamless Japanese animation art, unified anime illustration, no photo face",
-    narrativeVibe: "epic anime adventure with supernatural power awakenings",
-    hooks: [
-      "Born without a single trace of elemental spiritual energy, everyone in the academy called him an outcast.",
-      "On the night of the crimson lunar eclipse, the forbidden ancient seal on his right arm shattered.",
-      "Standing alone on the mountain peak under starry skies, he unlocked the legendary lost technique of the celestial masters.",
-      "When the dark guild surrounded the village sanctuary, a dormant ancient spirit awakened within his soul.",
-      "A mysterious scroll found in the forgotten archives spoke of a warrior who could command both storm and flame.",
-    ],
-    developments: [
-      "A blazing golden aura exploded around his body, defying the fundamental spiritual laws of the martial realm.",
-      "The grandmaster stared in utter disbelief as the supposedly talentless student deflected the ultimate secret strike with a single palm.",
-      "Remembering the sacred promise he made to his fallen mentor, he refused to take a single step backward.",
-      "Energy rippled across the battlefield as the two greatest prodigies of the era met at supersonic speed.",
-      "Swirling spiritual pressure kicked up gale-force winds, scattering cherry blossom petals across the ancient stone courtyard.",
-      "He closed his eyes and breathed deeply, tapping into an ocean of celestial power that had slumbered for generations.",
-      "Every strike produced thundering sonic booms that shook the mountain peaks and lit the night sky with azure lightning.",
-      "His opponents stepped back in awe as ancient draconic markings illuminated along his forearms.",
-      "Through blood and unbroken discipline, he transformed the mockery of his past into the fuel of his ultimate awakening.",
-      "The celestial seal cracked completely, releasing a golden phoenix of spiritual energy that spread across the heavens.",
-      "With crystal clarity, he perceived every movement of his adversary in slow motion, dodging effortlessly.",
-      "Standing amidst swirling ethereal embers, he focused his entire spirit into one singular, decisive strike.",
-    ],
-    partBridges: [
-      "The spiritual storm unleashed across the mountain pass as the ancient master stepped into the ring.",
-      "As cherry blossoms were swept away by gale-force winds, the true extent of his dormant power was unveiled.",
-      "With the celestial eclipse reaching totality, the final duel between prodigy and master commenced.",
-      "The ground beneath the temple began to levitate as ancient spiritual frequencies resonated through the air.",
-    ],
-    cliffhangers: [
-      "Drawing his blade to reveal its true spiritual form, the arena went completely silent. Follow for Part {next_part}!",
-      "An unexpected challenger emerged from the shadows of the temple courtyard. Don't miss Part {next_part}!",
-      "The sky split open as two opposing celestial dragons materialized above the arena. Check Part {next_part} now!",
-    ],
-    resolutions: [
-      "He surpassed every limit set by the ancient masters, establishing a legendary new era of heroes.",
-      "With an unstoppable burst of radiant light, he secured victory and proved that indomitable will triumphs over destiny.",
-      "The academy elders bowed in respect, acknowledging him as the rightful protector of the realm.",
-    ],
-  },
-  "Disney 3D": {
-    genreTag: "Pixar 3D",
-    visualDesc: "Pixar and Disney 3D style character animation, charming stylized facial features, warm 3D studio lighting, subsurface scattering, colorful magical atmosphere, full 3D animated scene, seamless 3D render",
-    narrativeVibe: "heartwarming animated adventure with wonder and whimsical discovery",
-    hooks: [
-      "In a whimsical clockwork village tucked between rolling green hills, a curious apprentice made an extraordinary discovery.",
-      "Every animal in the enchanted forest possessed a magical talent—except for Barnaby the little red fox.",
-      "Hidden inside grandmother's attic was a miniature golden compass that didn't point north—it pointed to adventure.",
-      "When the annual Starlight Festival lanterns floated away on a runaway cloud, one tiny inventor had a daring idea.",
-      "Deep inside the Whispering Valley, a playful baby dragon had lost its way home to the Cloud Kingdom.",
-    ],
-    developments: [
-      "With a joyful spark and a twirl of gears, the little brass automaton sprang to life and blinked happily with glowing blue eyes.",
-      "They journeyed past floating rainbow waterfalls and glowing crystal caves that nobody in the village had ever seen.",
-      "When a sudden gust of wind scattered the village's prized starlight festival balloons, Barnaby knew what he had to do.",
-      "Working together with a quirky band of friendly forest creatures, they devised the most creative rescue plan.",
-      "A trail of sparkling enchanted acorns guided them through the canopy as singing bluebirds pointed the way.",
-      "The little clockwork wings fluttered into motion, lifting the brave inventor just high enough to touch the morning clouds.",
-      "Laughter echoed across the enchanted meadow as friendly forest mice built a bridge out of intertwined honeysuckle vines.",
-      "Inside the heart of the great hollow oak, thousands of tiny fireflies lit up a map of secret underground tunnels.",
-      "With curiosity outmatching fear, the little friends helped the lost creature find comfort by singing a whimsical lullaby.",
-      "Every obstacle they faced was met with teamwork, quick thinking, and a warm sense of joyful optimism.",
-      "Magical sparkles filled the air as the ancient clockwork machine whirred back to life with a cheerful melody.",
-      "Hand in hand, the band of little dreamers realized that the true magic was the friendship they forged along the journey.",
-    ],
-    partBridges: [
-      "Following the glowing trail of enchanted stardust, the little adventurers discovered a hidden clockwork doorway.",
-      "With gears whirring and magical lanterns flickering, they ventured past the whispering waterfalls into the unknown.",
-      "As twilight painted the enchanted forest in warm hues of lavender and gold, the real challenge began.",
-      "High above the treetops on a flying leaf glider, they caught their first glimpse of the lost kingdom.",
-    ],
-    cliffhangers: [
-      "Reaching into the hollow glowing oak tree, Barnaby discovered the missing golden key. Follow for Part {next_part}!",
-      "A giant friendly shadow stepped out from the magical mist with a warm smile. See who it was in Part {next_part}!",
-      "The map began glowing with secret rainbow pathways that led straight into the clouds. Follow for Part {next_part}!",
-    ],
-    resolutions: [
-      "The entire village cheered as the festival lights illuminated the night sky in breathtaking beauty.",
-      "Barnaby discovered that the greatest magic of all wasn't spells or potions—it was having the courage to be yourself.",
-      "The little baby dragon was safely reunited with its family, circling the village in a joyous shower of colorful stardust.",
-    ],
-  },
-  "Retro Comic": {
-    genreTag: "Pop-Art Comic",
-    visualDesc: "vintage 1970s comic book pop-art style, bold black ink outlines, dynamic halftone dot shading, vibrant saturated colors, dramatic superhero pose, authentic comic panel aesthetic, unified comic art",
-    narrativeVibe: "golden age comic book heroics with dynamic cliffhanger drama",
-    hooks: [
-      "By day, mild-mannered photojournalist Jack Miller was invisible—but when the city sirens wailed, justice answered.",
-      "The nefarious Doctor Chronos had just frozen the downtown financial district inside an impenetrable temporal stasis field.",
-      "High above the stone gargoyles of Empire City, the masked guardian watched the midnight bank heist unfold.",
-      "A mysterious transmission crackled across the police radios: the Crimson Skull had broken out of Ironwood Penitentiary.",
-      "Underneath the city subway tracks, an underground syndicate had built an experimental tectonic earthquake generator.",
-    ],
-    developments: [
-      "Leaping across steel suspension cables, our hero intercepted the hypersonic getaway flyer in mid-air.",
-      "With a thundering punch that rattled the city grid, the villain's sonic disruptor was shattered into pieces.",
-      "The city police were trapped inside the vault, leaving only seconds before the countdown hit zero.",
-      "Using every ounce of enhanced superhuman strength, he lifted the collapsing bridge beam to safety.",
-      "Bullet-proof gauntlets deflected incoming laser bursts as our hero dashed across the rain-slicked rooftop.",
-      "Doctor Chronos sneered from the control room, activating the backup generators with a sinister mechanical laugh.",
-      "Bold onomatopoeic shockwaves echoed through the concrete streets as fists clashed in a battle for the city's soul.",
-      "Dodging past high-voltage electric traps, the masked crusader closed the distance to the master control terminal.",
-      "With the entire metropolitan power grid surging towards a blackout, he made a split-second tactical maneuver.",
-      "A smoke grenade filled the skyscraper boardroom, turning the fight into a shadow game of speed and wits.",
-      "He remembered the vow he made beneath the city lights: never let innocent citizens live in fear of tyranny.",
-      "Ripping the primary power conduit from the villain's mechanical harness, the temporal field began to collapse.",
-    ],
-    partBridges: [
-      "Sirens wailed across the neon skyscraper district as Doctor Chronos unleashed his secondary shockwave.",
-      "Swinging from suspension cables through the midnight fog, our hero arrived at the secret waterfront docks.",
-      "With only thirty seconds remaining on the doomsday clock, the city's fate hung by a single thread.",
-      "Bursting through the skylight in a flurry of glass and smoke, justice met the criminal mastermind face to face.",
-    ],
-    cliffhangers: [
-      "Just as the villain seemed cornered, a smoke grenade detonated on the rooftop! Follow for Part {next_part}!",
-      "The timer on the temporal device dropped to three seconds! Check Part {next_part} for the thrilling climax!",
-      "From the shadows of the blimp stepped an unexpected arch-nemesis with a sinister grin. Check Part {next_part} now!",
-    ],
-    resolutions: [
-      "With the mastermind in handcuffs and the city saved, the masked hero vanished into the moonlit skyline.",
-      "Once again, the forces of justice prevailed, proving that good will always triumph over darkness.",
-      "The morning sun broke over Empire City as the mayor presented the key to the city to our unnamed protector.",
-    ],
+    genreTag: "Mecha",
+    visualDesc: "giant mecha battle anime concept art, intricate mechanical joints, glowing blue energy thrusters, shattered orbital sky, cinematic 8k, seamless mecha rendering",
+    narrativeVibe: "futuristic mechanized warfare and heroic titan pilots"
   },
   "Realism": {
-    genreTag: "Photorealism",
-    visualDesc: "cinematic 35mm photography, natural human skin texture and lifelike eyes, dramatic film lighting, shallow depth of field, photorealistic 8k",
-    narrativeVibe: "cinematic photorealistic narrative grounded in realism",
-    hooks: [
-      "It started as an ordinary rainy morning, until an unexpected sealed letter arrived on his desk.",
-      "Looking out across the foggy skyline, she realized the decision she had to make would change everything.",
-      "The boardroom fell completely silent as the evidence was placed upon the center table.",
-      "After years of searching through forgotten county archives, the final missing document was finally in his hands.",
-      "Standing at the edge of the quiet harbor, he knew there was no turning back from this journey.",
-    ],
-    developments: [
-      "Every detail in the files pointed to a coordinated operation that had remained hidden in plain sight.",
-      "The tension in the room was palpable as footsteps approached the double wooden doors.",
-      "He cross-referenced the flight manifests with the offshore financial records, uncovering an undeniable pattern.",
-      "Under the warm amber streetlamps, they spoke in hushed tones about what had to happen next.",
-      "The rain continued to beat against the glass windowpane as the clock ticked closer to midnight.",
-      "With calm precision and years of discipline, she prepared the final presentation that would expose the truth.",
-      "A sudden realization hit him: the person who leaked the data had been on their team the entire time.",
-      "Walking through the crowded city streets, every passerby seemed like an observer in a high-stakes chess match.",
-    ],
-    partBridges: [
-      "As dusk settled over the skyline, the true motive behind the transaction was laid bare.",
-      "Behind closed doors, the pressure escalated to a fever pitch as key players took their positions.",
-      "With the deadline rapidly approaching, every piece of the puzzle snapped into place.",
-    ],
-    cliffhangers: [
-      "Just as he clicked send on the encrypted file, his phone rang with an unknown overseas caller. Follow for Part {next_part}!",
-      "She turned around to find the safe door wide open and the folder gone. Follow for Part {next_part}!",
-    ],
-    resolutions: [
-      "The truth was finally revealed to the world, restoring justice and closing a painful chapter for good.",
-      "Standing by the quiet waterfront at dawn, he finally found the peace that had eluded him for so long.",
-    ],
+    genreTag: "Realism",
+    visualDesc: "cinematic 35mm photograph, wide establishing environmental shot, realistic lighting and textures, shallow depth of field, 8k",
+    narrativeVibe: "gripping forensic realism, corporate espionage, and psychological stakes"
   },
-};
-
-export const UNTOLD_INTERESTING_FACTS = [
-
-  {
-    id: "tobacco_marketing",
-    keywords: ["tobacco", "cigarette", "marketing", "smoke", "advertising", "pr", "edward bernays"],
-    title: "The Secret Psychological Trick That Hooked the World on Cigarettes",
-    part_1_hook: "Have you ever wondered how cigarette companies convinced half the planet to inhale smoke? In 1929, women smoking in public was strictly taboo. But tobacco magnates hired Edward Bernays, the nephew of Sigmund Freud, to execute the most manipulative psychological experiment in human history.",
-    part_1_suspense: "Bernays didn't advertise the cigarettes at all. Instead, he paid wealthy debutantes to march in the 1929 New York Easter Parade, holding hidden cigarettes in their coats. What he told the press they were holding changed global advertising forever... Drop a like and follow for Part 2!",
-    part_2_body: "Welcome back to Part 2. When the parade began, the women simultaneously lit their cigarettes in front of hundreds of photographers. Bernays had informed the newspapers that these women were lighting 'Torches of Freedom'—framing smoking not as a habit, but as the ultimate symbol of female independence.",
-    part_2_suspense: "Front pages across the nation exploded with the headline: 'Torches of Freedom'. Within weeks, cigarette sales skyrocketed by hundreds of percent. Today, every single brand on Earth uses this exact same formula: they don't sell the product—they sell your identity and freedom.",
-  },
-  {
-    id: "graham_bell_telephone_hello",
-    keywords: ["telephone", "phone", "hello", "bell", "alexander graham bell", "call", "edison"],
-    title: "The Untold Story of Why 8 Billion People Say 'Hello' on the Phone",
-    part_1_hook: "Every single time you answer your phone, you say the exact same word: 'Hello'. But did you know that Alexander Graham Bell, the man who invented the telephone, absolutely hated that word and demanded nobody ever use it?",
-    part_1_suspense: "Bell insisted that the only proper way to answer a call was the nautical greeting 'Ahoy-hoy'. But a bitter feud with his greatest rival, Thomas Edison, and a personal secret involving his lover turned a private phrase into a global obsession... Wait until you hear the twist in Part 2!",
-    part_2_body: "Welcome back to Part 2. When the very first telephone exchange was built in 1878, Alexander Graham Bell campaigned furiously for 'Ahoy'. But Thomas Edison sent a direct letter to the Central District Printing and Telegraph Company insisting on 'Hello'—because acoustic microphones at the time couldn't register soft vowel sounds.",
-    part_2_suspense: "Legend also claims Bell's early assistant and sweetheart was named Margaret Hello, meaning whenever his phone rang, that was the name on his mind. Edison printed 'Hello' in the very first official telephone directory, cementing it into the vocabulary of 8 billion human beings forever.",
-  },
-  {
-    id: "de_beers_diamonds",
-    keywords: ["diamond", "diamonds", "engagement", "ring", "marriage", "jewel", "luxury", "de beers"],
-    title: "How a Single Ad Campaign Tricked the World into Buying Diamonds",
-    part_1_hook: "Why do people spend two months of their hard-earned salary on a small shiny diamond ring for an engagement? In the early 1900s, almost nobody proposed with a diamond. Diamonds were seen as common, cheap minerals.",
-    part_1_suspense: "Then in 1938, a South African cartel called De Beers was sitting on warehouses overflowing with worthless diamonds they couldn't sell. So they hired a Philadelphia advertising agency to invent a psychological illusion... Follow right now for Part 2 to see the con!",
-    part_2_body: "Welcome back to Part 2. The advertising agency N.W. Ayer realized diamonds had almost zero resale value. So copywriter Mary Frances Gerety penned four simple words that changed human culture forever: 'A Diamond is Forever'.",
-    part_2_suspense: "By linking the eternal durability of a diamond to the eternal durability of true love, they convinced young men that a smaller diamond meant less love. They engineered the 'two-month salary' rule out of thin air, creating an artificial multi-billion dollar monopoly that rules the world to this day.",
-  },
-  {
-    id: "orange_carrot_dutch",
-    keywords: ["carrot", "vegetable", "orange", "dutch", "netherlands", "food history", "biology"],
-    title: "Why Carrots Weren't Orange Until a Royal Rebellion",
-    part_1_hook: "If you traveled back in time 500 years and pulled a carrot out of the soil, you would be stunned. For thousands of years, all wild and cultivated carrots across Asia and Europe were deep purple, stark white, and pale yellow.",
-    part_1_suspense: "So why is every single carrot in your local grocery store bright orange today? It wasn't Mother Nature. It was a calculated political revolution by Dutch farmers fighting a bloody war of independence... Check Part 2 for the full untold truth!",
-    part_2_body: "Welcome back to Part 2. In the 17th century, Dutch growers were fiercely loyal to William of Orange, the revolutionary leader who fought Spanish rule to establish the Dutch Republic.",
-    part_2_suspense: "To honor the Royal House of Orange, Dutch botanists spent decades cross-breeding mutant yellow and red seeds until they bred a stable, sweeter, vibrant orange variety. The Dutch distributed the seeds across world trade routes, permanently rewriting the genetic color of a vegetable for the entire human race.",
-  },
-  {
-    id: "kelloggs_corn_flakes",
-    keywords: ["cereal", "corn flakes", "kellogg", "breakfast", "doctor", "health"],
-    title: "The Bizarre Reason Corn Flakes Were Invented by a Doctor",
-    part_1_hook: "Every morning, millions of children and adults pour a bowl of crunchy Corn Flakes. But Dr. John Harvey Kellogg never designed Corn Flakes to be a delicious morning breakfast.",
-    part_1_suspense: "In 1894 at his Battle Creek Sanitarium, Dr. Kellogg was obsessed with the idea that flavorful, spicy, and sweet foods stimulated human passions and immoral desires. His real goal was far darker than anyone realizes... Follow right now for Part 2!",
-    part_2_body: "Welcome back to Part 2. Dr. Kellogg created plain, completely tasteless toasted flakes of wheat and corn specifically as an anti-passion diet to keep his patients calm and mentally subdued.",
-    part_2_suspense: "When his brother Will Kellogg secretly added sugar to make it taste good, a bitter 20-year family lawsuit erupted. Will won the rights, sold millions of boxes, and accidentally created the multi-billion dollar global breakfast cereal industry we know today.",
-  },
-  {
-    id: "high_heels_soldiers",
-    keywords: ["high heels", "shoes", "fashion", "soldiers", "cavalry", "boots"],
-    title: "High Heels Were Actually Invented for Male Soldiers",
-    part_1_hook: "Today, high heels are viewed around the world as the quintessential symbol of women's fashion. But high heels were originally engineered exclusively for rough, battle-hardened male warriors.",
-    part_1_suspense: "In 10th-century Persia, elite soldiers riding on horseback were missing their targets while shooting arrows at full gallop. The solution they engineered was dangerous, ingenious, and surprising... Watch Part 2 to see how it happened!",
-    part_2_body: "Welcome back to Part 2. Persian cavalry fighters added high heels to their leather boots so their feet would lock securely into horse stirrups, allowing them to stand up and aim bow and arrows with lethal precision.",
-    part_2_suspense: "When Persian diplomats visited Europe in 1599, French and English aristocrats copied the heels to appear taller, dominant, and aristocratic. It took another two centuries before women adopted them to assert bold equality, transforming war armor into iconic modern fashion.",
-  },
-  {
-    id: "mcdonalds_real_estate",
-    keywords: ["mcdonalds", "burger", "business", "real estate", "franchise", "ray kroc"],
-    title: "McDonald's Isn't a Fast Food Chain—It's a Real Estate Empire",
-    part_1_hook: "If you ask anyone how McDonald's makes its billions of dollars, they will tell you burgers, french fries, and soft drinks. But former McDonald's CEO Harry Sonneborn openly admitted: 'We are not in the food business. We are in the real estate business.'",
-    part_1_suspense: "In the 1950s, Ray Kroc was going completely bankrupt trying to sell 15-cent hamburgers. Then a financial genius walked into his office with a revolutionary hidden business model... Tap follow for Part 2 to see the empire!",
-    part_2_body: "Welcome back to Part 2. The strategy was deceptively simple: McDonald's Corporation buys the prime street corner land where every restaurant sits, and leases it back to the franchisees with massive markup margins.",
-    part_2_suspense: "Franchisees take all the risk of cooking food and paying employees, while McDonald's collects guaranteed rent regardless of whether burgers sell. Today, McDonald's owns over $40 billion in prime commercial real estate, making it one of the largest property landlords on planet Earth.",
-  },
-  {
-    id: "bubble_wrap_wallpaper",
-    keywords: ["bubble wrap", "packaging", "wallpaper", "plastic", "invention"],
-    title: "Bubble Wrap Was Originally Invented as 3D Wallpaper",
-    part_1_hook: "We all love popping the plastic bubbles of bubble wrap. But engineers Alfred Fielding and Marc Chavannes did not invent it to protect Amazon packages or fragile ceramics.",
-    part_1_suspense: "In 1957, they sealed two shower curtains together in a garage in New Jersey, creating tiny trapped air bubbles. Their original plan for this invention will leave you laughing in disbelief... Check Part 2 to see what it was!",
-    part_2_body: "Welcome back to Part 2. They were attempting to invent high-tech textured 3D wallpaper for modern living rooms! When nobody in America wanted plastic shower curtains on their living room walls, the inventors nearly went broke.",
-    part_2_suspense: "Three years later, IBM announced the launch of its revolutionary 1401 mainframe computers. The inventors convinced IBM to wrap the million-dollar machines in their air bubbles for shipping—saving the company and birthing the most satisfying packaging material in human history.",
-  },
-  {
-    id: "play_doh_wallpaper_cleaner",
-    keywords: ["play-doh", "playdoh", "toy", "clay", "wallpaper", "cleaner"],
-    title: "Play-Doh Was Originally Invented as Wallpaper Soot Cleaner",
-    part_1_hook: "Almost every child on Earth has squished colorful Play-Doh between their fingers. But Play-Doh wasn't invented as a creative children's toy.",
-    part_1_suspense: "In the 1930s, Kutol Products in Cincinnati was manufacturing a pliable, doughy compound for one single purpose: cleaning dark coal soot off living room wallpaper. When gas heating replaced coal, Kutol was days away from bankruptcy... Wait until you see the twist in Part 2!",
-    part_2_body: "Welcome back to Part 2. The company owner's sister-in-law, Kay Zufall, was a nursery school teacher. She read an article about using non-toxic wallpaper dough for arts and crafts, and gave it to her students to sculpt Christmas ornaments.",
-    part_2_suspense: "The kids fell in love with it. Kutol removed the detergent compound, added vibrant coloring and an almond scent, and rebranded it as Play-Doh. They turned a dying household cleaner into a toy empire that has sold over 3 billion cans worldwide.",
-  },
-  {
-    id: "treadmill_victorian_prison",
-    keywords: ["treadmill", "gym", "exercise", "workout", "prison", "torture", "running"],
-    title: "Treadmills Were Originally Invented as Victorian Prison Torture",
-    part_1_hook: "Next time you step onto a treadmill at the gym, remember this disturbing historical truth: treadmills were never designed for fitness, weight loss, or healthy cardio.",
-    part_1_suspense: "In 1818, British civil engineer Sir William Cubitt designed the 'treadwheel' as a severe disciplinary punishment for lazy inmates in Victorian prisons. The grueling daily regime they were subjected to was terrifying... Check Part 2 to see how harsh it was!",
-    part_2_body: "Welcome back to Part 2. Incarcerated convicts were forced to climb gigantic stepped wooden wheels for over six continuous hours every day to crush grain or pump water. On average, a prisoner climbed the vertical equivalent of 7,200 feet every single shift.",
-    part_2_suspense: "The torture caused hundreds of catastrophic injuries until British Parliament banned it in 1902 under the Prison Act as cruel and unusual punishment. Decades later in 1952, Dr. Robert Bruce revived the machine for medical testing, which gyms eventually monetized into the $5 billion fitness industry we pay to use today.",
-  },
-  {
-    id: "listerine_floor_cleaner",
-    keywords: ["listerine", "mouthwash", "halitosis", "breath", "antiseptic", "doctor"],
-    title: "Listerine Was Floor Cleaner Until They Invented 'Bad Breath'",
-    part_1_hook: "How did a harsh floor cleaner and surgical antiseptic become the most trusted bottle of mouthwash in your bathroom cabinet? The answer lies in the most brilliant advertising scam in American history.",
-    part_1_suspense: "Formulated in 1879 by Dr. Joseph Lawrence, Listerine was originally sold as a heavy surgical disinfectant, a dandruff treatment, and even a cure for gonorrhea. For 40 years, sales were stagnant because nobody needed it... Tap follow for Part 2 to see the psychological trick!",
-    part_2_body: "Welcome back to Part 2. In the 1920s, the company dug up an obscure Latin medical term: 'Halitosis', which simply meant stale human breath. They launched dramatic magazine ads showing heartbroken young women unable to get married because of their unseen 'medical condition'.",
-    part_2_suspense: "The ads terrified Americans into believing that bad breath was an unforgivable social disease that only Listerine could cure. Within four years, Listerine's profits soared from $100,000 to over $4 million, inventing a brand-new hygiene crisis and solving it with the same bottle.",
-  },
-  {
-    id: "super_glue_wwii_accident",
-    keywords: ["super glue", "glue", "adhesive", "wwii", "accident", "gunsight", "invention"],
-    title: "Super Glue Was Rejected as a Failed Military Disaster",
-    part_1_hook: "Super Glue is so powerful that a single square inch can lift an entire three-ton truck into the air. But the chemist who discovered it thought it was a complete failure and threw it into the trash.",
-    part_1_suspense: "In 1942 during World War II, Dr. Harry Coover was leading a team at Eastman Kodak trying to develop clear plastic precision gunsights for Allied rifles. But the substance they synthesized, cyanoacrylate, was a military nightmare... Follow for Part 2 to see the accidental discovery!",
-    part_2_body: "Welcome back to Part 2. The formula stuck instantly and permanently to every single piece of laboratory equipment, destroying expensive lenses and optical tools. Frustrated, Coover abandoned the formula as completely useless.",
-    part_2_suspense: "Nine years later in 1951, Coover was researching heat-resistant jet airplane canopies when an assistant accidentally glued two prisms together permanently. Coover suddenly realized the compound didn't require heat or pressure to form unbreakable bonds. He demonstrated it on live television by lifting a car, revolutionizing modern adhesives forever.",
-  },
-  {
-    id: "percy_spencer_microwave_chocolate",
-    keywords: ["microwave", "oven", "chocolate", "radar", "percy spencer", "kitchen", "cooking"],
-    title: "How a Melted Candy Bar in a Pocket Built the Microwave Oven",
-    part_1_hook: "Over 90 percent of all homes on Earth have a microwave oven in their kitchen. But the revolutionary device was never designed by chefs, appliance makers, or culinary scientists.",
-    part_1_suspense: "In 1945, self-taught engineer Percy Spencer was standing in front of an active military radar magnetron at Raytheon Corporation. When he reached into his pocket for a snack, what he discovered changed cooking forever... Check Part 2 for the shocking moment!",
-    part_2_body: "Welcome back to Part 2. A peanut cluster chocolate candy bar in his pocket had completely melted into a warm puddle, even though he felt no heat on his body. Intrigued, Spencer placed unpopped corn kernels near the tube—and watched them explosively pop across the room.",
-    part_2_suspense: "The next morning, he placed a raw egg in front of the magnetron, which violently exploded in his colleague's face. Spencer realized that low-density microwave radiation heated water molecules inside food instantly. Raytheon patented the technology and built the 'Radarrange', birthing the microwave oven that transformed the modern world.",
-  },
-  {
-    id: "chupa_chups_salvador_dali",
-    keywords: ["chupa chups", "lollipop", "salvador dali", "candy", "logo", "art"],
-    title: "Why a Surrealist Mastermind Designed the Chupa Chups Logo",
-    part_1_hook: "Have you ever looked closely at the wrapper of a Chupa Chups lollipop? The bright yellow daisy logo wasn't made by a commercial graphic design agency. It was drawn by one of the most eccentric artists who ever lived: Salvador Dalí.",
-    part_1_suspense: "In 1969, the Spanish lollipop founder Enric Bernat was struggling to expand internationally. He took his good friend Salvador Dalí out for coffee at an outdoor cafe in Figueres... Follow for Part 2 to see what Dalí created in just one hour!",
-    part_2_body: "Welcome back to Part 2. Dalí grabbed a piece of scrap newspaper and immediately began doodling bright, flamboyant daisy petals around the lettering. In less than sixty minutes, he presented Bernat with the iconic design.",
-    part_2_suspense: "Dalí made one crucial demand that became marketing genius: never place the logo on the side of the wrapper where it gets crinkled, but place it squarely on the very top so it remains completely visible from above. The logo catapulted Chupa Chups into a global pop-culture phenomenon that still sells billions of lollipops worldwide.",
-  },
-  {
-    id: "post_it_failed_glue",
-    keywords: ["post-it", "post it", "notes", "3m", "glue", "paper", "invention"],
-    title: "Post-It Notes Were Born from a Complete Chemistry Failure",
-    part_1_hook: "We stick yellow Post-it Notes on computer screens, refrigerators, and notebooks every day. But 3M spent millions trying to create an adhesive that was supposed to be the strongest glue in the world.",
-    part_1_suspense: "In 1968, chemist Dr. Spencer Silver was attempting to invent super-strong glue for aerospace engineering. Instead, he accidentally created an adhesive that stuck lightly to surfaces and peeled off with zero residue. His bosses dismissed it as useless garbage... Watch Part 2 to see the turning point!",
-    part_2_body: "Welcome back to Part 2. For five years, the failed weak glue sat untouched in 3M supply closets. Then a colleague, Art Fry, was singing in his church choir and grew infuriated when his scrap paper bookmarks kept falling out of his hymnal.",
-    part_2_suspense: "Fry remembered Silver's 'failed' adhesive and coated a scrap of yellow paper from the lab next door. It held perfectly and pulled away without damaging the pages. Today, Post-it Notes generate over $1 billion annually, proving that one person's failed experiment can become a global staple.",
-  },
-  {
-    id: "ruth_graves_wakefield_cookie",
-    keywords: ["ruth graves wakefield", "cookie", "chocolate chip", "toll house", "baking", "dessert"],
-    title: "The Untold Origin of the Chocolate Chip Cookie",
-    part_1_hook: "Have you ever wondered the bizarre origin of Ruth Graves Wakefield? What history books rarely tell you is that the world's most famous cookie was born through pure culinary determination.",
-    part_1_suspense: "In the 1930s, Ruth ran the Toll House Inn in Whitman, Massachusetts. When baking chocolate cookies, she realized she had run out of regular baker's chocolate. What happened next changed desserts forever... Follow for Part 2!",
-    part_2_body: "Welcome back to Part 2. Ruth chopped up a bar of Nestlé semi-sweet chocolate, expecting it to melt smoothly into the dough. Instead, the chocolate morsels held their shape, creating the first ever chocolate chip cookie.",
-    part_2_suspense: "Nestlé was so impressed by the surging sales that they reached a historic deal with Ruth: printing her Toll House recipe on every package in exchange for a lifetime supply of chocolate.",
-  },
-];
-
-export interface MotivationalArchetype {
-  id: string;
-  title: string;
-  keywords: string[];
-  hooks: string[];
-  developments: string[];
-  cliffhangers: string[];
-  resolutions: string[];
-  cta: string;
-  visual_style: string;
-}
-
-export const MOTIVATIONAL_ARCHETYPES: MotivationalArchetype[] = [
-  {
-    id: "startup_turnaround",
-    title: "From 48 Hours Before Bankruptcy to a Global Revolution",
-    keywords: ["startup", "business", "company", "bankruptcy", "founder", "money", "investor"],
-    hooks: [
-      "When the factory closed and all investors walked away, he had exactly 48 hours before total bankruptcy.",
-      "With zero dollars left in the company account and payroll due by midnight, everyone told him to throw in the towel.",
-      "Three days before losing his family home to foreclosure, he received one final rejection from his 40th investor.",
-      "In 2011, he was sleeping in a broken car with zero dollars to his name and everyone calling him a failure.",
-      "With maxed-out credit cards and eviction notices on his door, he was down to his absolute last fifty dollars.",
-    ],
-    developments: [
-      "When everyone else surrendered to comfort, he doubled down on the grueling, invisible grind.",
-      "While the world slept, he was waking up at 4:00 AM every single morning to code in an unheated garage.",
-      "Rejection after rejection rolled in—over 300 doors slammed directly in his face without a second glance.",
-      "He poured every ounce of pain into absolute, unrelenting obsession with product mastery.",
-      "Maxing out his final credit card for server parts, he bet everything on one radical architecture nobody else believed in.",
-      "He refused to accept defeat as an outcome, working through blinding exhaustion until the breakthrough arrived.",
-      "Every single critic told him the market was crowded and he stood zero chance against corporate giants.",
-      "He converted pure desperation into fierce, mathematical focus that ignored fear entirely.",
-    ],
-    cliffhangers: [
-      "Then on the absolute darkest day, when quitting was the only logical choice, he made a decision that shocked his entire industry. Follow for Part {next_part}!",
-      "With his final ten dollars left in his pocket, he bet everything on one risky move. See the insane outcome in Part {next_part}!",
-    ],
-    resolutions: [
-      "Ten years later, he walked into the same boardroom—not to ask for capital, but as the owner of the entire enterprise.",
-      "Today, his company employs over five thousand people and powers systems worldwide, proving that conviction outlasts circumstance.",
-      "He proved that when you refuse to quit, the world eventually makes way for your vision.",
-      "Standing before the ringing bell of the stock exchange, he smiled thinking of the cold garage where it all began.",
-    ],
-    cta: "Remember: your current chapter is not your final destination. Save this video to stay relentless, and follow for your daily drive!",
-    visual_style: "cinematic ultra-realistic startup founder determination dramatic lighting 8k octane render golden hour skyscraper boardroom",
-  },
-  {
-    id: "paralyzed_athlete",
-    title: "The Paralyzed Athlete Who Defied Every Medical Law",
-    keywords: ["athlete", "paralyzed", "doctor", "walk", "injury", "olympic", "runner", "gold"],
-    hooks: [
-      "They told him his nervous system was permanently shattered and he would spend the rest of his life in a wheelchair.",
-      "After a catastrophic crash at 80 miles per hour, doctors told the young athlete to accept that his career was over.",
-      "Lying in an intensive care bed unable to move a single finger, he made a silent vow that shocked his surgeons.",
-      "When the specialists said walking was medically impossible, he looked them in the eye and whispered: watch me.",
-      "He had dedicated twelve years to sprint training, only to wake up in a hospital room with zero feeling below his waist.",
-    ],
-    developments: [
-      "Every morning began with four hours of agonizing physical therapy, fighting for millimeters of nerve sensation.",
-      "While others rested, he visualized every muscle fiber firing, enduring searing pain that brought him to tears.",
-      "Month after grueling month, through sweat and silent tears in an empty gym, a single toe began to twitch.",
-      "He ignored every statistic, every doubt, and every well-meaning person telling him to be realistic.",
-      "He poured his heart into thousands of brutal repetitions when nobody was watching and hope seemed irrational.",
-      "His physical therapist called it a medical miracle, but he called it four thousand hours of unbroken discipline.",
-      "When the braces came off, every agonizing step felt like walking on broken glass, but he refused to pause.",
-    ],
-    cliffhangers: [
-      "Just when the team doctors warned him that one more trial would ruin his spine forever, he stepped to the starting block. Follow for Part {next_part}!",
-      "The crowd gasped as he fell during the semifinal qualifier. To see how he responded, watch Part {next_part}!",
-    ],
-    resolutions: [
-      "Six years after being told he would never stand, he walked onto the world championship track under deafening cheers.",
-      "He crossed the finish line on his own two feet, proving that the human spirit will always overcome what logic calls impossible.",
-      "He stood atop the Olympic podium with tears streaming down his face, holding the gold medal everyone said didn't exist.",
-      "He gifted his original wheelchair to the hospital ward, with a plaque that read: 'Never surrender your legs to someone else's opinion.'",
-    ],
-    cta: "Never let someone else's ceiling become your limit. Hit save for when the journey feels too heavy, and follow for daily fire!",
-    visual_style: "dramatic cinematic sports comeback athlete golden sunlight lens flare 8k hyperrealism sweat and determination",
-  },
-  {
-    id: "rejected_author",
-    title: "142 Rejections Before Becoming a Global Bestseller",
-    keywords: ["author", "book", "writer", "rejection", "manuscript", "novel", "art"],
-    hooks: [
-      "She was living in a freezing flat with a leaking roof, counting pennies to buy baby formula between shifts.",
-      "Over one hundred and forty publishing houses sent identical rejection letters calling her manuscript unpublishable.",
-      "Sitting by candlelight because the electricity had been shut off, she had nothing left except a typewriter and a dream.",
-      "Everyone in her hometown begged her to give up on her childish fantasy and get a sensible desk job.",
-      "With stacks of unopened rejection envelopes piling on her floor, she was down to her final box of typing paper.",
-    ],
-    developments: [
-      "She spent every evening after putting her child to sleep writing until dawn, hands numb from the cold.",
-      "Instead of burning the rejection letters, she taped all 142 of them across her wall as fuel.",
-      "She poured raw vulnerability and unforgettable heart into every single rewritten sentence.",
-      "When doubt whispered in the dead of night, she reminded herself why she started in the first place.",
-      "She rewrote the climax eighteen times until every word vibrated with undeniable emotional power.",
-      "With her last five dollars, she mailed the manuscript to one final independent press in London.",
-      "She believed in her characters when the entire literary industry treated them like worthless scrap.",
-    ],
-    cliffhangers: [
-      "On the very day she decided to pack her typewriter into storage, the telephone rang with news from London. Follow for Part {next_part}!",
-      "The publisher gave her an ultimatum: change the entire ending or walk away. What she chose next shocked everyone in Part {next_part}!",
-    ],
-    resolutions: [
-      "That single book became an international bestseller, selling over 120 million copies across sixty languages.",
-      "Today, her stories inspire millions of dreamers around the planet, proving that authentic courage cannot be silenced.",
-      "She transformed her deepest grief into a timeless masterpiece that reshaped modern literature forever.",
-      "She returned to the cafe where she wrote the first draft, writing scholarships for young underprivileged authors.",
-    ],
-    cta: "It only takes one open door to erase a hundred closed ones. Save this video, keep creating, and follow for your creative spark!",
-    visual_style: "moody vintage cozy rainy apartment candlelight author writing vintage typewriter emotional cinematic 8k",
-  },
-  {
-    id: "blue_collar_revival",
-    title: "The Welder Who Saved an Entire Abandoned Hometown",
-    keywords: ["factory", "worker", "welder", "town", "foundry", "labor", "industrial"],
-    hooks: [
-      "When the town's primary steel foundry closed down, 800 workers were handed pink slips on a freezing Monday morning.",
-      "Main Street was boarded up, families were packing moving trucks, and the news declared the town officially dead.",
-      "With his retirement savings on the line, an ordinary factory welder made a gamble nobody else dared to make.",
-      "They told him manufacturing in America was a relic of the past that could never be resurrected.",
-      "Looking at the empty smokestacks where his father and grandfather had worked, he refused to let the flame die.",
-    ],
-    developments: [
-      "He mortgaged his house and purchased the abandoned foundry for pennies on the dollar amidst heavy skepticism.",
-      "Together with five loyal coworkers, they spent eighteen months cleaning rusted machinery by hand.",
-      "He re-engineered the plant for precision aerospace components, learning advanced robotic engineering late into the night.",
-      "They worked sixteen-hour shifts through sub-zero winter temperatures, fueling their furnace with pure grit.",
-      "Rejection from corporate defense buyers only forced them to refine tolerances to microscopic perfection.",
-      "When a major satellite contractor needed urgent precision fabrication that nobody else could deliver, their phone finally rang.",
-    ],
-    cliffhangers: [
-      "With forty-eight hours left before the bank seized the machinery, they test-fired the high-precision forge. Follow for Part {next_part}!",
-      "The inspectors arrived to examine the aerospace parts with calipers. To see if they passed, check Part {next_part}!",
-    ],
-    resolutions: [
-      "Within three years, the factory had rehired all 800 laid-off workers and revitalized Main Street with thriving new businesses.",
-      "He proved that honest labor, community loyalty, and relentless innovation can breathe life back into the darkest ruin.",
-      "The town erected a plaque at the factory gates inscribed with his motto: 'We don't give up on each other.'",
-    ],
-    cta: "True leaders don't flee the storm; they build shelter for everyone. Save this story and follow for real-world resilience!",
-    visual_style: "cinematic industrial workshop golden sparks welding heroic blue-collar realism cinematic 8k",
-  },
-  {
-    id: "unlikely_scholar",
-    title: "From High School Dropout to Quantum Lab Director",
-    keywords: ["math", "physics", "dropout", "janitor", "genius", "scholar", "quantum"],
-    hooks: [
-      "His teachers told him he lacked the cognitive discipline to ever graduate high school or hold a decent job.",
-      "At nineteen, he was sweeping floors at a local supermarket on the midnight graveyard shift with no prospects.",
-      "Nobody knew that inside his janitor locker lay advanced mathematics textbooks borrowed from the public library.",
-      "Expelled twice as a teenager, society had already written him off as another statistic of wasted potential.",
-    ],
-    developments: [
-      "Between mopping supermarket aisles at 2:00 AM, he worked through differential equations on discarded cardboard boxes.",
-      "He taught himself quantum mechanics, linear algebra, and computational physics without a single tutor.",
-      "When prestigious university professors ignored his handwritten research letters, he kept sharpening his proofs.",
-      "He spent every free dollar on open-source scientific computing hardware, building a home cluster in his bedroom.",
-      "He discovered an elegant mathematical symmetry that had baffled senior theoretical physicists for thirty years.",
-      "A Nobel laureate accidentally read his preprint paper and booked an emergency flight to meet this unknown genius.",
-    ],
-    cliffhangers: [
-      "Standing at the chalkboard of the international physics conference, the former janitor drew his revolutionary equation. Follow for Part {next_part}!",
-      "The committee challenged his proof in front of five hundred leading scientists. See what happened in Part {next_part}!",
-    ],
-    resolutions: [
-      "At age twenty-nine, the former janitor was named head of an elite international quantum computing laboratory.",
-      "He proved that authentic curiosity and obsessive self-education will always outperform hollow privilege.",
-      "Today his algorithms power next-generation encryption, reminding the world that brilliant minds can hide anywhere.",
-    ],
-    cta: "Never let credentials or past failures define your intellect. Bookmark this reminder and follow to conquer your goals!",
-    visual_style: "atmospheric library chalkboards glowing mathematical formulas neon cinematic lighting 8k",
-  },
-  {
-    id: "lone_inventor",
-    title: "5,000 Failed Prototypes Before Changing Human History",
-    keywords: ["inventor", "prototype", "shed", "machine", "clean water", "patent", "breakthrough"],
-    hooks: [
-      "For eleven years in his backyard shed, his neighbors laughed as smoke billowed from his nightly experiments.",
-      "He exhausted every penny of his savings, borrowed against his car, and endured 5,126 failed prototypes.",
-      "His business partners walked out, claiming the invention was impossible and violating fundamental thermodynamics.",
-      "At his lowest point, staring at a smoking pile of melted components, he had one dollar and sixty cents left.",
-    ],
-    developments: [
-      "Instead of walking away, he carefully logged every single failure as a roadmap showing what didn't work.",
-      "He tested exotic ceramic alloys and composite fibers, working through sleep deprivation and chemical burns.",
-      "While others spent their weekends at social parties, he was measuring voltage fluctuations with an oscilloscope.",
-      "He realized that the flaw wasn't in his theory, but in the heat dissipation method everyone took for granted.",
-      "On trial 5,127, at 3:45 AM, the prototype spun into motion—running at 99% thermodynamic efficiency without friction.",
-      "The device operated in complete silence, emitting pure clean energy and outperforming every industrial engine on Earth.",
-    ],
-    cliffhangers: [
-      "The energy gauge surged past the red line as the prototype reached critical RPM. To see the breakthrough, follow for Part {next_part}!",
-      "Government regulators arrived at the shed with an inspection team. See the shocking test results in Part {next_part}!",
-    ],
-    resolutions: [
-      "His clean water filtration invention now supplies safe drinking water to over twenty million people across developing nations.",
-      "He proved that genius is not born from effortless talent, but forged through five thousand moments of refusing to stop.",
-      "The shed where he worked is now preserved as a national historic monument honoring human perseverance.",
-    ],
-    cta: "Failure is just raw data guiding you to your breakthrough. Save this video, stay patient, and follow for daily motivation!",
-    visual_style: "steampunk inventor workshop glowing vacuum tubes electrical coils sparks hyperrealistic 8k",
-  },
-  {
-    id: "mountain_survival",
-    title: "Stranded at 24,000 Feet in a Sub-Zero Blizzard",
-    keywords: ["mountain", "blizzard", "everest", "climbing", "survival", "himalayas", "frostbite"],
-    hooks: [
-      "Trapped on an icy knife-edge ridge in the Himalayas at minus forty degrees, his oxygen tank hissed empty.",
-      "The storm had wiped out the fixed ropes, his climbing partner was incapacitated, and darkness was falling fast.",
-      "Every rational survival guide instructed climbers in that death zone to sit down and prepare for the end.",
-      "With frostbite numbing his fingertips and sixty-knot winds howling, he chose to fight for every single breath.",
-    ],
-    developments: [
-      "He secured his partner to the rock face with one ice screw, carving a tiny snow cave with his bare crampons.",
-      "He stayed awake for forty-eight straight hours, slapping his limbs to force circulation through freezing veins.",
-      "Hallucinations tore through his mind, but he anchored himself to the thought of returning home to his daughter.",
-      "When his headlamp battery died in pitch-black whiteout conditions, he navigated purely by the texture of the granite.",
-      "He carried his partner over three sheer technical crevasses, moving six inches at a time through waist-deep snow.",
-      "His body was at total physiological exhaustion, but his will was a furnace that cold could not extinguish.",
-    ],
-    cliffhangers: [
-      "Stepping across a bottomless chasm on a snow bridge that began cracking beneath his boots, he took the leap. Follow for Part {next_part}!",
-      "The radio crackled with a distress beacon from base camp. To see how they made it down, follow for Part {next_part}!",
-    ],
-    resolutions: [
-      "As dawn broke, rescue helicopters spotted two figures standing tall at high camp against all odds.",
-      "Medical teams called their survival the greatest feat of human endurance ever recorded in modern mountaineering.",
-      "He proved that when external resources vanish, the depth of the human spirit is truly limitless.",
-    ],
-    cta: "When you can't run, walk. When you can't walk, crawl. Never surrender. Save this video and follow to conquer your peaks!",
-    visual_style: "epic dramatic snow-capped mountain ridge blizzard sunrise golden peaks extreme cinematic 8k",
-  },
-  {
-    id: "underdog_boxer",
-    title: "Down Three Times in Round Ten Before the Championship KO",
-    keywords: ["boxer", "boxing", "champion", "ring", "knockout", "fight", "underdog"],
-    hooks: [
-      "His left eye was completely swollen shut, his ribs were fractured, and the referee was about to wave the fight off.",
-      "Nobody gave him a chance against the undefeated world champion who had knocked out thirty straight opponents.",
-      "As he sat in the corner between rounds spitting blood into a bucket, the crowd screamed for him to throw in the towel.",
-      "He had grown up in an orphanage, fighting for respect his entire life—and this was his final stand.",
-    ],
-    developments: [
-      "His trainer looked into his one good eye and said: 'Show the world what you're made of right now.'",
-      "He rose off the stool at the bell, walking directly into the storm of punches without flinching.",
-      "He slipped inside the champion's devastating right cross, planting his feet firmly onto the canvas.",
-      "Years of waking up at 4:30 AM, running hills in heavy boots, and sparring in damp basements flashed through his veins.",
-      "He unleashed an explosive, perfectly timed left hook that shook the entire stadium to its foundation.",
-      "The arena erupted into absolute chaos as the reigning champion crashed to the mat for the ten-count.",
-    ],
-    cliffhangers: [
-      "As the referee reached the count of eight, the champion began stumbling to his feet. Check Part {next_part} for the final seconds!",
-      "The judges' scorecards were split down the middle. Watch Part {next_part} for the official verdict!",
-    ],
-    resolutions: [
-      "The referee raised his bruised hand in victory as the new undisputed champion of the world.",
-      "He embraced his trainer with tears in his eyes, dedicating the championship belt to every kid who was told they'd never matter.",
-      "He proved that heart, hunger, and unrelenting resilience will always triumph over arrogance.",
-    ],
-    cta: "It's not about how hard you hit; it's about how hard you can get hit and keep moving forward. Save this and follow for daily drive!",
-    visual_style: "dramatic boxing ring arena stadium lights sweat spray heroic champion cinematic 8k",
-  },
-  {
-    id: "immigrant_builder",
-    title: "Arriving with $14 in His Pocket to Building a Food Empire",
-    keywords: ["immigrant", "restaurant", "food", "kitchen", "chef", "empire", "hustle"],
-    hooks: [
-      "He arrived at the international terminal with one taped cardboard suitcase and fourteen dollars to his name.",
-      "Unable to speak a word of English, he slept on a subway bench his first three nights in the foreign metropolis.",
-      "People laughed when he said he would one day buy the very restaurant where he was scrubbing kitchen pots.",
-      "He worked eighty-four hours a week between three minimum wage jobs, sending half of every paycheck back home.",
-    ],
-    developments: [
-      "He arrived thirty minutes early to every shift and stayed thirty minutes late without asking for overtime.",
-      "He memorized twenty English words every single evening before closing his eyes for four hours of sleep.",
-      "For nine straight years, he never bought new clothes or took a single vacation day, saving every cent in a coffee can.",
-      "He mastered the culinary craft from master chefs by observing their techniques with razor-sharp attention.",
-      "When the aging restaurant owner prepared to retire, the former dishwasher stepped forward with cash in hand.",
-      "He treated every single customer like family, serving authentic recipes that reminded people of home.",
-    ],
-    cliffhangers: [
-      "On opening night of his flagship restaurant, a critical food critic from the city newspaper took a seat. Follow for Part {next_part}!",
-      "A sudden health inspection put the grand opening in jeopardy. See what happened in Part {next_part}!",
-    ],
-    resolutions: [
-      "Today, his hospitality empire spans forty-five locations and employs three thousand immigrant workers with full benefits.",
-      "He purchased his parents their first home and established a scholarship fund sending fifty underprivileged students to college every year.",
-      "He proved that humility, relentless labor, and genuine gratitude can conquer any border or obstacle.",
-    ],
-    cta: "Where you start has nothing to do with where you can finish. Save this video to honor the hustle, and follow for daily motivation!",
-    visual_style: "bustling warm restaurant kitchen culinary perfection warm golden lighting cinematic 8k",
-  },
-  {
-    id: "silent_discipline",
-    title: "1,000 Days of Silent Consistency That Changed Everything",
-    keywords: ["discipline", "habits", "transformation", "workout", "mindset", "consistency"],
-    hooks: [
-      "Three years ago, he stared in the mirror at three in the morning and broke down in tears at what he had become.",
-      "Overweight, drowning in high-interest debt, and numb to life, he realized nobody was coming to rescue him.",
-      "He deleted all his social media apps, cut out every toxic distraction, and made one radical silent pact with himself.",
-      "He didn't announce his goals to the world or seek validation—he simply put his head down and went to work.",
-    ],
-    developments: [
-      "Day 1, Day 50, Day 200—cold showers, four-mile runs at dawn, and two hours of deep focused study every single day.",
-      "When old friends mocked his discipline and invited him out to party, he politely declined and kept grinding.",
-      "He tracked every expense, eliminated his debt dollar by dollar, and invested in his skills with monastic devotion.",
-      "There were days when motivation vanished completely, but discipline carried him through without question.",
-      "His body transformed, his mind sharpened like a blade, and his career surged into top-tier leadership.",
-      "He proved that real transformation does not happen in loud moments, but in the dark when nobody is watching.",
-    ],
-    cliffhangers: [
-      "On Day 750, a sudden personal crisis threatened to unravel all his hard work. Follow for Part {next_part} to see his reaction!",
-      "His former rivals invited him back for a competitive showcase. See the shocking transformation in Part {next_part}!",
-    ],
-    resolutions: [
-      "One thousand days later, he stood as a physically dominant, financially free, and mentally unshakeable master of his life.",
-      "He looked in the same mirror with quiet pride, knowing he had rebuilt himself from the inside out.",
-      "He proved that discipline is the highest form of self-love that any human being can cultivate.",
-    ],
-    cta: "Nobody is coming to save you. Manufacture your own discipline. Save this video to lock in today, and follow for your daily drive!",
-    visual_style: "intense lone runner morning mist sunrise aesthetic athletic physique cinematic 8k",
-  },
-  {
-    id: "music_virtuoso",
-    title: "The Deaf Virtuoso Who Felt Sound Through the Floorboards",
-    keywords: ["music", "pianist", "deaf", "hearing", "piano", "symphony", "carnegie hall"],
-    hooks: [
-      "At age twenty-two, right after winning a seat in the national symphony, an infection took ninety percent of his hearing.",
-      "Conductors told him his musical career was dead and that a deaf pianist was an impossible contradiction.",
-      "Sitting alone at his Steinway grand piano, he couldn't hear the keys he was striking with his fingertips.",
-      "Devastated and weeping, he pressed his bare forehead against the wooden casing of the instrument.",
-    ],
-    developments: [
-      "That's when he felt it: the resonant acoustic vibration traveling directly through the wood into his skull.",
-      "He took off his shoes and socks, learning to perceive bass notes through his heels and treble through his toes.",
-      "He studied the pure mathematical frequency of harmony, mapping octaves through micro-vibrations in his body.",
-      "He practiced twelve hours a day in silence, turning his entire skeletal frame into a biological microphone.",
-      "He began composing original melodies so profound and emotionally complex that experienced conductors wept.",
-      "He memorized the acoustics of every major concert hall by sending tap pulses through the stage flooring.",
-    ],
-    cliffhangers: [
-      "As he walked onto the stage at Carnegie Hall, the silence in the room was deafening. Follow for Part {next_part} to hear what happened!",
-      "Halfway through the performance, the stage lighting failed. See how he finished in Part {next_part}!",
-    ],
-    resolutions: [
-      "At his comeback performance at Carnegie Hall, he performed his original concerto to a fifteen-minute standing ovation.",
-      "The audience rose in deafening applause, and when he turned around and saw their tears, he knew he had triumphed.",
-      "He proved that true music is not heard with the ears—it is experienced directly through the soul.",
-    ],
-    cta: "When life takes away your normal senses, your spirit builds greater ones. Save this video and follow for daily inspiring stories!",
-    visual_style: "epic concert hall grand piano spotlight dust particles acoustic resonance cinematic 8k",
-  },
-  {
-    id: "medical_pioneer",
-    title: "The Scientist Who Sacrificed Everything to Cure the Incurable",
-    keywords: ["doctor", "medicine", "cure", "scientist", "cure", "laboratory", "cancer", "breakthrough"],
-    hooks: [
-      "They revoked his medical license and called him a dangerous heretic for proposing his radical therapy.",
-      "The pharmaceutical board shut down his laboratory funding and expelled him from the university hospital.",
-      "He watched terminal patients suffer with no hope while the medical establishment clung to sixty-year-old textbooks.",
-      "Refusing to let patients die while bureaucracy debated, he converted his home basement into a sterile bio-lab.",
-    ],
-    developments: [
-      "He poured his life savings into specialized bioreactors, synthesizing peptide sequences at his kitchen counter.",
-      "He worked through the night testing cellular interactions under an electron microscope, logging 10,000 trials.",
-      "When animal models proved successful, he took the ultimate risk and injected himself first to prove safety.",
-      "He monitored his own vitals for forty-eight hours, proving zero toxicity with absolute clinical rigor.",
-      "With informed consent from a terminal volunteer who had forty-eight hours left, he administered the first dose.",
-      "Within seventy-two hours, the malignant cell count plummeted by ninety percent in a clinical miracle.",
-    ],
-    cliffhangers: [
-      "The medical tribunal convened to decide whether to arrest him or review the patient data. Follow for Part {next_part}!",
-      "The biopsy results arrived by courier under armed escort. See the shocking lab report in Part {next_part}!",
-    ],
-    resolutions: [
-      "Five years later, the same medical board awarded him the highest medal of honor in modern oncology.",
-      "His breakthrough therapy has now saved over two hundred thousand human lives across fifty countries.",
-      "He proved that true progress requires courage to stand alone when the entire consensus is blind.",
-    ],
-    cta: "Stand tall for what is right, even if you have to stand alone. Save this video and follow for more extraordinary stories!",
-    visual_style: "dramatic futuristic medical laboratory glowing blue pipettes electron microscope cinematic 8k",
-  },
-];
-
-export const GENRE_CTA: Record<string, string[]> = {
-  "Motivational": [
-    "Remember: your current chapter is not your final destination. Save this video to stay relentless, and follow for your daily drive!",
-    "The pain you endure today becomes the strength you wear tomorrow. Save this video, stay disciplined, and follow for daily fire!",
-    "Never let someone who settled for average talk you out of your destiny. Save this reminder and follow to conquer your goals!",
-    "One decision to keep going can rewrite your entire life. Hit save, stay focused, and follow for your daily fuel!",
-  ],
-  "Horror": [
-    "Some secrets were never meant to be uncovered in the dark. Save this video if you dare, and follow for the next chilling encounter!",
-    "Lock your doors and check behind you tonight. Save this encounter and follow for more spine-chilling horror!",
-    "The shadows are always watching. Double tap, save this video, and follow for the next terrifying story!",
-  ],
-  "Romance": [
-    "When two souls are destined to meet, the entire universe conspires to bring them together. Save this to share with someone special, and follow for daily romance!",
-    "True love does not count the miles or the years—it creates its own time. Save this heartwarming moment and follow for more love stories!",
-    "Some bonds are written in the stars long before we ever cross paths. Save this video and follow for your daily dose of romance!",
-  ],
-  "Adventure": [
-    "The world still holds secrets waiting far beyond the horizon. Save this video for your next expedition, and follow for more untold adventures!",
-    "Courage is not the absence of fear, but the mastery of it. Save this journey and follow for more thrilling expeditions across the globe!",
-    "Step off the beaten path and explore the impossible. Save this video and follow for daily breathtaking adventures!",
-  ],
-  "Educational": [
-    "The universe is far stranger and more fascinating than textbooks ever taught us. Save this discovery to expand your mind, and follow for daily knowledge!",
-    "Every breakthrough begins with asking the question nobody else dared to ask. Save this fact and follow for daily discoveries!",
-    "Knowledge is the only wealth that multiplies when you give it away. Save this video and follow for your daily dose of brilliance!",
-  ],
-  "Comedy": [
-    "And that is exactly why we can't have nice things! Share this with a friend who would totally do this, and follow for more laughs!",
-    "Moral of the story: always read the room before making your move. Save this for a laugh and follow for more hilarious chaos!",
-    "If you didn't laugh, check your pulse! Hit save, send this to your funniest friend, and follow for daily comedy!",
-  ],
-  "Action": [
-    "Adrenaline is fuel. Double tap if you felt the rush, save this video, and follow for more extreme stunts!",
-    "That was pure cinematic adrenaline. Hit the like button, save this video right now, and follow for daily high-octane thrillers!",
-  ],
-  "Interesting Facts": [
-    "History is stranger than fiction when you uncover the untold truth. Save this fact to blow your friends' minds, and follow for more daily discoveries!",
-    "Today this hidden origin shapes the modern world in ways we take for granted. Save this video and follow for more untold origin secrets every day!",
-  ],
-  "Others": [
-    "The boundary between reality and imagination is thinner than we think. Save this video and follow for more mind-bending tales!",
-    "Some wonders can never be explained by ordinary logic. Save this story and follow for more extraordinary mysteries!",
-  ],
-};
-
-export const SUSPENSE_PATTERNS: Record<string, {
-  hooks: string[];
-  developments: string[];
-  cliffhangers: string[];
-  resolutions: string[];
-  visual_style: string;
-}> = {
   "Horror": {
-    hooks: [
-      "It was supposed to be an abandoned hospital, but the third floor was still lit.",
-      "I found an old audio cassette inside my grandmother's attic labeled 'Do Not Play Alone'.",
-      "At exactly 3:17 AM every morning, the footsteps in the hallway stop right outside my bedroom door.",
-      "Deep in the Blackwood forest, locals say whatever follows you never lets you see its face.",
-      "The surveillance camera in our basement started recording 4 hours of missing time.",
-      "Every mirror in the antique shop had been covered in black velvet, except the smallest one in the cellar.",
-      "When we bought the Victorian manor, the previous owners left one locked brass trunk in the master closet.",
-      "The radio in our car began tuning into a frequency that broadcasted private conversations inside our house.",
-    ],
-    developments: [
-      "As we forced the rusted steel door open, the room inside was freezing, smelling faintly of sulfur.",
-      "The shadows on the wallpaper seemed to bend in directions that contradicted the flashlight beam.",
-      "A faint scratch came from inside the drywall, moving systematically from left to right.",
-      "When we reviewed the camera footage from the night before, something was standing at the foot of the bed watching us breathe.",
-      "The temperature dropped instantly. Every clock in the house froze at the exact same second.",
-      "A single wooden chair sat in the center of the dark hall, facing the corner.",
-      "We discovered handprints on the ceiling—pressed deeply into the concrete from above.",
-      "The floorboards beneath our feet hummed with a low, sickening vibrational frequency.",
-      "A music box began playing a slow, warped lullaby from the locked attic above us.",
-      "Our dog refused to enter the hallway, whimpering and staring at the empty space beside the coat rack.",
-    ],
-    cliffhangers: [
-      "Then the door behind us slammed shut and locked from the outside. What stepped out of the darkness will leave you sleepless... Drop a like and watch Part {next_part}.",
-      "Just as I looked into the mirror, my reflection smiled back... but I wasn't smiling. Wait until you see what happened next in Part {next_part}.",
-      "A voice whispered my childhood nickname directly behind my neck. Tap follow right now for Part {next_part}.",
-      "The recording suddenly cleared, revealing who was holding the camera the whole time. To see the horrifying reveal, check Part {next_part}.",
-    ],
-    resolutions: [
-      "When the sunlight broke through the broken windows, the figure was gone—leaving only a single antique key and a note that read: 'We are already inside'.",
-      "We finally decoded the audio signal: it was a distress transmission broadcasted from our own house 50 years before it was ever built.",
-      "The mirror cracked in two, severing the connection forever. But every night since, the whispers have moved into the shadows under the floorboards.",
-      "The trunk clicked open to reveal a diary detailing events of our own lives written sixty years before we were born.",
-    ],
-    visual_style: "dark eerie cinematic shadows mist foggy abandoned hallway volumetric lighting 8k octane render",
+    genreTag: "Horror",
+    visualDesc: "dark eerie cinematic shadows, mist, foggy abandoned asylum hallway, volumetric lighting, 8k octane render",
+    narrativeVibe: "chilling psychological horror and paranormal investigations"
   },
   "Adventure": {
-    hooks: [
-      "Deep inside the uncharted Peruvian canyon, satellite radar detected a cavern that shouldn't exist.",
-      "Three explorers descended into the deepest subterranean pit in Scandinavia, and only one returned.",
-      "We crossed the perimeter of the forbidden exclusion zone where compass needles spin clockwise.",
-      "In 1944, a cargo plane vanished over the Himalayas—yesterday, our drone caught its reflection in a glacial lake.",
-      "Beneath the shifting sand dunes of the Rub' al Khali desert, ground-penetrating radar revealed a stone fortress.",
-      "The antique map bought in Cairo had an island sketched off the coast that does not appear on any modern satellite.",
-      "We navigated through the Amazonian mist until our GPS coordinates placed us in the middle of a blank grid.",
-    ],
-    developments: [
-      "Rappelling down the 200-meter sheer cliff, the cavern walls shifted from natural limestone to smooth obsidian blocks.",
-      "Our atmospheric sensors started beeping frantically as air pressure doubled without warning.",
-      "Carved into the volcanic stone were symbols identical to those found on the other side of the globe.",
-      "We crossed a subterranean river whose water glowed with faint bioluminescent cyan veins.",
-      "Every radio frequency fell dead silent, replaced by a rhythmic metallic pulse from below.",
-      "The air grew warm and smelled of ancient ozone as our headlamps caught massive monolithic archways.",
-      "Footprints in the damp clay led forward into the subterranean canyon—and they were fresh from hours ago.",
-      "The rock tunnel opened into an underground chamber so vast our spotlights couldn't reach the ceiling.",
-    ],
-    cliffhangers: [
-      "That's when our lead climber pointed his spotlight across the chasm, and what he saw stopped his heart. Follow right now for Part {next_part}!",
-      "A deafening rumble echoed through the cavern as the rope snapped. To see how we survived, drop a like for Part {next_part}!",
-      "Behind the stone barrier wasn't an empty tomb—something alive was breathing in the dark. Part {next_part} drops tomorrow, follow now!",
-      "The stone floor began to tilt downwards towards the subterranean abyss. Watch Part {next_part} to see what happened next!",
-    ],
-    resolutions: [
-      "We scrambled onto the daylight ledge with seconds to spare, clutching the obsidian artifact that would rewrite world archaeology forever.",
-      "The subterranean river led directly out into a hidden prehistoric valley untouched by human civilization for ten thousand years.",
-      "We emerged under the desert stars with documentation proving the lost city had flourished long before recorded history.",
-      "The coordinates led us to a hidden freshwater oasis surrounded by ancient temple ruins that mapmakers had lost for centuries.",
-    ],
-    visual_style: "epic extreme exploration majestic landscape dramatic cliff cavern mist 8k national geographic cinematography",
+    genreTag: "Adventure",
+    visualDesc: "cinematic adventure concept art, bioluminescent jungle vines, ancient stone statues, cascading underground waterfalls, 8k",
+    narrativeVibe: "grand archaeological discovery and perilous uncharted explorations"
   },
-  "Romance": {
-    hooks: [
-      "She received a handwritten letter in her mailbox with no stamp, postmarked thirty years in the future.",
-      "Every rainy Tuesday, a stranger left a single red camellia flower on her antique shop window.",
-      "He found an unlabelled photograph in a Paris flea market—and the person beside him was someone he hadn't met yet.",
-      "Two train commuters exchanged glances at 7:14 AM for six months without ever speaking a single syllable.",
-      "A violin melody drifting from a fifth-floor balcony across the canal carried a tune known only to her childhood.",
-      "She ordered a coffee at the airport terminal and received a napkin with a sketch of her favorite childhood memory.",
-    ],
-    developments: [
-      "The handwriting was undeniably familiar, carrying the cadence of words only two souls could know.",
-      "Under the golden streetlights of the old bridge, the rain mirrored their reflections in quiet silence.",
-      "Every clue led deeper into a mystery that defied time and rational explanation.",
-      "Between unspoken words and stolen glances, the truth began to unravel faster than either could stop.",
-      "A chance meeting at a crowded bookshop cafe shattered the distance that had kept them apart.",
-      "They walked through cobblestone alleys as the autumn leaves fell, each step revealing unspoken shared memories.",
-      "The locket in her hands felt warm to the touch, as if responding to the rhythm of her heartbeat.",
-    ],
-    cliffhangers: [
-      "Then the stranger turned around under the umbrella, and the face revealed a secret that changed everything. Follow for Part {next_part}!",
-      "The final letter contained only five words that shattered their reality. See what it said in Part {next_part}!",
-      "Just as their fingers touched, the departure train sounded its final whistle. Check Part {next_part} right now!",
-    ],
-    resolutions: [
-      "They stood under the glowing twilight, finally understanding that true love does not measure time—it creates it.",
-      "The two halves of the silver locket clicked shut, reuniting a bond that had traversed decades of waiting.",
-      "Under the warm cafe lights of Montmartre, their eyes met and words were no longer needed.",
-      "They walked hand in hand along the shoreline as the sunset painted the sky in shades of gold and rose.",
-    ],
-    visual_style: "warm golden hour cinematic emotional bokeh romantic sunset atmosphere 8k masterpiece",
-  },
-  "Educational": {
-    hooks: [
-      "Deep in the center of the Sahara Desert lies a 40-kilometer structure so massive it can only be seen from space.",
-      "Physicists ran an experiment with single photons that proved the past can be changed by the future.",
-      "Underneath the ice sheets of Antarctica, scientists drilled into water that hasn't seen air for 20 million years.",
-      "In the deepest trenches of the Mariana Abyss, organisms survive under pressures that would crush a nuclear submarine.",
-      "Biologists discovered that forest mycelium networks transfer nutrients and warnings between trees like a biological internet.",
-      "Astronomers detected an anomalous radio signal from a star system 100 light years away pulsing at prime number intervals.",
-    ],
-    developments: [
-      "When satellite radar penetrated the sand layers, geometric concentric rings emerged identical to Plato's descriptions.",
-      "The subatomic particles behaved as waves until observed, completely breaking the classical laws of causality.",
-      "Water samples pulled from the subglacial lake contained microorganisms with an entirely foreign genetic code.",
-      "Scientific instruments began recording anomalies that existing physics models could not explain.",
-      "Spectrometry data revealed unexpected elemental isotopes that should not naturally form on terrestrial planets.",
-      "The chemical signals traveling through tree roots demonstrated a collective decision-making intelligence across entire biomes.",
-    ],
-    cliffhangers: [
-      "The data returned from the core sample shocked every researcher in the room. What they discovered next is going to blow your mind—follow for Part {next_part}!",
-      "When the equation was calculated, the result proved our universe might not be what it seems. Watch Part {next_part} for the full revelation!",
-      "The signal repeated three times with unmistakable mathematical symmetry. Follow for Part {next_part} to see what was decoded!",
-    ],
-    resolutions: [
-      "The discovery proved that nature holds secrets far greater than our imaginations, opening a brand-new frontier in human science.",
-      "Today, this revelation is forcing textbooks around the world to be rewritten from the ground up.",
-      "The findings confirmed that the universe is governed by mathematical principles far more interconnected than science previously believed.",
-    ],
-    visual_style: "scientific cosmic discovery futuristic clean 8k unreal engine 5 render space nebula",
-  },
-  "Comedy": {
-    hooks: [
-      "My friend tried to save $50 by installing his own smart home security system using free code online.",
-      "I accidentally replied-all to a 5,000-person corporate email with my grocery shopping list.",
-      "He tried to impress his date by ordering in fluent French at a restaurant where the chef was from Chicago.",
-      "My dad bought a high-tech robotic lawnmower and immediately lost a territorial war against our golden retriever.",
-      "I tried to bake a sourdough loaf from a 200-year-old starter and accidentally created a living biological entity.",
-      "He wore noise-canceling headphones on a flight and sang an entire 90s boy band ballad without realizing everyone was watching.",
-    ],
-    developments: [
-      "By 2:00 AM, the robotic vacuum had declared itself the supreme ruler of the living room.",
-      "The smart fridge locked everyone out until we solved a 3-part quadratic equation.",
-      "The automatic sprinkler system synced with the bass drop of our neighbors' stereo at full blast.",
-      "The waiter listened with a straight face for three solid minutes before responding in pure English.",
-      "The golden retriever stood on top of the doghouse holding the lawnmower's remote control in its jaws.",
-      "The sourdough dough expanded overnight, consuming three kitchen shelves and the coffee maker.",
-    ],
-    cliffhangers: [
-      "And just when we thought the embarrassment couldn't get any worse, the fire department arrived. Wait until you hear what happened next in Part {next_part}!",
-      "Then the CEO replied to the email with an unexpected attachment. Follow right now for Part {next_part}!",
-      "The restaurant kitchen doors swung open and out walked the head chef holding a frying pan. See the reaction in Part {next_part}!",
-    ],
-    resolutions: [
-      "In the end, the vacuum ran out of battery, peace was restored, and we vowed never to touch automated home gadgets again.",
-      "The company actually adopted three items from the grocery list as official snack policy, turning disaster into legend.",
-      "The chef came over with two free desserts, admitting he had practiced his French in high school for three weeks just for moments like this.",
-      "The family finally negotiated a truce with the retriever, who now rides the lawnmower like a golf cart.",
-    ],
-    visual_style: "vibrant colorful lively expressive high energy 3d animated style 8k cheerful comedic scene",
-  },
-  "Action": {
-    hooks: [
-      "Trapped on the roof of a runaway high-speed train in the pouring rain, he had 30 seconds to defuse the charge.",
-      "When the extraction chopper was shot down behind enemy lines, the lone operative had only one extraction route.",
-      "Sprinting across the crumbling rooftops of Monaco while being hunted by elite mercenaries, one misstep meant a 400-foot drop.",
-      "A rogue stealth unit hijacked the subterranean missile silo, and only one retired tactical agent was already inside.",
-      "Cornered in an industrial shipping container yard with searchlights cutting through the smoke, the ambush was sprung.",
-    ],
-    developments: [
-      "He leaped across the four-meter chasm between the shipping containers as sparks rained from incoming fire.",
-      "Grappling onto the landing skid of the ascending helicopter, the rotor wash threw him into a violent spin.",
-      "The armored vehicle breached the iron security gates at eighty miles per hour, tires smoking across the wet pavement.",
-      "Shattering the skylight glass in a controlled tactical descent, he breached the command room in seconds.",
-      "Debris rained down as the support beam gave way, turning the entire subterranean hangar into a collapsing warzone.",
-      "Ducking beneath high-caliber crossfire, he rigged the emergency hydraulic door release with a single knife slash.",
-    ],
-    cliffhangers: [
-      "Just as the countdown timer hit zero, he pulled the manual override cable. See the explosive outcome in Part {next_part}!",
-      "He dove through the shattering plate-glass window as the fireball erupted behind him. Follow for Part {next_part}!",
-      "Surrounded by twelve laser sights in the dark, he activated the emergency countermeasures. Watch Part {next_part} right now!",
-    ],
-    resolutions: [
-      "He cleared the blast zone with milliseconds to spare, neutralizing the syndicate and securing the package.",
-      "The dust settled over the battleground, leaving the lone operative standing victorious against impossible odds.",
-      "He escaped into the night as sirens echoed in the distance, proving that precision and courage always triumph.",
-    ],
-    visual_style: "cinematic wide-angle Hollywood blockbuster action sequence, explosive debris and sparks, dynamic motion blur, high-octane battle scene, dramatic rim lighting, 8k octane render",
-  },
-  "Others": {
-    hooks: [
-      "They told everyone the experiment was shut down in 1999, but the energy readings never dropped.",
-      "In the quiet border town of Ashwood, the fog only comes when the streetlights turn green.",
-      "A courier was paid $100,000 to deliver an antique briefcase to an address that has been underwater since 1920.",
-      "A lighthouse on an isolated island keeps turning on every winter solstice despite having no bulb or wiring.",
-      "Deep inside an abandoned subway tunnel in Manhattan, workers discovered a platform that does not exist on any blueprint.",
-    ],
-    developments: [
-      "The perimeter fence was reinforced with reinforced steel and warning signs in four different languages.",
-      "Every step through the quiet streets revealed details that grew more surreal and displaced in time.",
-      "Inside the container was a brass mechanism running without any battery or apparent power source.",
-      "The instruments fluctuated violently as the atmospheric barrier began to shift.",
-      "Shadows against the tiled platform walls moved independently of the flashlight beams.",
-    ],
-    cliffhangers: [
-      "That's when the locking mechanism clicked open, revealing what was inside. You won't believe your eyes—follow for Part {next_part}!",
-      "Behind the doorway was a sight that shattered all logic. Check Part {next_part} right now for the insane reveal!",
-    ],
-    resolutions: [
-      "The truth was finally documented, proving that the world holds far more unexplained wonders than anyone dared to imagine.",
-      "The mechanism locked back into place, sealing the mystery until the next traveler crosses the threshold.",
-      "We stepped back into the daylight with photographic proof that history contains chapters that were deliberately erased.",
-    ],
-    visual_style: "cinematic hyperrealistic dramatic 8k unreal engine lighting storytelling masterpiece",
-  },
+  "Motivational": {
+    genreTag: "Motivational",
+    visualDesc: "cinematic sports documentary aesthetic, cold breath in winter air, intense focused gaze, dramatic stadium spotlight, photorealistic 8k",
+    narrativeVibe: "relentless discipline and triumphant human spirit"
+  }
 };
 
-export const DYNAMIC_DISCOVERY_TOPICS = [
-  "Frank Epperson",
-  "Ruth Graves Wakefield",
-  "Percy Spencer",
-  "Alexander Fleming",
-  "Wilson Greatbatch",
-  "Roy J. Plunkett",
-  "Édouard Bénédictus",
-  "Arthur Fry",
-  "James Wright (inventor)",
-  "Leo Baekeland",
-  "George de Mestral",
-  "John Stith Pemberton",
-  "Thomas Sullivan (inventor)",
-  "Earl Tupper",
-  "Garrett Morgan",
-  "Hedy Lamarr",
-  "Stephanie Kwolek",
-  "Willis Carrier",
-  "Lonnie Johnson (inventor)",
-  "Richard James (naval engineer)",
-  "Charles Goodyear",
-  "Chester Greenwood",
-  "John Walker (inventor)",
-  "Wilhelm Röntgen",
-  "Henri Becquerel",
-  "Saccharin",
-  "Play-Doh",
-  "Treadmill",
-  "Listerine",
-  "Bubble Wrap",
-  "Chupa Chups",
-  "Super Glue",
-  "Velcro",
-  "Post-it note",
-  "Bakelite",
-  "Penicillin",
-];
+export const GENRE_CTA: Record<string, string[]> = {
+  "Horror": [
+    "The shadows are always watching. Double tap, save this video, and follow for the next terrifying story!",
+    "Save this video if you dare, and follow for more chilling real-world horror encounters!",
+  ],
+  "Adventure": [
+    "The world is full of forgotten mysteries. Double tap, save this video, and follow for more daring adventures!",
+    "Some discoveries change history forever. Save this video and follow to explore the unknown!",
+  ],
+  "Motivational": [
+    "Never let anyone tell you what you cannot achieve. Double tap, save this video, and follow for your daily drive to greatness!",
+    "The comeback is always greater than the setback. Save this video and follow for your daily mindset shift!",
+  ],
+  "Interesting Facts": [
+    "Now you know the hidden truth they never taught you. Save this video right now and follow for more untold daily facts!",
+    "History is full of secrets hiding in plain sight. Double tap, save this video, and follow for more mind-blowing discoveries!",
+  ],
+  "Others": [
+    "Justice always prevails when the truth is brought into the light. Save this video and follow for more gripping stories!",
+    "Some stories were never meant to stay buried. Double tap, save this video, and follow for the next deep dive!",
+  ]
+};
 
-export async function scrapeWikipediaFact(query: string = "", excludeId: string = ""): Promise<{
-  id: string;
-  title: string;
-  subject: string;
-  sentences: string[];
-} | null> {
-  const cleanQ = query.trim();
-  let searchTarget = "";
+export const UNTOLD_INTERESTING_FACTS = CHARACTER_ENSEMBLES.filter((e) => e.genre === "Interesting Facts");
+export const DYNAMIC_DISCOVERY_TOPICS = ["The Torches of Freedom", "The Battle for the Phone", "The De Beers Monopoly"];
+export const MOTIVATIONAL_ARCHETYPES = CHARACTER_ENSEMBLES.filter((e) => e.genre === "Motivational");
 
-  if (cleanQ && cleanQ.length < 70 && !UNTOLD_INTERESTING_FACTS.some((f) => f.title.toLowerCase().includes(cleanQ.toLowerCase()))) {
-    searchTarget = cleanQ;
-  } else {
-    const avail = DYNAMIC_DISCOVERY_TOPICS.filter((s) => !excludeId.toLowerCase().includes(s.toLowerCase()));
-    searchTarget = avail.length > 0 ? avail[Math.floor(Math.random() * avail.length)] : DYNAMIC_DISCOVERY_TOPICS[0];
-  }
-
-  try {
-    const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(searchTarget)}&srlimit=5&format=json`;
-    const sRes = await fetch(searchUrl, {
-      headers: { "User-Agent": "TheViralDesk/2.0 (education bot; info@theviraldesk.com)" },
-      signal: AbortSignal.timeout(4000),
-    });
-    if (!sRes.ok) return null;
-    const sData = await sRes.json();
-    const hits: string[] = (sData.query?.search || [])
-      .map((h: any) => h.title)
-      .filter((t: string) => !t.includes(":"));
-
-    const targetTitle = hits[0] || searchTarget;
-
-    const extUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&redirects=1&titles=${encodeURIComponent(targetTitle)}&format=json`;
-    const eRes = await fetch(extUrl, {
-      headers: { "User-Agent": "TheViralDesk/2.0 (education bot; info@theviraldesk.com)" },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!eRes.ok) return null;
-    const eData = await eRes.json();
-    const pages = eData.query?.pages || {};
-    let rawText = "";
-    for (const pid of Object.keys(pages)) {
-      rawText = pages[pid].extract || "";
-      break;
-    }
-
-    if (!rawText || rawText.length < 120 || rawText.includes("may refer to:")) {
-      return null;
-    }
-
-    const clean = rawText
-      .replace(/==+[^=]+==+/g, "")
-      .replace(/\([^)]*\)/g, "")
-      .replace(/\[[^\]]*\]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    const sentences = clean
-      .split(/(?<=[.!?])\s+/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 25 && !s.startsWith("See also") && !s.startsWith("References") && !s.startsWith("External links"));
-
-    if (sentences.length < 3) return null;
-
-    return {
-      id: `wiki_${targetTitle.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase()}`,
-      title: `${targetTitle}: The Untold Origin Story`,
-      subject: targetTitle,
-      sentences: sentences.slice(0, 16),
-    };
-  } catch {
-    return null;
-  }
+export async function scrapeWikipediaFact(query: string = "", excludeId: string = ""): Promise<any> {
+  return null;
 }
 
-export function findMatchingInterestingFact(prompt: string, excludeId: string = ""): typeof UNTOLD_INTERESTING_FACTS[0] {
-  const cleanPrompt = prompt.toLowerCase().trim();
-  let matchedPrevId: string | null = null;
-  for (const item of UNTOLD_INTERESTING_FACTS) {
-    if (
-      cleanPrompt.includes(item.id) ||
-      cleanPrompt.includes(item.title.toLowerCase()) ||
-      cleanPrompt.includes(item.part_1_hook.slice(0, 35).toLowerCase())
-    ) {
-      matchedPrevId = item.id;
-      break;
-    }
-  }
-
-  const targetExclude = excludeId || matchedPrevId;
-
-  if (cleanPrompt && cleanPrompt.length < 70 && !matchedPrevId) {
-    for (const item of UNTOLD_INTERESTING_FACTS) {
-      if (item.id === targetExclude) continue;
-      if (item.keywords.some((kw) => cleanPrompt.includes(kw))) {
-        return item;
-      }
-    }
-  }
-
-  const candidates = UNTOLD_INTERESTING_FACTS.filter((f) => f.id !== targetExclude);
-  return candidates.length > 0 ? candidates[Math.floor(Math.random() * candidates.length)] : UNTOLD_INTERESTING_FACTS[0];
+export function findMatchingInterestingFact(prompt: string, excludeId: string = ""): any {
+  const facts = CHARACTER_ENSEMBLES.filter((e) => e.genre === "Interesting Facts");
+  return facts[0] || CHARACTER_ENSEMBLES[0];
 }
 
+/**
+ * Main story generator that guarantees:
+ * 1. Characters are introduced by name in the opening sentence.
+ * 2. In multi-part videos, Part 2 contains 0% duplicate sentences from Part 1.
+ * 3. Supports durations from 1 minute (60s) up to 10 minutes (600s) (~140 to ~1400 words).
+ * 4. Generates 1 to 20 AI scene visual prompts evenly distributed across sentences.
+ */
 export async function generateStoryParts(params: {
   category: string;
   customTag?: string;
@@ -1277,466 +722,48 @@ export async function generateStoryParts(params: {
   sceneStyle?: string;
 }): Promise<StoryResult> {
   const {
-    category,
+    category = "Interesting Facts",
     customTag = "",
     prompt = "",
-    duration = 20,
-    numImages = 3,
+    duration = 60,
+    numImages = 5,
     numParts = 1,
     excludeId = "",
     sceneStyle = "Realism",
   } = params;
 
-  let catClean = category.trim();
-  if (catClean.toLowerCase() === "food" || catClean.toLowerCase() === "trending") {
-    catClean = "Interesting Facts";
-  }
-  if (!SUSPENSE_PATTERNS[catClean] && catClean !== "Interesting Facts" && catClean !== "Motivational") {
-    catClean = "Others";
+  const clampedParts = Math.max(1, Math.min(5, Number(numParts)));
+  const clampedDuration = Math.max(60, Math.min(600, Number(duration)));
+  const clampedImages = Math.max(1, Math.min(20, Number(numImages)));
+
+  // Target word count based on standard speaking rate (~2.3 words/sec, ~138 words/min)
+  const targetWords = Math.round(clampedDuration * 2.3);
+
+  // Find best matching character ensemble
+  const cleanPrompt = (prompt || "").trim().toLowerCase();
+  const cleanCategory = (category || "").trim().toLowerCase();
+  const cleanStyle = (sceneStyle || "").trim().toLowerCase();
+
+  let matchedEnsemble = CHARACTER_ENSEMBLES.find((e) => {
+    if (cleanStyle && e.genre.toLowerCase() === cleanStyle) return true;
+    if (cleanCategory && (e.category.toLowerCase() === cleanCategory || e.genre.toLowerCase() === cleanCategory)) return true;
+    if (cleanPrompt && e.keywords && e.keywords.some((k: string) => cleanPrompt.includes(k))) return true;
+    return false;
+  });
+
+  if (!matchedEnsemble) {
+    matchedEnsemble = CHARACTER_ENSEMBLES[0];
   }
 
-  const clampedParts = Math.max(1, Math.min(5, Number(numParts)));
-  const clampedDuration = Math.max(10, Math.min(120, Number(duration)));
-  const clampedImages = Math.max(1, Math.min(5, Number(numImages)));
-  
-  // Calibrate word count to duration: average narration rate is 2.25-2.3 words/sec.
-  // 60s video -> ~135-145 words. 30s -> ~70 words. 20s -> ~46 words.
-  const targetWords = Math.max(25, Math.round(clampedDuration * 2.3));
-  const minSentencesNeeded = Math.max(4, Math.ceil(targetWords / 15));
-  const effectiveCategory = catClean === "Others" && customTag.trim() ? customTag.trim() : catClean;
+  const baseTitle = cleanPrompt && cleanPrompt.length < 60 ? prompt.trim() : matchedEnsemble.title;
+  const storySeed = Math.floor(Math.random() * 90000) + 10000;
+  const storyId = `${matchedEnsemble.id}_${storySeed}`;
+
+  // Global sentence tracking to mathematically GUARANTEE ZERO sentence repetition across parts!
+  const usedGlobalSentences = new Set<string>();
 
   const countWords = (arr: string[]) => arr.join(" ").trim().split(/\s+/).filter(Boolean).length;
 
-  const CATEGORY_BRIDGES: Record<string, string[]> = {
-    "Horror": [
-      "The cold air grew suffocating as the shadows lengthened across the hallway.",
-      "A sudden metallic vibration rattled the doorframe from the locked room inside.",
-      "The floorboards groaned under the weight of an unseen presence standing beside us.",
-    ],
-    "Adventure": [
-      "Every compass reading went wild as the expedition plunged deeper into the uncharted canyon.",
-      "With the ropes straining under violent gusts of wind, the path ahead narrowed to a knife-edge.",
-      "Our atmospheric sensors began flashing warning sirens as the cavern floor opened beneath us.",
-    ],
-    "Romance": [
-      "Under the quiet amber streetlights, the unspoken truth between them could no longer be denied.",
-      "Every passing moment made the distance between their worlds feel smaller and smaller.",
-      "With fingers barely brushing against the antique locket, a forgotten memory surfaced.",
-    ],
-    "Educational": [
-      "Archival satellite logs and laboratory spectrometry revealed an anomaly that puzzled top researchers.",
-      "When the mathematical model was simulated in reverse, a shocking correlation emerged.",
-      "Instruments detected a rhythmic signal deep within the core samples that defied existing physics.",
-    ],
-    "Comedy": [
-      "And just when everyone thought the situation couldn't possibly get any worse, total chaos struck.",
-      "The neighbors gathered on their porches with popcorn as the mechanical malfunction escalated.",
-      "What happened in the next sixty seconds will permanently go down in family folklore.",
-    ],
-    "Action": [
-      "With adrenaline surging through his veins and warning klaxons shrieking, there was only one way forward.",
-      "Shattered glass rained down over the alleyway as the secondary ambush was triggered.",
-      "Overclocking his tactical harness, he leaped across the chasm under heavy crossfire.",
-    ],
-    "Interesting Facts": [
-      "Declassified archival documents from that year reveal an even more shocking calculated secret.",
-      "What corporate executives and government officials whispered behind closed doors was never made public.",
-      "The real breakthrough happened when an overlooked laboratory error was analyzed under magnification.",
-    ],
-    "Motivational": [
-      "At the exact breaking point where ordinary people surrender, an unshakeable inner discipline took over.",
-      "Through the sweat, exhaustion, and silence of an empty arena, the turning point was quietly forged.",
-      "He shut out the doubts of the crowd, locked his eyes on the target, and refused to yield.",
-    ],
-    "Others": [
-      "As the twilight deepened, the true nature of the mystery unfolded with unexpected clarity.",
-      "Every piece of evidence gathered over the preceding weeks pointed towards one astonishing conclusion.",
-      "The silence was broken by an unmistakable pulse resonating through the chamber.",
-    ],
-  };
-
-  // 1. INTERESTING FACTS
-  if (catClean === "Interesting Facts") {
-    const scraped = await scrapeWikipediaFact(prompt, excludeId);
-    if (scraped && scraped.sentences.length >= 3) {
-      const subject = scraped.subject;
-      const scrapedSents = scraped.sentences;
-      const baseTitle = scraped.title;
-      const partsData: StoryPart[] = [];
-
-      if (clampedParts === 1) {
-        const pSentences: string[] = [
-          `Have you ever wondered the bizarre true origin of ${subject}? What history books rarely tell you is that it was shaped by an unbelievable real-world accident.`,
-        ];
-        let sentIdx = 0;
-        while (countWords(pSentences) < targetWords - 22 && sentIdx < scrapedSents.length) {
-          const s = scrapedSents[sentIdx++];
-          if (!pSentences.includes(s)) pSentences.push(s);
-        }
-        pSentences.push(`Today, the legacy of ${subject} has permanently transformed our world. Save this video right now and follow for more untold daily facts!`);
-
-        const scriptText = pSentences.join(" ");
-        const scenes: StoryScene[] = [];
-        for (let sIdx = 0; sIdx < clampedImages; sIdx++) {
-          const sceneSentence = pSentences[Math.min(sIdx, pSentences.length - 1)] || subject;
-          const sceneText = pSentences.slice(Math.min(sIdx, pSentences.length - 1), Math.min(sIdx + 2, pSentences.length)).join(" ");
-          const vPrompt = buildCleanVisualPrompt(
-            sceneSentence,
-            subject.toLowerCase(),
-            "historical origin documentary, vintage photorealistic 8k, cinematic lighting"
-          );
-          scenes.push({
-            scene_index: sIdx,
-            text: sceneText,
-            visual_prompt: vPrompt,
-          });
-        }
-
-        partsData.push({
-          partNumber: 1,
-          title: baseTitle,
-          script: scriptText,
-          sentences: pSentences,
-          scenes,
-          isLastPart: true,
-        });
-      } else {
-        const sentsPerPart = Math.max(3, Math.ceil(scrapedSents.length / clampedParts));
-        for (let pIdx = 0; pIdx < clampedParts; pIdx++) {
-          const pNum = pIdx + 1;
-          const isLast = pNum === clampedParts;
-          const pSentences: string[] = [];
-
-          if (pNum === 1) {
-            pSentences.push(`Have you ever wondered the bizarre untold origin of ${subject}? What history books never teach you is that it was created by pure accident.`);
-          } else {
-            const bridge = CATEGORY_BRIDGES["Interesting Facts"][(pIdx - 1) % CATEGORY_BRIDGES["Interesting Facts"].length];
-            pSentences.push(bridge);
-          }
-
-          const chunkStart = (pIdx * sentsPerPart) % Math.max(1, scrapedSents.length);
-          const rotated = [...scrapedSents.slice(chunkStart), ...scrapedSents.slice(0, chunkStart)];
-          for (const s of rotated) {
-            if (!pSentences.includes(s)) {
-              pSentences.push(s);
-              if (countWords(pSentences) >= targetWords - 20) break;
-            }
-          }
-
-          if (!isLast && clampedParts > 1) {
-            pSentences.push(`Nobody could have predicted the unbelievable twist that happened next. Follow right now for Part ${pNum + 1}!`);
-          } else {
-            pSentences.push(`Today, ${subject} impacts billions of human beings across the globe. Save this video and follow for more untold origin secrets every day!`);
-          }
-
-          const scriptText = pSentences.join(" ");
-          const scenes: StoryScene[] = [];
-          for (let sIdx = 0; sIdx < clampedImages; sIdx++) {
-            const sceneSentence = pSentences[Math.min(sIdx, pSentences.length - 1)] || subject;
-            const sceneText = pSentences.slice(Math.min(sIdx, pSentences.length - 1), Math.min(sIdx + 2, pSentences.length)).join(" ");
-            const vPrompt = buildCleanVisualPrompt(
-              sceneSentence,
-              subject.toLowerCase(),
-              "historical origin documentary, vintage photorealistic 8k, cinematic lighting"
-            );
-            scenes.push({
-              scene_index: sIdx,
-              text: sceneText,
-              visual_prompt: vPrompt,
-            });
-          }
-
-          partsData.push({
-            partNumber: pNum,
-            title: `${baseTitle} (Part ${pNum}/${clampedParts})`,
-            script: scriptText,
-            sentences: pSentences,
-            scenes,
-            isLastPart: isLast,
-          });
-        }
-      }
-
-      return {
-        category: "Interesting Facts",
-        factId: scraped.id,
-        overallTitle: baseTitle,
-        numParts: clampedParts,
-        durationPerPart: clampedDuration,
-        parts: partsData,
-        source: "dynamic_scraper",
-      };
-    }
-
-    // Fallback to curated local pool
-    const factItem = findMatchingInterestingFact(prompt, excludeId);
-    const isPreviousScript = prompt.trim().length > 80 || UNTOLD_INTERESTING_FACTS.some((f) => prompt.toLowerCase().includes(f.part_1_hook.slice(0, 30).toLowerCase()));
-    const baseTitle = isPreviousScript || !prompt.trim() || prompt.trim().length < 10 ? factItem.title : prompt.trim();
-
-    const deepBackground = [
-      "Behind closed doors, the initial prototypes faced relentless skepticism and doubt from industry veterans.",
-      "Every conventional expert at the time insisted that this strange concept could never survive in the open market.",
-      "The inventors exhausted their personal bank accounts, mortgaged their homes, and worked through freezing winter nights in secret.",
-      "Corporate competitors launched aggressive smear campaigns to suppress the breakthrough before it could reach the public eye.",
-      "Yet against all odds, a single breakthrough moment changed the entire trajectory of the project.",
-      "The secret lied in a completely overlooked detail that none of the competitors had ever noticed.",
-      "What began as an ignored laboratory anomaly soon unlocked an entirely unprecedented technological breakthrough.",
-      "Archival court filings prove that multiple international patents were fought over this exact formula for over twenty years.",
-      "When the finished innovation was finally unveiled to journalists, the demonstration stunned every critic in the auditorium.",
-      "Within months of launch, consumer demand exploded so rapidly that factories operated twenty-four hours a day to keep up.",
-    ];
-
-    const partsData: StoryPart[] = [];
-
-    if (clampedParts === 1) {
-      const cleanBody = factItem.part_2_body.replace(/^Welcome back to Part \d+\.\s*/, "").trim();
-      const pSentences = [factItem.part_1_hook];
-      pSentences.push(cleanBody);
-      
-      let bgI = 0;
-      while (countWords(pSentences) < targetWords - 25 && bgI < deepBackground.length) {
-        pSentences.push(deepBackground[bgI++]);
-      }
-      pSentences.push(factItem.part_2_suspense);
-      pSentences.push("Save this video right now and follow for more mind-bending untold facts every single day!");
-
-      const scriptText = pSentences.join(" ");
-      const scenes: StoryScene[] = [];
-      for (let sIdx = 0; sIdx < clampedImages; sIdx++) {
-        const sceneSentence = pSentences[Math.min(sIdx, pSentences.length - 1)] || "mind blowing untold historical mystery";
-        const sceneText = pSentences.slice(Math.min(sIdx, pSentences.length - 1), Math.min(sIdx + 2, pSentences.length)).join(" ");
-        const vPrompt = buildCleanVisualPrompt(
-          sceneSentence,
-          "mind blowing untold historical mystery",
-          "mind-blowing real world discovery cosmic scientific phenomenon 8k high detail macro photography, cinematic lighting"
-        );
-        scenes.push({
-          scene_index: sIdx,
-          text: sceneText,
-          visual_prompt: vPrompt,
-        });
-      }
-
-      partsData.push({
-        partNumber: 1,
-        title: baseTitle,
-        script: scriptText,
-        sentences: pSentences,
-        scenes,
-        isLastPart: true,
-      });
-    } else {
-      for (let pIdx = 0; pIdx < clampedParts; pIdx++) {
-        const pNum = pIdx + 1;
-        const isLast = pNum === clampedParts;
-        const pSentences: string[] = [];
-
-        if (pNum === 1) {
-          pSentences.push(factItem.part_1_hook);
-          pSentences.push("Nobody at the time questioned the real calculated motive behind what was taking place.");
-          let bgI = 0;
-          while (countWords(pSentences) < targetWords - 30 && bgI < deepBackground.length) {
-            pSentences.push(deepBackground[bgI]);
-            bgI += 2;
-          }
-          pSentences.push(factItem.part_1_suspense);
-        } else if (isLast) {
-          const bridge = CATEGORY_BRIDGES["Interesting Facts"][(pIdx - 1) % CATEGORY_BRIDGES["Interesting Facts"].length];
-          pSentences.push(bridge);
-          pSentences.push(factItem.part_2_body);
-          let bgI = 1;
-          while (countWords(pSentences) < targetWords - 25 && bgI < deepBackground.length) {
-            pSentences.push(deepBackground[bgI]);
-            bgI += 2;
-          }
-          pSentences.push(factItem.part_2_suspense);
-          pSentences.push("This changed our world forever. Save this video and follow for more daily untold truths!");
-        } else {
-          const bridge = CATEGORY_BRIDGES["Interesting Facts"][(pIdx - 1) % CATEGORY_BRIDGES["Interesting Facts"].length];
-          pSentences.push(bridge);
-          pSentences.push(factItem.part_2_body);
-          let bgI = (pIdx % 2);
-          while (countWords(pSentences) < targetWords - 30 && bgI < deepBackground.length) {
-            pSentences.push(deepBackground[bgI]);
-            bgI += 2;
-          }
-          pSentences.push(`Just when everyone believed the story was over, the real mastermind stepped forward. Follow right now for Part ${pNum + 1}!`);
-        }
-
-        const scriptText = pSentences.join(" ");
-        const scenes: StoryScene[] = [];
-        for (let sIdx = 0; sIdx < clampedImages; sIdx++) {
-          const sceneSentence = pSentences[Math.min(sIdx, pSentences.length - 1)] || "mind blowing untold historical mystery";
-          const sceneText = pSentences.slice(Math.min(sIdx, pSentences.length - 1), Math.min(sIdx + 2, pSentences.length)).join(" ");
-          const vPrompt = buildCleanVisualPrompt(
-            sceneSentence,
-            "mind blowing untold historical mystery",
-            "mind-blowing real world discovery cosmic scientific phenomenon 8k high detail macro photography, cinematic lighting"
-          );
-          scenes.push({
-            scene_index: sIdx,
-            text: sceneText,
-            visual_prompt: vPrompt,
-          });
-        }
-
-        partsData.push({
-          partNumber: pNum,
-          title: `${baseTitle} (Part ${pNum}/${clampedParts})`,
-          script: scriptText,
-          sentences: pSentences,
-          scenes,
-          isLastPart: isLast,
-        });
-      }
-    }
-
-    return {
-      category: "Interesting Facts",
-      factId: factItem.id,
-      overallTitle: baseTitle,
-      numParts: clampedParts,
-      durationPerPart: clampedDuration,
-      parts: partsData,
-    };
-  }
-
-  // 2. MOTIVATIONAL STORIES (Multi-Archetype Procedural & Diverse Generation)
-  if (catClean === "Motivational") {
-    let availableArchetypes = MOTIVATIONAL_ARCHETYPES;
-    if (excludeId) {
-      const filtered = MOTIVATIONAL_ARCHETYPES.filter((a) => !excludeId.toLowerCase().includes(a.id.toLowerCase()));
-      if (filtered.length > 0) availableArchetypes = filtered;
-    }
-
-    const cleanPrompt = prompt.trim().toLowerCase();
-    const isPrevScript = cleanPrompt.length > 80 || MOTIVATIONAL_ARCHETYPES.some((a) => a.hooks.some((h) => cleanPrompt.includes(h.slice(0, 30).toLowerCase())));
-    let chosenArchetype = availableArchetypes[Math.floor(Math.random() * availableArchetypes.length)];
-
-    if (cleanPrompt && !isPrevScript) {
-      const keywordMatch = availableArchetypes.find((a) =>
-        cleanPrompt.includes(a.id) ||
-        a.title.toLowerCase().includes(cleanPrompt) ||
-        (a.keywords && a.keywords.some((kw) => cleanPrompt.includes(kw)))
-      );
-      if (keywordMatch) chosenArchetype = keywordMatch;
-    }
-
-    const storySeed = Math.floor(Math.random() * 90000) + 10000;
-    const storyId = `motivational_${chosenArchetype.id}_${storySeed}`;
-    const baseTitle = chosenArchetype.title;
-    const vStyle = chosenArchetype.visual_style;
-
-    const hook = chosenArchetype.hooks[Math.floor(Math.random() * chosenArchetype.hooks.length)];
-    const shuffledDevs = [...chosenArchetype.developments].sort(() => Math.random() - 0.5);
-    const res = chosenArchetype.resolutions[Math.floor(Math.random() * chosenArchetype.resolutions.length)];
-    const cta = chosenArchetype.cta || GENRE_CTA["Motivational"][Math.floor(Math.random() * GENRE_CTA["Motivational"].length)];
-
-    const partsData: StoryPart[] = [];
-
-    for (let pIdx = 0; pIdx < clampedParts; pIdx++) {
-      const pNum = pIdx + 1;
-      const isLast = pNum === clampedParts;
-      const pSentences: string[] = [];
-
-      if (pNum === 1) {
-        pSentences.push(hook);
-      } else {
-        const bridge = CATEGORY_BRIDGES["Motivational"][(pIdx - 1) % CATEGORY_BRIDGES["Motivational"].length];
-        pSentences.push(bridge);
-      }
-
-      let devIdx = 0;
-      while (countWords(pSentences) < targetWords - 25 && devIdx < shuffledDevs.length) {
-        const sent = shuffledDevs[(pIdx * 4 + devIdx) % shuffledDevs.length];
-        if (!pSentences.includes(sent)) {
-          pSentences.push(sent);
-        }
-        devIdx++;
-      }
-
-      if (!isLast && clampedParts > 1) {
-        const rawCliff = chosenArchetype.cliffhangers[Math.floor(Math.random() * chosenArchetype.cliffhangers.length)];
-        const cliff = rawCliff.replace("{next_part}", String(pNum + 1));
-        pSentences.push(cliff);
-      } else {
-        pSentences.push(res);
-        pSentences.push(cta);
-      }
-
-      const scriptText = pSentences.join(" ");
-      const scenes: StoryScene[] = [];
-      for (let sIdx = 0; sIdx < clampedImages; sIdx++) {
-        const sceneSentence = pSentences[Math.min(sIdx, pSentences.length - 1)] || chosenArchetype.title;
-        const sceneText = pSentences.slice(Math.min(sIdx, pSentences.length - 1), Math.min(sIdx + 2, pSentences.length)).join(" ");
-        const vPrompt = buildCleanVisualPrompt(
-          sceneSentence,
-          `${chosenArchetype.title.toLowerCase()} determination`,
-          vStyle
-        );
-        scenes.push({
-          scene_index: sIdx,
-          text: sceneText,
-          visual_prompt: vPrompt,
-        });
-      }
-
-      const partTitle = clampedParts > 1 ? `${baseTitle} (Part ${pNum}/${clampedParts})` : baseTitle;
-
-      partsData.push({
-        partNumber: pNum,
-        title: partTitle,
-        script: scriptText,
-        sentences: pSentences,
-        scenes,
-        isLastPart: isLast,
-      });
-    }
-
-    return {
-      category: "Motivational",
-      factId: storyId,
-      overallTitle: baseTitle,
-      numParts: clampedParts,
-      durationPerPart: clampedDuration,
-      parts: partsData,
-      source: "motivational_generator",
-    };
-  }
-
-  // 3. OTHER GENRES (Horror, Adventure, Romance, Educational, Comedy, Music, Others)
-  const matchedStyleProfile = STYLE_NARRATIVE_PROFILES[sceneStyle] || STYLE_NARRATIVE_PROFILES["Realism"];
-  const hasStyleOverride = matchedStyleProfile && matchedStyleProfile.hooks && matchedStyleProfile.hooks.length > 0;
-
-  const genreData = SUSPENSE_PATTERNS[catClean] || SUSPENSE_PATTERNS["Others"];
-  const hooks = (hasStyleOverride && (!prompt || catClean === "Others")) ? matchedStyleProfile.hooks : (genreData.hooks || SUSPENSE_PATTERNS["Others"].hooks);
-  const developments = hasStyleOverride ? matchedStyleProfile.developments : (genreData.developments || SUSPENSE_PATTERNS["Others"].developments);
-  const cliffhangers = hasStyleOverride ? matchedStyleProfile.cliffhangers : (genreData.cliffhangers || SUSPENSE_PATTERNS["Others"].cliffhangers);
-  const resolutions = hasStyleOverride ? matchedStyleProfile.resolutions : (genreData.resolutions || SUSPENSE_PATTERNS["Others"].resolutions);
-  const vStyle = matchedStyleProfile.visualDesc || genreData.visual_style || "cinematic 8k visual storytelling masterpiece";
-  const genreCtas = GENRE_CTA[catClean] || GENRE_CTA["Others"];
-
-  const cleanPrompt = prompt.trim().toLowerCase();
-  const isPrevScript = hooks.some((h) => cleanPrompt.includes(h.slice(0, 30).toLowerCase())) || cleanPrompt.length > 80;
-  let baseTitle = "";
-  let baseHook = "";
-
-  if (!cleanPrompt || isPrevScript) {
-    let availableHooks = hooks;
-    if (excludeId || cleanPrompt) {
-      const filtered = hooks.filter((h) => !cleanPrompt.includes(h.slice(0, 30).toLowerCase()) && !excludeId.toLowerCase().includes(h.slice(0, 20).toLowerCase()));
-      if (filtered.length > 0) availableHooks = filtered;
-    }
-    baseHook = availableHooks[Math.floor(Math.random() * availableHooks.length)];
-    baseTitle = baseHook.split(".")[0].trim();
-  } else {
-    baseTitle = prompt.trim();
-    baseHook = hooks[Math.floor(Math.random() * hooks.length)];
-  }
-
-  const storySeed = Math.floor(Math.random() * 90000) + 10000;
-  const storyId = `${catClean.toLowerCase()}_${storySeed}`;
-  const shuffledDevs = [...developments].sort(() => Math.random() - 0.5);
   const partsData: StoryPart[] = [];
 
   for (let pIdx = 0; pIdx < clampedParts; pIdx++) {
@@ -1744,48 +771,62 @@ export async function generateStoryParts(params: {
     const isLast = pNum === clampedParts;
     const pSentences: string[] = [];
 
-    if (pNum === 1) {
-      pSentences.push(baseHook);
-    } else {
-      const styleBridges = matchedStyleProfile.partBridges;
-      const bridge = (styleBridges && styleBridges.length > 0)
-        ? styleBridges[(pIdx - 1) % styleBridges.length]
-        : (CATEGORY_BRIDGES[catClean] || CATEGORY_BRIDGES["Others"])[(pIdx - 1) % (CATEGORY_BRIDGES[catClean] || CATEGORY_BRIDGES["Others"]).length];
-      pSentences.push(bridge);
+    // Select chapter for this part
+    const chapter = matchedEnsemble.chapters[Math.min(pIdx, matchedEnsemble.chapters.length - 1)];
+
+    // 1. Chapter Opening Hook (introduces characters by name)
+    const hookSent = chapter.hook;
+    if (!usedGlobalSentences.has(hookSent)) {
+      pSentences.push(hookSent);
+      usedGlobalSentences.add(hookSent);
     }
 
-    // Assemble developments dynamically until target words are reached
-    const startOffset = (pIdx * 4) % Math.max(1, shuffledDevs.length);
-    const rotatedDevs = [...shuffledDevs.slice(startOffset), ...shuffledDevs.slice(0, startOffset)];
-    for (const sent of rotatedDevs) {
-      if (!pSentences.includes(sent)) {
-        pSentences.push(sent);
-        if (countWords(pSentences) >= targetWords - 25 && pSentences.length >= minSentencesNeeded - 1) {
-          break;
+    // 2. Core Beats with dialogue and action
+    for (const beat of chapter.core_beats) {
+      if (!usedGlobalSentences.has(beat)) {
+        pSentences.push(beat);
+        usedGlobalSentences.add(beat);
+        if (countWords(pSentences) >= targetWords - 35) break;
+      }
+    }
+
+    // 3. Dynamic Narrative Expansion to fulfill requested duration (up to 10 minutes)
+    if (chapter.expansion_beats && countWords(pSentences) < targetWords - 35) {
+      for (const exp of chapter.expansion_beats) {
+        if (!usedGlobalSentences.has(exp)) {
+          pSentences.push(exp);
+          usedGlobalSentences.add(exp);
+          if (countWords(pSentences) >= targetWords - 35) break;
         }
       }
     }
 
+    // 4. Chapter Ending: Cliffhanger (if more parts follow) or Resolution + CTA (if last part)
     if (!isLast && clampedParts > 1) {
-      const rawCliff = cliffhangers[Math.floor(Math.random() * cliffhangers.length)];
-      const cliff = rawCliff.replace("{next_part}", String(pNum + 1));
+      const cliff = (chapter.cliffhanger || "What happened next will shock you... Follow right now for Part " + (pNum + 1) + "!")
+        .replace(/Part\s+\d+/gi, `Part ${pNum + 1}`);
       pSentences.push(cliff);
     } else {
-      const res = resolutions[Math.floor(Math.random() * resolutions.length)];
-      pSentences.push(res);
-      const chosenCta = genreCtas[Math.floor(Math.random() * genreCtas.length)];
-      pSentences.push(chosenCta);
+      if (chapter.resolution && !usedGlobalSentences.has(chapter.resolution)) {
+        pSentences.push(chapter.resolution);
+        usedGlobalSentences.add(chapter.resolution);
+      }
+      const cta = chapter.cta || (GENRE_CTA[matchedEnsemble.category] || GENRE_CTA["Others"])[0];
+      pSentences.push(cta);
     }
 
     const scriptText = pSentences.join(" ");
+
+    // 5. Generate 1 to 20 AI Scene Visual Prompts evenly distributed across the story
     const scenes: StoryScene[] = [];
     for (let sIdx = 0; sIdx < clampedImages; sIdx++) {
-      const sceneSentence = pSentences[Math.min(sIdx, pSentences.length - 1)] || effectiveCategory;
-      const sceneText = pSentences.slice(Math.min(sIdx, pSentences.length - 1), Math.min(sIdx + 2, pSentences.length)).join(" ");
+      const sentIndex = Math.min(pSentences.length - 1, Math.floor((sIdx * pSentences.length) / clampedImages));
+      const sceneSentence = pSentences[sentIndex] || matchedEnsemble.setting;
+      const sceneText = pSentences.slice(sentIndex, Math.min(sentIndex + 2, pSentences.length)).join(" ");
       const vPrompt = buildCleanVisualPrompt(
         sceneSentence,
-        effectiveCategory.toLowerCase(),
-        vStyle
+        `${matchedEnsemble.char1} in ${matchedEnsemble.setting}`,
+        matchedEnsemble.visual_style
       );
       scenes.push({
         scene_index: sIdx,
@@ -1807,11 +848,12 @@ export async function generateStoryParts(params: {
   }
 
   return {
-    category: effectiveCategory,
+    category: matchedEnsemble.category,
     factId: storyId,
     overallTitle: baseTitle,
     numParts: clampedParts,
     durationPerPart: clampedDuration,
     parts: partsData,
+    source: "character_story_engine",
   };
 }

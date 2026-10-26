@@ -570,8 +570,8 @@ export default function Home() {
   const [studioMode, setStudioMode] = useState<"viral" | "ai">("viral");
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiVoice, setAiVoice] = useState("en-US-ChristopherNeural");
-  const [aiNumImages, setAiNumImages] = useState<number>(3);
-  const [aiDuration, setAiDuration] = useState<number>(20);
+  const [aiNumImages, setAiNumImages] = useState<number>(5);
+  const [aiDuration, setAiDuration] = useState<number>(60);
   const [aiNumParts, setAiNumParts] = useState<number>(1);
   const [aiCurrentPart, setAiCurrentPart] = useState<number>(1);
   const [isGeneratingScript, setIsGeneratingScript] = useState<boolean>(false);
@@ -1173,7 +1173,7 @@ export default function Home() {
       return "Please select a video duration timer between 10s and 120s.";
     }
     if (!aiNumImages || aiNumImages < 1 || aiNumImages > 5) {
-      return "Please select the number of AI scene images (1 to 5).";
+      return "Please select the number of AI scene images (1 to 20).";
     }
     if (!aiNumParts || aiNumParts < 1 || aiNumParts > 5) {
       return "Please select the number of parts (1 to 5).";
@@ -2936,28 +2936,28 @@ export default function Home() {
                         </p>
                       </div>
 
-                      {/* Scene Count 1 to 5 */}
+                      {/* Scene Count 1 to 20 */}
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0' }}>AI Scene Images:</span>
+                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0' }}>AI Scene Images (1 to 20):</span>
                           <span style={{ fontSize: '12px', fontWeight: 700, color: '#38bdf8', background: 'rgba(56,189,248,0.15)', padding: '2px 8px', borderRadius: '4px' }}>
                             {aiNumImages} {aiNumImages === 1 ? 'Scene' : 'Scenes'}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          {[1, 2, 3, 4, 5].map((n) => (
+                        <div style={{ display: 'flex', gap: '5px', marginBottom: '8px' }}>
+                          {[1, 3, 5, 8, 12, 16, 20].map((n) => (
                             <button
                               key={n}
                               type="button"
                               onClick={() => setAiNumImages(n)}
                               style={{
                                 flex: 1,
-                                padding: '6px 0',
+                                padding: '5px 0',
                                 borderRadius: '6px',
                                 border: `1px solid ${aiNumImages === n ? '#38bdf8' : '#2a2e3d'}`,
                                 background: aiNumImages === n ? '#0284c7' : '#181b24',
                                 color: '#fff',
-                                fontSize: '12px',
+                                fontSize: '11px',
                                 fontWeight: 700,
                                 cursor: 'pointer',
                               }}
@@ -2966,31 +2966,75 @@ export default function Home() {
                             </button>
                           ))}
                         </div>
-                        <p style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>Visual backdrops generated per part by local PyTorch model.</p>
+                        <input
+                          type="range"
+                          min={1}
+                          max={20}
+                          step={1}
+                          value={aiNumImages}
+                          onChange={(e) => setAiNumImages(Number(e.target.value))}
+                          style={{ width: '100%', cursor: 'pointer', accentColor: '#38bdf8', display: 'block' }}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#64748b', marginTop: '4px' }}>
+                          <span>1 image</span>
+                          <span>10 images</span>
+                          <span>20 images</span>
+                        </div>
+                        <p style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>Generates up to 20 unique scene visuals per part matching your story.</p>
                       </div>
                     </div>
 
-                    {/* Timer Slider 10 sec to 120 sec (2 mins) - Full Length Width */}
+                    {/* Timer Slider 1 min (60s) to 10 mins (600s) - Full Length Width */}
                     <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid #1e2230', width: '100%' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0' }}>Video Duration:</span>
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0' }}>Video Duration (1 to 10 Minutes):</span>
                         <span style={{ fontSize: '12px', fontWeight: 700, color: '#a855f7', background: 'rgba(168,85,247,0.15)', padding: '2px 8px', borderRadius: '4px' }}>
-                          ⏱️ {aiDuration >= 60 ? `${Math.floor(aiDuration / 60)}m ${aiDuration % 60}s` : `${aiDuration}s`}
+                          ⏱️ {Math.floor(aiDuration / 60)}m {aiDuration % 60 ? `${aiDuration % 60}s` : '0s'} ({aiDuration}s)
                         </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+                        {[
+                          { sec: 60, label: "1 min" },
+                          { sec: 120, label: "2 mins" },
+                          { sec: 180, label: "3 mins" },
+                          { sec: 300, label: "5 mins" },
+                          { sec: 420, label: "7 mins" },
+                          { sec: 600, label: "10 mins" },
+                        ].map((d) => (
+                          <button
+                            key={d.sec}
+                            type="button"
+                            onClick={() => setAiDuration(d.sec)}
+                            style={{
+                              flex: 1,
+                              padding: '5px 0',
+                              borderRadius: '6px',
+                              border: `1px solid ${aiDuration === d.sec ? '#a855f7' : '#2a2e3d'}`,
+                              background: aiDuration === d.sec ? 'rgba(168,85,247,0.3)' : '#181b24',
+                              color: aiDuration === d.sec ? '#f3e8ff' : '#cbd5e1',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {d.label}
+                          </button>
+                        ))}
                       </div>
                       <input
                         type="range"
-                        min={10}
-                        max={120}
-                        step={5}
+                        min={60}
+                        max={600}
+                        step={15}
                         value={aiDuration}
                         onChange={(e) => setAiDuration(Number(e.target.value))}
                         style={{ width: '100%', cursor: 'pointer', accentColor: '#a855f7', display: 'block' }}
                       />
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#64748b', marginTop: '4px' }}>
-                        <span>10 sec (Short)</span>
-                        <span>60 sec (1 min)</span>
-                        <span>120 sec (2 mins)</span>
+                        <span>1 min (60s)</span>
+                        <span>3 mins (180s)</span>
+                        <span>5 mins (300s)</span>
+                        <span>10 mins (600s - Epic)</span>
                       </div>
                     </div>
 

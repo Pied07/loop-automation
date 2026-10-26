@@ -2152,8 +2152,8 @@ export async function generateAiVideoAction(params: {
     const voice = params.voice?.trim() || "en-US-ChristopherNeural";
     const stylePreset = params.stylePreset?.trim() || "Realism";
     const captionStyle = params.captionStyle?.trim() || "viral_yellow";
-    const numImages = params.numImages ? Math.max(1, Math.min(5, Number(params.numImages))) : 3;
-    const duration = params.duration ? Math.max(10, Math.min(120, Number(params.duration))) : 20;
+    const numImages = params.numImages ? Math.max(1, Math.min(20, Number(params.numImages))) : 5;
+    const duration = params.duration ? Math.max(60, Math.min(600, Number(params.duration))) : 60;
     const numParts = params.numParts ? Math.max(1, Math.min(5, Number(params.numParts))) : 1;
     const partNumber = params.partNumber ? Math.max(1, Math.min(numParts, Number(params.partNumber))) : 1;
 
