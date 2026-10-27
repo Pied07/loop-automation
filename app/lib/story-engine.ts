@@ -154,193 +154,108 @@ export function buildCleanVisualPrompt(sceneText: string, fallbackSubject: strin
   return `Cinematic shot of ${visualAction}, ${styleTag}, vertical 9:16 composition`;
 }
 
-// ─── EXTENSIVE DIVERSE CHARACTER REGISTRIES (100+ NAMES) ───────────────────
+// ─── PHONOTACTIC ML CHARACTER NAME & ROLE GENERATOR (FROM SCRATCH) ─────────
 
-const MALE_NAMES = [
-  "Liam", "Lucas", "Finnian", "Marcus", "Julian", "Victor", "Arthur", "Gabriel",
-  "Ethan", "Noah", "Alexander", "Mateo", "Cole", "Vance", "Kaelen", "Torin",
-  "Jax", "Jordan", "Caleb", "Kai", "Devin", "Felix", "Barney", "Toby",
-  "Santiago", "Adrian", "Dorian", "Miles", "Zack", "Kieran", "Silas", "Sebastian",
-  "Ronan", "Ezra", "Cassian", "Soren", "Jasper", "Rhys", "Nolan", "Declan",
-  "Damon", "Tobias", "Simon", "Elijah", "Oliver", "Hugo", "Gideon", "Desmond",
-  "Rowan", "Callum", "Beckett", "Harrison", "Sterling", "Evander", "Alisdair"
+const ONSET_CLUSTERS = [
+  "B", "C", "D", "F", "G", "H", "J", "K", "L", "M", "N", "P", "R", "S", "T", "V", "Z",
+  "Ch", "Sh", "Th", "Al", "El", "Mar", "Luc", "Dan", "Val", "Kael", "Finn", "Tor", "Zan",
+  "Cor", "Frey", "Cyn", "Ast", "Joc", "Mor", "Ren", "Soren", "Dax", "Cass"
 ];
+const NUCLEUS_VOWELS = ["a", "e", "i", "o", "u", "ia", "ea", "ai", "au", "ae"];
+const CODA_CONSONANTS = ["b", "c", "d", "f", "g", "k", "l", "m", "n", "p", "r", "s", "t", "v", "z", "th", "st", "nd", "ld", "nt"];
+const TERMINAL_MORPHS = ["a", "e", "ia", "en", "an", "on", "is", "us", "iel", "ian", "or", "ar", "er", "os", "lyn", "na", "ra", "la", "el"];
 
-const FEMALE_NAMES = [
-  "Elena", "Clara", "Naomi", "Maya", "Sophia", "Evelyn", "Grace", "Chloe",
-  "Isla", "Valeria", "Ren", "Sena", "Jocelyn", "Corina", "Amara", "Kira",
-  "Talia", "Freya", "Serena", "Mira", "Tessa", "Gemma", "Rosie", "Alessia",
-  "Yuki", "Carmen", "Lyra", "Eva", "Sora", "Tara", "Noelle", "Maeve",
-  "Astrid", "Cynthia", "Diana", "Lyanna", "Iris", "Veda", "Nora", "Vivienne",
-  "Genevieve", "Celeste", "Margot", "Selene", "Nadia", "Zara", "Leona", "Seraphina",
-  "Isolde", "Kendra", "Bridget", "Helena", "Rowena", "Camilla", "Daphne"
-];
+function generateMLCharacterName(latentVector: Float32Array, seed: number, charIdx: number = 0): string {
+  const startIdx = (charIdx * 16) % latentVector.length;
+  let latentWeight = 0;
+  for (let i = 0; i < Math.min(16, latentVector.length - startIdx); i++) {
+    latentWeight += Math.abs(latentVector[startIdx + i]) * (i + 1);
+  }
+  const rng = createPseudoRandom(seed + Math.floor(latentWeight * 1000) + charIdx * 7919);
 
-const GENRE_ROLES: Record<string, [string, string][]> = {
-  Horror: [
-    ["a night-shift archivist", "a paranormal acoustic specialist"],
-    ["an investigative reporter", "a forensic sound engineer"],
-    ["a secluded lighthouse keeper", "a maritime historian"],
-    ["a rare manuscript restorer", "an archaic folklorist"],
-    ["an urban preservationist", "a structural engineer"],
-    ["a radio broadcast technician", "an audio frequency specialist"],
-    ["a forensic investigator", "a historical document analyst"],
-    ["a night security warden", "a forensic photographer"],
-  ],
-  Adventure: [
-    ["an uncharted cavern surveyor", "a paleoclimatologist"],
-    ["a deep-sea cartographer", "a marine salvage biologist"],
-    ["an aerial reconnaissance pilot", "a wilderness survivalist"],
-    ["an archaeological surveyor", "an ancient script linguist"],
-    ["a subterranean speleologist", "a remote terrain geologist"],
-    ["a glacial expedition guide", "an atmospheric scientist"],
-    ["a high-altitude trekker", "an expedition field doctor"],
-    ["a desert ruins scout", "an ancient metallurgy expert"],
-  ],
-  Action: [
-    ["a tactical rescue operative", "a counter-perimeter specialist"],
-    ["a rogue cybersecurity engineer", "an elite extraction driver"],
-    ["a reconnaissance scout", "a combat drone analyst"],
-    ["a structural breach specialist", "a tactical surveillance officer"],
-    ["a high-altitude jumpmaster", "an electronic countermeasures expert"],
-    ["a deep-cover intelligence officer", "a covert operations handler"],
-  ],
-  Romance: [
-    ["an antique horologist", "a concert cellist"],
-    ["an architectural designer", "an art gallery curator"],
-    ["a vintage bookstore curator", "a landscape photographer"],
-    ["a botanical illustrator", "a classical acoustic pianist"],
-    ["a film restoration archivist", "a theatre director"],
-    ["a ceramic sculptor", "an independent literary editor"],
-    ["a heritage acoustic luthier", "a symphony composer"],
-  ],
-  Motivational: [
-    ["a relentless marathon runner", "a mental resilience coach"],
-    ["an independent aerospace engineer", "a lead propulsion scientist"],
-    ["an endurance cyclist", "a sports physiologist"],
-    ["a self-taught hardware craftsman", "an industrial innovator"],
-    ["a high-altitude mountain guide", "an expedition logistics director"],
-    ["a grassroots social entrepreneur", "an operational strategist"],
-  ],
-  Educational: [
-    ["a quantum physicist", "an astrophysics researcher"],
-    ["a cognitive neurobiologist", "a machine intelligence researcher"],
-    ["a deep-core geochemist", "a planetary geologist"],
-    ["a marine bioacoustics researcher", "an oceanographic surveyor"],
-    ["a molecular geneticist", "a biotechnology developer"],
-  ],
-  Comedy: [
-    ["an over-enthusiastic barista", "a skeptical regular customer"],
-    ["an accident-prone delivery driver", "a frantic event coordinator"],
-    ["a self-proclaimed illusionist", "an exhausted stage manager"],
-    ["a high-strung artisanal baker", "a laid-back health inspector"],
-    ["a tech-obsessed smart-home owner", "an old-school locksmith"],
-  ],
-  Food: [
-    ["a perfectionist pasta master", "an underground culinary critic"],
-    ["a midnight ramen artisan", "a fermentation science specialist"],
-    ["a wood-fired bakery master", "a heritage grain farmer"],
-    ["a street-food innovator", "a travel food documentarian"],
-    ["an open-flame grillmaster", "a traditional seasoning blender"],
-  ],
-  Music: [
-    ["an analog tape mastering engineer", "an avant-garde modular synth prodigy"],
-    ["a jazz trumpet virtuoso", "an independent vinyl record founder"],
-    ["a film score orchestrator", "a classical concert harpist"],
-    ["an acoustic chamber designer", "an ambient sound artist"],
-    ["a vintage tube amplifier restorer", "an indie recording vocalist"],
-  ],
-  Trending: [
-    ["an investigative digital reporter", "a live broadcast producer"],
-    ["a cybersecurity researcher", "an independent investigative journalist"],
-    ["a tech trends whistleblower", "a digital forensics analyst"],
-    ["a documentary creator", "a field operations coordinator"],
-  ],
-};
+  const c1 = rng.choice(ONSET_CLUSTERS);
+  const v1 = rng.choice(NUCLEUS_VOWELS);
+  const m = rng.choice(CODA_CONSONANTS);
+  const end = rng.choice(TERMINAL_MORPHS);
 
-const GENRE_BASE_SETTINGS: Record<string, string[]> = {
-  Horror: [
-    "a decommissioned coastal broadcast tower wrapped in heavy sea mist",
-    "the subterranean archives beneath an abandoned 19th-century psychiatric hospital",
-    "a desolate high-altitude observatory cut off by an approaching blizzard",
-    "an antique mirror restoration hall where every reflection lags by half a second",
-    "an isolated radio relay station in northern Maine during an unexplainable blackout",
-    "a forgotten cargo vessel drifting in the North Atlantic with warm engines and no crew",
-    "a Victorian manor library where footsteps pace the floorboards of locked rooms",
-    "an abandoned subway terminal sealed since the 1960s beneath Manhattan",
-    "a remote logging outpost surrounded by miles of silent black pines",
-  ],
-  Adventure: [
-    "an uncharted volcanic archipelago shrouded in perpetual geothermal vapor",
-    "a subterranean crystal labyrinth five hundred meters beneath the Antarctic ice shelf",
-    "an ancient lost temple half-swallowed by the dense jungle canopy of Central America",
-    "a treacherous mountain pass in the Andes where magnetic compasses spin uncontrollably",
-    "a submerged prehistoric cavern system discovered off the coast of Madagascar",
-    "a windswept desert canyon concealing the sandstone ruins of a forgotten empire",
-    "a colossal subterranean sinkhole opening into an isolated prehistoric ecosystem",
-    "a fog-shrouded glacial ravine lined with frozen shipwrecks from centuries past",
-    "an uncharted underground river flowing beneath a dormant volcanic plateau",
-  ],
-  Action: [
-    "the rain-soaked rooftop of a neon-lit skyscraper high above Shanghai",
-    "a high-speed bullet train racing along the Pacific coast during a torrential storm",
-    "a fortified offshore oil platform converted into an encrypted black-site server facility",
-    "a crumbling subterranean transit tunnel under heavy perimeter surveillance",
-    "an abandoned industrial shipyard illuminated only by tactical searchlights",
-    "a high-altitude mountain research facility under an imminent countdown",
-  ],
-  Romance: [
-    "a rain-slicked cobblestone courtyard in Paris beneath the amber glow of streetlamps",
-    "a candlelit antique bookshop tucked between quiet canals in Amsterdam",
-    "a windswept clifftop terrace overlooking the Mediterranean at dusk",
-    "a snowbound train carriage traveling through the Scottish Highlands at midnight",
-    "an overgrown botanical glasshouse glowing under the soft autumn twilight",
-    "a rooftop garden overlooking the twilight skyline of Florence",
-    "a quiet seaside pier bathed in the gentle warmth of an autumn sunset",
-  ],
-  Motivational: [
-    "a quiet solitary gym at 4:30 AM before the city begins to wake",
-    "the steep rocky switchbacks leading up the final ascent of Mount Rainier",
-    "a modest garage workshop where the lights stay on long past midnight",
-    "the grueling finish line of a hundred-mile desert ultramarathon",
-    "an austere training facility echoing with heavy breathing and determination",
-    "the quiet starting blocks of an Olympic track under cold morning floodlights",
-  ],
-  Educational: [
-    "the observation platform of the Atacama Large Millimeter Array under crystal stars",
-    "a sterile cleanroom lab housing the world's most sensitive gravitational wave detector",
-    "a high-pressure deep-sea exploration submersible two miles below sea level",
-    "a remote particle accelerator control center monitoring high-energy collisions",
-    "a high-arctic paleontology camp unearthing permafrost core samples",
-  ],
-  Comedy: [
-    "a wildly chaotic specialty bakery on the morning of a royal wedding order",
-    "an overcrowded subway platform during an unexpected flash mob rehearsal",
-    "a wildly over-engineered smart home having a complete electronic meltdown",
-    "a dog grooming salon during a simultaneous visit from twelve runaway poodles",
-    "a boutique restaurant where the automatic conveyor belt went into overdrive",
-  ],
-  Food: [
-    "a bustling midnight street-food stall in the neon-lit alleys of Osaka",
-    "a centuries-old rustic stone mill in Tuscany dusted with heirloom flour",
-    "a high-octane Michelin-star kitchen during the peak of dinner service",
-    "a secluded cedar smokehouse in Kyoto preparing centuries-old dashi recipes",
-    "a traditional wood-fired bakery in Oaxaca at the break of dawn",
-  ],
-  Music: [
-    "a dimly lit Abbey Road mastering studio packed with vintage tube amplifiers",
-    "a subterranean jazz club in New Orleans where the music never stops until dawn",
-    "a high-ceilinged cathedral recording chamber resonating with pure acoustic reverb",
-    "a soundproof mixing studio surrounded by towering modular synthesizer racks",
-    "an analog tape vault containing forgotten recording sessions from the 1970s",
-  ],
-  Trending: [
-    "a high-tech creator studio lit with dynamic cyber-cyan and amber lights",
-    "the control room of a viral live-stream event counting down to zero",
-    "a digital forensic workstation surrounded by encrypted server monitors",
-    "an investigative newsroom running down a breaking worldwide revelation",
-  ],
-};
+  let name = `${c1}${v1}${m}${end}`;
+  name = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+  if (name.length > 8) {
+    name = name.slice(0, 7);
+  }
+  return name;
+}
+
+function generateMLCharacterRole(category: string, latentVector: Float32Array, seed: number, charIdx: number = 0): string {
+  const rng = createPseudoRandom(seed + Math.floor(Math.abs(latentVector[charIdx % latentVector.length]) * 1000) + charIdx * 513);
+
+  const domainFields: Record<string, string[]> = {
+    Adventure: ["subterranean", "deep-cavern", "high-altitude", "glacial", "archaeological", "uncharted terrain", "expedition", "marine salvage"],
+    Horror: ["acoustic", "night-shift", "forensic", "archaic archive", "historical document", "frequency", "field investigation", "nocturnal"],
+    Action: ["tactical rescue", "perimeter defense", "extraction", "reconnaissance", "cybersecurity", "counter-surveillance", "incursion"],
+    Romance: ["botanical", "vintage archive", "acoustic music", "art restoration", "literary", "landscape photography", "architectural"],
+    Motivational: ["endurance performance", "athletic resilience", "propulsion engineering", "master craftsmanship", "mental conditioning"],
+    Educational: ["quantum physics", "neurobiology", "deep-core geology", "astrophysics", "bioacoustic", "planetary science"],
+    Comedy: ["specialty bakery", "express delivery", "stage illusion", "smart-home setup", "event coordination"],
+    Food: ["artisan pasta", "midnight culinary", "fermentation science", "wood-fired hearth", "open-flame seasoning"],
+    Music: ["analog tape mastering", "modular synthesizer", "acoustic chamber", "orchestral arrangement", "vinyl preservation"],
+    Trending: ["digital forensics", "investigative livestream", "cyber whistleblower", "independent broadcast", "data verification"],
+  };
+
+  const titles = ["specialist", "researcher", "analyst", "surveyor", "director", "technician", "navigator", "innovator", "coordinator", "strategist"];
+
+  const fields = domainFields[category] || domainFields["Trending"];
+  const f = rng.choice(fields);
+  const t = rng.choice(titles);
+  const article = "aeiou".includes(f[0].toLowerCase()) ? "an" : "a";
+  return `${article} ${f} ${t}`;
+}
+
+function generateMLSetting(category: string, prompt: string, latentVector: Float32Array, seed: number): string {
+  if (prompt) {
+    const lowP = prompt.toLowerCase();
+    for (const marker of [" in ", " at ", " inside ", " on ", " near ", " beneath ", " through "]) {
+      if (lowP.includes(marker)) {
+        const customSet = prompt.slice(lowP.indexOf(marker) + marker.length).trim();
+        if (customSet.length >= 4 && customSet.split(/\s+/).length <= 10) {
+          return customSet;
+        }
+      }
+    }
+    if (prompt.split(/\s+/).length <= 7 && !["make", "generate", "create", "video", "story"].some((w) => lowP.includes(w))) {
+      return prompt;
+    }
+  }
+
+  const rng = createPseudoRandom(seed + Math.floor(Math.abs(latentVector[16] || 0) * 1000));
+
+  const baseStructures: Record<string, string[]> = {
+    Adventure: ["an uncharted subterranean cavern", "a lost granite sanctuary", "a volcanic fissure labyrinth", "a prehistoric sinkhole ecosystem", "a fog-shrouded glacial ravine"],
+    Horror: ["an abandoned coastal relay tower", "the subterranean vaults beneath a 19th-century asylum", "an isolated broadcast post during a blackout", "a derelict vessel drifting in silent waters"],
+    Action: ["a rain-slicked skyscraper helipad", "a fortified offshore server platform", "a high-speed transit tunnel under surveillance", "an encrypted black-site industrial facility"],
+    Romance: ["a cobblestone courtyard bathed in amber lantern glow", "a quiet canalside bookshop in late autumn", "a windswept clifftop terrace overlooking the sea", "an overgrown conservatory under twilight"],
+    Motivational: ["a solitary training center before dawn", "the rocky switchbacks of an unforgiving mountain", "an austere workshop lit long past midnight", "the grueling final mile of a championship course"],
+    Educational: ["a high-altitude optical observatory", "a sterile cleanroom housing laser interferometers", "a deep-sea research vessel examining tectonic trenches", "a particle physics laboratory monitoring collisions"],
+    Comedy: ["a bustling specialty bakery facing a deadline", "a wildly malfunctioning automated smart house", "an overbooked delivery hub in peak traffic", "a stage rehearsal spiraling into complete chaos"],
+    Food: ["a midnight ramen shop in a quiet neon alley", "a centuries-old rustic flour mill in Tuscany", "a high-tempo Michelin kitchen during dinner rush", "a traditional smokehouse seasoning heirloom broths"],
+    Music: ["a dimly lit Abbey Road mastering suite", "a subterranean jazz vault echoing with brass", "a high-ceilinged acoustic stone chamber", "a modular synth workspace surrounded by analog oscillators"],
+    Trending: ["a high-tech investigative creator studio", "the control room of a viral live-stream event", "an encrypted data center analyzing leaked archives", "a breaking broadcast newsroom at midnight"],
+  };
+
+  const modifiers = [
+    "wrapped in perpetual mist and echoing with distant resonance",
+    "where atmospheric pressure drops noticeably with every step",
+    "illuminated only by the hypnotic glow of auxiliary monitors",
+    "untouched by weather or outside observers for decades",
+    "pulsing with high-frequency static and unexplained readings",
+    "standing frozen in time beneath heavy seasonal shadows",
+  ];
+
+  const structures = baseStructures[category] || baseStructures["Trending"];
+  return `${rng.choice(structures)} ${rng.choice(modifiers)}`;
+}
+
+// ─── RICH CATEGORY-SPECIFIC NARRATIVE DATA ────────────────────────────────
 
 const GENRE_NARRATIVE_DATA: Record<string, {
   openings: string[];
@@ -958,11 +873,14 @@ export async function generateStoryParts(params: {
   }
   const latentScore = latentVector.length > 0 ? latentSum / latentVector.length : 0.05;
 
-  // 1. Select / Extract Character Names & Roles
+  // 1. Generate Setting from Scratch
+  const setting = generateMLSetting(effectiveCat, prompt, latentVector, seedVal);
+
+  // 2. Generate Character Names & Roles from Scratch using ML Phonotactics
   let extractedNames: string[] = [];
   if (prompt) {
     const rawMatches = prompt.match(/\b[A-Z][a-z]+\b/g) || [];
-    extractedNames = rawMatches.filter((w) => !["The", "A", "An", "Part", "Video", "When", "And", "Into", "For", "From", "With", "About", "This", "That", "Untold", "Story", "Mystery", "Secret"].includes(w));
+    extractedNames = rawMatches.filter((w) => !["The", "A", "An", "Part", "Video", "When", "And", "Into", "For", "From", "With", "About", "This", "That", "Untold", "Story", "Mystery", "Secret", "Triangle", "Bermuda", "Atlantic", "Pacific", "Mountain", "Andes", "Ocean", "Valley"].includes(w) && !setting.toLowerCase().includes(w.toLowerCase()));
   }
 
   let c1 = "";
@@ -972,45 +890,13 @@ export async function generateStoryParts(params: {
     c2 = extractedNames[1];
   } else if (extractedNames.length === 1) {
     c1 = extractedNames[0];
-    c2 = rng.choice(FEMALE_NAMES.filter((n) => n !== c1));
+    c2 = generateMLCharacterName(latentVector, seedVal, 1);
   } else {
-    let c1Sub = 0;
-    for (let i = 0; i < Math.min(8, latentVector.length); i++) c1Sub += Math.abs(latentVector[i]);
-    let c2Sub = 0;
-    for (let i = 8; i < Math.min(16, latentVector.length); i++) c2Sub += Math.abs(latentVector[i]);
-
-    const c1Idx = Math.floor(c1Sub * 1000 + seedVal) % MALE_NAMES.length;
-    const c2Idx = Math.floor(c2Sub * 1000 + Math.floor(seedVal / 3)) % FEMALE_NAMES.length;
-    c1 = MALE_NAMES[c1Idx];
-    c2 = FEMALE_NAMES[c2Idx];
-  }
-
-  // Roles
-  const catRoles = GENRE_ROLES[effectiveCat] || GENRE_ROLES["Trending"];
-  let roleSub = 0;
-  for (let i = 0; i < Math.min(4, latentVector.length); i++) roleSub += Math.abs(latentVector[i]);
-  const roleIdx = Math.floor(roleSub * 500 + seedVal) % catRoles.length;
-  const [c1Role, c2Role] = catRoles[roleIdx];
-
-  // 2. Select / Extract Setting
-  const catSettings = GENRE_BASE_SETTINGS[effectiveCat] || GENRE_BASE_SETTINGS["Trending"];
-  let setLatentSum = 0;
-  for (let i = 16; i < Math.min(32, latentVector.length); i++) {
-    setLatentSum += Math.abs(latentVector[i]);
-  }
-  const setIdx = Math.floor(setLatentSum * 1000 + Math.floor(seedVal / 7)) % catSettings.length;
-  let setting = catSettings[setIdx];
-
-  if (prompt) {
-    const lowP = prompt.toLowerCase();
-    for (const marker of [" in ", " at ", " inside ", " on ", " near ", " beneath "]) {
-      if (lowP.includes(marker)) {
-        const customSet = prompt.slice(lowP.indexOf(marker) + marker.length).trim();
-        if (customSet.length >= 6 && customSet.split(/\s+/).length <= 8) {
-          setting = customSet;
-          break;
-        }
-      }
+    // Generate names mathematically from scratch
+    c1 = generateMLCharacterName(latentVector, seedVal, 0);
+    c2 = generateMLCharacterName(latentVector, seedVal, 1);
+    if (c1.toLowerCase() === c2.toLowerCase()) {
+      c2 = generateMLCharacterName(latentVector, seedVal + 33, 2);
     }
   }
 
