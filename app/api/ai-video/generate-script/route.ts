@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
     const numParts = body.numParts ? Math.max(1, Math.min(5, Number(body.numParts))) : 1;
     const excludeId = typeof body.excludeId === "string" ? body.excludeId.trim() : "";
     const sceneStyle = typeof body.sceneStyle === "string" ? body.sceneStyle.trim() : "Realism";
+    const seed = body.seed ? Number(body.seed) : (Math.floor(Math.random() * 1000000) + 1);
 
     let result: any = null;
 
@@ -31,8 +32,9 @@ export async function POST(req: NextRequest) {
       const safeCustomTag = customTag.replace(/"/g, '\\"');
       const safePrompt = prompt.replace(/"/g, '\\"');
       const safeStyle = sceneStyle.replace(/"/g, '\\"');
+      const safeExclude = excludeId.replace(/"/g, '\\"');
 
-      const cmd = `"${pyExe}" "${scriptPath}" --category "${safeCat}" --custom-tag "${safeCustomTag}" --prompt "${safePrompt}" --duration ${duration} --num-images ${numImages} --num-parts ${numParts} --scene-style "${safeStyle}"`;
+      const cmd = `"${pyExe}" "${scriptPath}" --category "${safeCat}" --custom-tag "${safeCustomTag}" --prompt "${safePrompt}" --duration ${duration} --num-images ${numImages} --num-parts ${numParts} --scene-style "${safeStyle}" --exclude-id "${safeExclude}" --seed ${seed}`;
       const { stdout } = await execAsync(cmd, { maxBuffer: 10 * 1024 * 1024 });
       const jsonStart = stdout.indexOf("{");
       if (jsonStart !== -1) {
@@ -53,6 +55,7 @@ export async function POST(req: NextRequest) {
         numParts,
         excludeId,
         sceneStyle,
+        seed,
       });
     }
 

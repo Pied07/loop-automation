@@ -635,6 +635,7 @@ def generate_story_parts(
     num_parts: int = 1,
     exclude_id: str = "",
     scene_style: str = "Realism",
+    seed: int = 0,
 ) -> Dict[str, Any]:
     """
     Generates a rich, character-driven story specifically calibrated to the video duration.
@@ -666,8 +667,12 @@ def generate_story_parts(
     latent_vec = model.forward(query_vec)
     latent_norm = float(np.linalg.norm(latent_vec))
 
-    # Neural seed calculation derived from ML latent vector coordinates
-    seed_val = int(abs(latent_norm * 100000)) + sum(ord(c) for c in query_text)
+    # Neural seed calculation derived from ML latent vector coordinates + seed variation
+    seed_offset = seed if seed != 0 else random.randint(1, 1000000)
+    seed_val = int(abs(latent_norm * 100000)) + sum(ord(c) for c in query_text) + (seed_offset % 100000)
+    if exclude_id and f"ml_{cat_key.lower()}_{seed_val}" == exclude_id:
+        seed_val += 7919
+
     rng = random.Random(seed_val)
 
     # 2. Dynamic Character & Setting Generation guided by the ML Model
@@ -824,6 +829,7 @@ def main():
     parser.add_argument("--num-parts", type=int, default=1)
     parser.add_argument("--exclude-id", default="")
     parser.add_argument("--scene-style", default="Realism")
+    parser.add_argument("--seed", type=int, default=0)
 
     args = parser.parse_args()
     res = generate_story_parts(
@@ -835,6 +841,7 @@ def main():
         num_parts=args.num_parts,
         exclude_id=args.exclude_id,
         scene_style=args.scene_style,
+        seed=args.seed,
     )
     print(json.dumps(res, indent=2))
 

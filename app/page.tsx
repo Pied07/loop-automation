@@ -1190,12 +1190,21 @@ export default function Home() {
 
     setIsGeneratingScript(true);
     const catLabel = selectedCategory === "Others" ? (customStoryTag || "Custom") : selectedCategory;
-    notify(`🧠 Running from-scratch ML model to generate suspenseful story & scenes for ${catLabel}...`);
+    const isRegenerate = generatedStoryParts.length > 0;
+    notify(
+      isRegenerate
+        ? `🧠 Regenerating new story & scenes for ${catLabel} from custom ML model...`
+        : `🧠 Running from-scratch ML model to generate suspenseful story & scenes for ${catLabel}...`
+    );
     try {
-      // If aiPrompt matches any previously generated part script, treat it as a fresh regeneration request
-      const isPriorGeneratedScript = generatedStoryParts.length > 0 &&
-        generatedStoryParts.some((p) => p.script.trim() === aiPrompt.trim());
-      const promptToSend = isPriorGeneratedScript ? "" : aiPrompt;
+      // If regenerating, or if aiPrompt matches any previously generated part script,
+      // or if aiPrompt is an existing narrative script (>100 chars), treat it as a fresh generation request.
+      const isPriorGeneratedScript =
+        isRegenerate &&
+        (generatedStoryParts.some((p) => p.script.trim() === aiPrompt.trim()) ||
+          aiPrompt.trim().length > 100);
+      const promptToSend = isPriorGeneratedScript ? "" : aiPrompt.trim();
+      const freshSeed = Math.floor(Math.random() * 1000000) + 1;
 
       const res = await fetch("/api/ai-video/generate-script", {
         method: "POST",
@@ -1205,10 +1214,12 @@ export default function Home() {
           customTag: customStoryTag,
           prompt: promptToSend,
           excludeId: lastFactId,
+          seed: freshSeed,
           duration: aiDuration,
           numImages: aiNumImages,
           numParts: aiNumParts,
           voice: aiVoice,
+          sceneStyle: selectedSceneStyle,
         }),
       });
       const data = await res.json();
@@ -1225,7 +1236,7 @@ export default function Home() {
         setAiPrompt(parts[0].script);
       }
       const titleInfo = data.overallTitle ? `"${data.overallTitle}"` : (data.numParts > 1 ? `${data.numParts} cliffhanger parts` : '1 complete story');
-      notify(`✨ Generated ${titleInfo} with ${aiNumImages} scenes calibrated to ${aiDuration}s!`);
+      notify(`✨ ${isRegenerate ? 'Regenerated' : 'Generated'} ${titleInfo} with ${aiNumImages} scenes calibrated to ${aiDuration}s!`);
     } catch (err: any) {
       notify("Failed to generate script: " + err.message);
     } finally {

@@ -695,6 +695,7 @@ export async function generateStoryParts(params: {
   numParts?: number;
   excludeId?: string;
   sceneStyle?: string;
+  seed?: number;
 }): Promise<StoryGenerationResult> {
   const modelData = loadMLModelData();
   const { config, weights } = modelData;
@@ -735,7 +736,12 @@ export async function generateStoryParts(params: {
 
   let charSum = 0;
   for (let i = 0; i < queryText.length; i++) charSum += queryText.charCodeAt(i);
-  const seedVal = Math.floor(Math.abs(latentNorm * 100000)) + charSum;
+
+  const seedOffset = params.seed ? Number(params.seed) : (Math.floor(Math.random() * 1000000) + 1);
+  let seedVal = Math.floor(Math.abs(latentNorm * 100000)) + charSum + (seedOffset % 100000);
+  if (params.excludeId && `ml_${catKey.toLowerCase()}_${seedVal}` === params.excludeId) {
+    seedVal += 7919;
+  }
 
   const rng = createPseudoRandom(seedVal);
 
