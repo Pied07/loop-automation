@@ -1,6 +1,5 @@
 import configData from "./models/ai_video_config.json";
 import weightsData from "./models/ai_video_weights.json";
-import archetypesData from "./models/narrative_archetypes.json";
 
 export interface StoryPart {
   partNumber: number;
@@ -27,27 +26,8 @@ export interface StoryGenerationResult {
   parts: StoryPart[];
   hashtags: string[];
   latent_score: number;
-  archetype_theme?: string;
   source: string;
 }
-
-interface Archetype {
-  theme: string;
-  title_template: string;
-  c1_pool: ([string, string] | string)[];
-  c2_pool: ([string, string] | string)[];
-  settings: string[];
-  openings: string[];
-  beats: string[];
-  expansions?: string[];
-  cliffhangers?: string[];
-  resolutions?: string[];
-  cta?: string;
-  style_prompt?: string;
-}
-
-// Master archetypes database imported directly from bundle
-const MASTER_ARCHETYPES: Record<string, Archetype[]> = archetypesData as unknown as Record<string, Archetype[]>;
 
 function vectorizeText(text: string, vocab: Record<string, number>, idf: number[], vocabSize: number = 512): Float32Array {
   const vec = new Float32Array(vocabSize);
@@ -71,7 +51,7 @@ function vectorizeText(text: string, vocab: Record<string, number>, idf: number[
   return vec;
 }
 
-function neuralMLPForward(vector: Float32Array, weights: any): Float32Array {
+function neuralMLPForward(vector: Float32Array, weights: Record<string, any>): Float32Array {
   if (!weights) {
     return new Float32Array(64);
   }
@@ -129,14 +109,12 @@ function createPseudoRandom(seed: number) {
 }
 
 function buildCleanVisualPrompt(sceneText: string, fallbackSubject: string, styleDescriptor: string): string {
-  // 1. Remove script artifacts, fillers, and CTA noise
   let clean = sceneText.replace(/\b(?:Part\s+\d+|Welcome back to Part\s+\d+|Follow for Part\s+\d+|Watch Part\s+\d+|Save this video|follow for more|subscribe|share this|comment below)[^.]*/gi, "");
   clean = clean.replace(/\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|eighteen|twenty|thirty|forty|fifty|hundred|thousand|million)\s+(?:times|doors|days|hours|years|copies|rejections)\b/gi, "");
   clean = clean.replace(/["'*_#`~]/g, " ");
   clean = clean.replace(/[^a-zA-Z0-9\s,.-]/g, " ");
   clean = clean.replace(/\s+/g, " ").trim();
 
-  // 2. Extract vivid narrative action sentences up to 160 chars
   let visualAction = "";
   if (clean.length >= 10) {
     const sents = clean.split(/[.!?]/).map((s) => s.trim()).filter((s) => s.length > 5);
@@ -146,7 +124,6 @@ function buildCleanVisualPrompt(sceneText: string, fallbackSubject: string, styl
     }
   }
 
-  // Fallback to characters & setting if sentence was sparse
   if (!visualAction || visualAction.length < 8) {
     visualAction = fallbackSubject;
   } else if (fallbackSubject && !visualAction.toLowerCase().includes(fallbackSubject.toLowerCase().split(",")[0].trim())) {
@@ -156,7 +133,6 @@ function buildCleanVisualPrompt(sceneText: string, fallbackSubject: string, styl
     }
   }
 
-  // 3. Crisp, genre-accurate cinematic aesthetic (concise, avoiding prompt bloat)
   const isHorror = /horror|haunted|ghost|demon|creepy|paranormal|nightmare|asylum|spectral|phantom|shadow/i.test(`${sceneText} ${fallbackSubject} ${styleDescriptor}`);
   const isRealism = /realism|photoreal|35mm/i.test(styleDescriptor);
   const isAnime = /anime|manga|ghibli/i.test(styleDescriptor);
@@ -178,6 +154,128 @@ function buildCleanVisualPrompt(sceneText: string, fallbackSubject: string, styl
   return `Cinematic shot of ${visualAction}, ${styleTag}, vertical 9:16 composition`;
 }
 
+const CHARACTER_REGISTRY: Record<string, [string, string, string, string][]> = {
+  Horror: [
+    ["Damian", "a night-shift archivist", "Elena", "a paranormal acoustic specialist"],
+    ["Victor", "an investigative reporter", "Maya", "a sound engineer"],
+    ["Arthur", "a lighthouse keeper", "Clara", "a maritime historian"],
+    ["Julian", "a rare manuscript restorer", "Naomi", "a folklorist"],
+    ["Marcus", "an urban explorer", "Evelyn", "a structural engineer"],
+    ["Gabriel", "a radio broadcaster", "Sophia", "a frequency technician"],
+  ],
+  Romance: [
+    ["Julian", "an antique horologist", "Elena", "a concert cellist"],
+    ["Liam", "an architectural designer", "Clara", "an art gallery curator"],
+    ["Ethan", "a vintage bookshop owner", "Grace", "a travel photographer"],
+    ["Mateo", "a botanical illustrator", "Chloe", "a classical pianist"],
+    ["Noah", "an acoustic composer", "Isla", "a museum archivist"],
+    ["Alexander", "a film preservationist", "Valeria", "a screen director"],
+  ],
+  Action: [
+    ["Cole", "a tactical rescue specialist", "Vance", "a field operative"],
+    ["Kaelen", "a cybersecurity operative", "Ren", "an extraction driver"],
+    ["Darek", "a reconnaissance scout", "Jocelyn", "a combat drone engineer"],
+    ["Torin", "a high-altitude climber", "Sena", "an expedition medic"],
+    ["Jax", "a structural demolitions expert", "Corina", "a surveillance analyst"],
+  ],
+  Adventure: [
+    ["Nolan", "a deep-sea cartographer", "Amara", "a marine biologist"],
+    ["Finnian", "an uncharted cavern surveyor", "Kira", "a paleoclimatologist"],
+    ["Lucas", "an aerial explorer", "Talia", "a wilderness survivalist"],
+    ["Declan", "an archaeological surveyor", "Freya", "an ancient linguist"],
+  ],
+  Motivational: [
+    ["Jordan", "a relentless marathoner", "Marcus", "a mental resilience coach"],
+    ["Devin", "an independent aerospace builder", "Serena", "a lead propulsion scientist"],
+    ["Kai", "an endurance cyclist", "Elena", "a sports physiologist"],
+    ["Caleb", "a self-made craftsman", "Mira", "an industrial innovator"],
+  ],
+  Educational: [
+    ["Professor Vance", "a quantum physicist", "Dr. Lin", "an astrophysics researcher"],
+    ["Dr. Aris", "a neurobiologist", "Tessa", "a cognitive data scientist"],
+    ["Felix", "a deep-core geologist", "Dr. Mercer", "a planetary scientist"],
+  ],
+  Comedy: [
+    ["Barney", "an over-enthusiastic barista", "Penny", "a skeptical regular customer"],
+    ["Toby", "an accident-prone delivery driver", "Gemma", "a frantic event coordinator"],
+    ["Milo", "a self-proclaimed escape artist", "Rosie", "his exhausted stage assistant"],
+  ],
+  Food: [
+    ["Chef Marco", "a perfectionist pasta maker", "Alessia", "an underground food critic"],
+    ["Kenji", "a midnight ramen artisan", "Yuki", "a culinary fermentation specialist"],
+    ["Santiago", "a wood-fired bakery master", "Carmen", "a heritage grain farmer"],
+  ],
+  Music: [
+    ["Adrian", "an analog tape mastering engineer", "Lyra", "an avant-garde synth prodigy"],
+    ["Miles", "a jazz trumpet virtuoso", "Eva", "a vinyl record label founder"],
+    ["Dorian", "a modular synthesizer designer", "Sora", "an ambient sound designer"],
+  ],
+  Trending: [
+    ["Zack", "an investigative content creator", "Tara", "a live stream producer"],
+    ["Kieran", "a tech whistleblower", "Noelle", "an independent digital analyst"],
+  ],
+};
+
+const SETTING_REGISTRY: Record<string, string[]> = {
+  Horror: [
+    "a decommissioned coastal broadcast tower wrapped in heavy sea mist",
+    "the subterranean archives beneath an abandoned 19th-century asylum",
+    "a desolate high-altitude observatory cut off by an approaching blizzard",
+    "an antique mirror restoration hall in Venice where every reflection lags by half a second",
+    "an isolated radio relay station in northern Maine during a total blackout",
+    "a forgotten deep-water shipping vessel found adrift with warm engines and no crew",
+  ],
+  Romance: [
+    "a rain-slicked cobblestone courtyard in Paris beneath the amber glow of streetlamps",
+    "a candlelit antique bookshop tucked between quiet canals in Amsterdam",
+    "a windswept clifftop terrace overlooking the Mediterranean at dusk",
+    "a snowbound train carriage traveling through the Scottish Highlands at midnight",
+    "an overgrown botanical glasshouse glowing under the soft autumn twilight",
+  ],
+  Action: [
+    "the rain-soaked rooftop of a neon-lit skyscraper high above Shanghai",
+    "a high-speed bullet train racing along the Pacific coast during a storm",
+    "a fortified offshore oil platform converted into a black-site server facility",
+    "a crumbling subterranean transit tunnel under heavy perimeter surveillance",
+  ],
+  Adventure: [
+    "an uncharted volcanic archipelago shrouded in perpetual geothermal vapor",
+    "a subterranean crystal labyrinth five hundred meters beneath the Antarctic ice sheet",
+    "an ancient lost temple half-swallowed by the dense jungle canopy of Central America",
+    "a treacherous mountain pass in the Andes where magnetic compasses spin uncontrollably",
+  ],
+  Motivational: [
+    "a quiet solitary gym at 4:30 AM before the city begins to wake",
+    "the steep rocky switchbacks leading up the final ascent of Mount Rainier",
+    "a modest garage workshop where the lights stay on long past midnight",
+    "the finish line of a grueling hundred-mile desert ultramarathon",
+  ],
+  Educational: [
+    "the observation platform of the Atacama Large Millimeter Array under crystal stars",
+    "a sterile cleanroom lab housing the world's most sensitive gravitational wave detector",
+    "a high-pressure deep-sea exploration submersible two miles below sea level",
+  ],
+  Comedy: [
+    "a wildly chaotic specialty bakery on the morning of a royal wedding order",
+    "an overcrowded subway platform during an unexpected flash mob rehearsal",
+    "a wildly over-engineered smart home having a complete electronic meltdown",
+  ],
+  Food: [
+    "a bustling midnight street-food stall in the neon-lit alleys of Osaka",
+    "a centuries-old rustic stone mill in Tuscany dusted with heirloom flour",
+    "a high-octane Michelin-star kitchen during the peak of dinner service",
+  ],
+  Music: [
+    "a dimly lit Abbey Road mastering studio packed with vintage tube amplifiers",
+    "a subterranean jazz club in New Orleans where the music never stops until dawn",
+    "a high-ceilinged cathedral recording chamber resonating with pure acoustic reverb",
+  ],
+  Trending: [
+    "a high-tech creator studio lit with dynamic cyber-cyan and amber lights",
+    "the control room of a viral live-stream event counting down to zero",
+  ],
+};
+
 export async function generateStoryParts(params: {
   category: string;
   customTag?: string;
@@ -189,32 +287,27 @@ export async function generateStoryParts(params: {
   sceneStyle?: string;
   seed?: number;
 }): Promise<StoryGenerationResult> {
-  const effectiveCat =
-    params.category?.trim().toLowerCase() === "others" && params.customTag?.trim()
-      ? params.customTag.trim()
-      : (params.category || "Romance").trim();
+  const catParam = (params.category || "Horror").trim();
+  const knownCategories = [
+    "Trending", "Comedy", "Motivational", "Horror", "Educational",
+    "Romance", "Adventure", "Music", "Food", "Action"
+  ];
 
-  let catKey = effectiveCat;
-  if (!MASTER_ARCHETYPES[catKey]) {
-    for (const k of Object.keys(MASTER_ARCHETYPES)) {
-      if (k.toLowerCase() === effectiveCat.toLowerCase() || effectiveCat.toLowerCase().includes(k.toLowerCase())) {
-        catKey = k;
-        break;
-      }
-    }
-    if (!MASTER_ARCHETYPES[catKey]) {
-      catKey = effectiveCat.toLowerCase().includes("love") ? "Romance" : (effectiveCat.toLowerCase().includes("action") ? "Action" : "Interesting Facts");
+  let effectiveCat = "Trending";
+  for (const kc of knownCategories) {
+    if (kc.toLowerCase() === catParam.toLowerCase()) {
+      effectiveCat = kc;
+      break;
     }
   }
 
-  const archetypeList = MASTER_ARCHETYPES[catKey] || MASTER_ARCHETYPES["Romance"];
   const prompt = (params.prompt || "").trim();
   const clampedDuration = Math.max(60, Math.min(600, Number(params.duration) || 60));
   const clampedParts = Math.max(1, Math.min(5, Number(params.numParts) || 1));
   const clampedImages = Math.max(1, Math.min(20, Number(params.numImages) || 5));
   const sceneStyle = params.sceneStyle || "Realism";
 
-  // 1. Forward Neural Inference via ONNX Weights
+  // 1. Forward Neural Inference via User Trained MLP Weights
   const queryText = `${effectiveCat} ${params.customTag || ""} ${prompt}`.trim();
   const queryVec = vectorizeText(queryText, configData.vocabulary, configData.idf, configData.vocab_size || 512);
   const latentPred = neuralMLPForward(queryVec, weightsData);
@@ -226,128 +319,146 @@ export async function generateStoryParts(params: {
   let charSum = 0;
   for (let i = 0; i < queryText.length; i++) charSum += queryText.charCodeAt(i);
 
-  // Dynamic seed: unique per run, ensuring non-repeating generation
-  const seedOffset = params.seed ? Number(params.seed) : Math.floor(Math.random() * 1000000) + 1;
+  // Dynamic seed unique per run / regenerate click
+  const seedOffset = params.seed && params.seed > 0 ? Number(params.seed) : (Date.now() % 1000000 + Math.floor(Math.random() * 99999));
   let seedVal = Math.floor(Math.abs(latentNorm * 100000)) + charSum + (seedOffset % 100000);
-  if (params.excludeId && `ml_${catKey.toLowerCase()}_${seedVal}` === params.excludeId) {
+  if (params.excludeId && `ml_${effectiveCat.toLowerCase()}_${seedVal}` === params.excludeId) {
     seedVal += 7919;
   }
 
-  // Neural Archetype Selector: picks among multiple diverse archetypes based on continuous latent space + seed
-  let latentSum = 0;
-  for (let i = 0; i < Math.min(16, latentPred.length); i++) latentSum += Math.abs(latentPred[i]);
-  const archetypeIdx = Math.floor(latentSum * 10000 + seedOffset) % archetypeList.length;
-  const archetype = archetypeList[archetypeIdx];
-
   const rng = createPseudoRandom(seedVal);
 
-  // Dynamic Character & Setting Selection from Chosen Archetype
-  const c1Pair = rng.choice(archetype.c1_pool);
-  const c2Pair = rng.choice(archetype.c2_pool);
-  const c1 = Array.isArray(c1Pair) ? c1Pair[0] : c1Pair;
-  const r1 = Array.isArray(c1Pair) && c1Pair.length > 1 ? c1Pair[1] : "specialist";
-  const c2 = Array.isArray(c2Pair) ? c2Pair[0] : c2Pair;
-  const r2 = Array.isArray(c2Pair) && c2Pair.length > 1 ? c2Pair[1] : "specialist";
-  let setting = rng.choice(archetype.settings);
+  // 2. Sample Characters & Setting from Continuous Latent Sub-spaces
+  const catChars = CHARACTER_REGISTRY[effectiveCat] || CHARACTER_REGISTRY["Trending"];
+  let charLatentSum = 0;
+  for (let i = 0; i < Math.min(16, latentPred.length); i++) charLatentSum += Math.abs(latentPred[i]);
+  const charIdx = Math.floor(charLatentSum * 1000 + seedVal) % catChars.length;
+  let [c1, c1Role, c2, c2Role] = catChars[charIdx];
 
-  let baseTitle = "";
-  if (prompt && prompt.length > 4) {
-    baseTitle = prompt.length <= 60 ? prompt : prompt.slice(0, 57).replace(/\s+\S*$/, "") + "...";
-    setting = `${setting} to uncover the truth behind ${prompt}`;
-  } else {
-    baseTitle = archetype.title_template || `The Story of ${c1} & ${c2}`;
+  if (prompt) {
+    const userWords = prompt.match(/\b[A-Z][a-z]+\b/g) || [];
+    const validWords = userWords.filter(w => !["The", "A", "An", "Part", "Video"].includes(w));
+    if (validWords.length > 0) {
+      c1 = validWords[0];
+      if (validWords.length > 1) c2 = validWords[1];
+    }
   }
 
-  // Duration Calibration: 140 words/min spoken narration
-  // 60s -> ~140-150 words (6-8 sentences); 120s -> ~280-300 words (14-16 sentences)
-  const targetWordsPerPart = Math.max(120, Math.floor((clampedDuration * 140) / 60));
+  const catSettings = SETTING_REGISTRY[effectiveCat] || SETTING_REGISTRY["Trending"];
+  let setLatentSum = 0;
+  for (let i = 16; i < Math.min(32, latentPred.length); i++) setLatentSum += Math.abs(latentPred[i]);
+  const setIdx = Math.floor(setLatentSum * 1000 + Math.floor(seedVal / 7)) % catSettings.length;
+  const setting = catSettings[setIdx];
+
+  // 3. Synthesize Procedural Multi-part Script Calibrated to Duration
+  const targetWordsPerPart = Math.floor(clampedDuration * 2.5);
+  const sentencesNeeded = Math.max(5, Math.min(24, Math.round(targetWordsPerPart / 15)));
+
   const partsData: StoryPart[] = [];
+  const baseTitle = prompt ? `${prompt.slice(0, 40)}: The Untold Story` : `${c1} and ${c2}: The Mystery of ${effectiveCat}`;
 
   for (let pIdx = 0; pIdx < clampedParts; pIdx++) {
     const pNum = pIdx + 1;
-    const isLast = pNum === clampedParts;
-    const partSentences: string[] = [];
+    const isLast = (pNum === clampedParts);
+    const sents: string[] = [];
 
+    // Opening Hook
     if (pNum === 1) {
-      const rawOpen = rng.choice(archetype.openings);
-      const opening = rawOpen
-        .replace(/\{c1\}/g, c1)
-        .replace(/\{r1\}/g, r1)
-        .replace(/\{c2\}/g, c2)
-        .replace(/\{r2\}/g, r2)
-        .replace(/\{setting\}/g, setting);
-      partSentences.push(opening);
+      const hookOptions = [
+        `It was meant to be an ordinary assignment when ${c1}, ${c1Role}, and ${c2}, ${c2Role}, arrived at ${setting}.`,
+        `No one could have prepared ${c1} for what lay hidden inside ${setting}.`,
+        `At precisely the moment the storm reached its peak, ${c1} and ${c2} made a discovery at ${setting} that defied every logical explanation.`,
+        `When ${c1} first stepped inside ${setting}, the stillness in the air felt heavy and charged with anticipation.`,
+      ];
+      sents.push(rng.choice(hookOptions));
     } else {
-      partSentences.push(`Welcome back to Part ${pNum}. Picking up right as ${c1} and ${c2} pushed deeper into the mystery...`);
+      sents.push(`Welcome back to Part ${pNum}. The situation inside ${setting} had escalated beyond anything ${c1} and ${c2} could have anticipated.`);
     }
 
-    const coreBeatsPool = (archetype.beats || []).map((b) =>
-      b.replace(/\{c1\}/g, c1).replace(/\{c2\}/g, c2).replace(/\{setting\}/g, setting)
-    );
-    const shuffledBeats = rng.shuffle(coreBeatsPool);
+    // Inciting Incident
+    const incitingOptions = [
+      `${c1} pointed out an anomaly in the perimeter readings, prompting ${c2} to step forward cautiously.`,
+      `A sudden fluctuation in the atmosphere caught ${c2}'s attention, causing ${c1} to immediately pause.`,
+      `Without warning, an unexpected signal echoed across the space, breaking the long-standing silence.`,
+      `Looking closely at the instruments, ${c1} realized that the readings were shifting in real time.`,
+    ];
+    sents.push(rng.choice(incitingOptions));
 
-    const expPool = (archetype.expansions || []).map((e) =>
-      e.replace(/\{c1\}/g, c1).replace(/\{c2\}/g, c2).replace(/\{setting\}/g, setting)
-    );
-    const shuffledExp = rng.shuffle(expPool);
+    // Dynamic Narrative Actions & Dialogue
+    const dialogueBank = [
+      `'${c2}, take a look at this right now,' ${c1} urged, gesturing toward the central console.`,
+      `'${c1}, are you seeing what I'm seeing?' ${c2} whispered, checking the auxiliary monitors.`,
+      `'We need to be extremely deliberate with our next step,' ${c1} warned, tightening their grip on the equipment.`,
+      `'${c1}, this changes everything we thought we understood,' ${c2} remarked as the data confirmed their suspicions.`,
+    ];
 
-    for (const beat of shuffledBeats) {
-      if (!partSentences.includes(beat)) {
-        partSentences.push(beat);
-      }
-      const currentWords = partSentences.join(" ").split(/\s+/).length;
-      if (currentWords >= targetWordsPerPart - 45) {
-        break;
+    const actionBank = [
+      `Shadows lengthened across the walls as an electric hum resonated through the structural pillars.`,
+      `The atmospheric pressure shifted noticeably, condensing their breath into visible vapor.`,
+      `Every dial on the secondary interface began registering erratic, unprecedented values.`,
+      `Together, they moved toward the inner threshold, navigating the narrow corridor with measured steps.`,
+      `A low resonance vibrated through the floorboards, signaling that the mechanism had been activated.`,
+      `The ambient light flickered momentarily, casting long, dramatic silhouettes across the interior.`,
+      `Examining the artifact closely, ${c1} noted the intricate craftsmanship that had remained undisturbed for decades.`,
+      `${c2} cross-referenced the coordinates with the original blueprints, finding an exact match.`,
+      `A subtle click echoed through the chamber as the locking mechanism smoothly disengaged.`,
+      `Outside, the elements raged against the reinforced glass, but inside, absolute concentration took over.`,
+    ];
+
+    const shuffledD = rng.shuffle(dialogueBank);
+    const shuffledA = rng.shuffle(actionBank);
+
+    let dIdx = 0;
+    let aIdx = 0;
+    while (sents.length < sentencesNeeded - 2) {
+      if (sents.length % 2 === 0 && dIdx < shuffledD.length) {
+        sents.push(shuffledD[dIdx++]);
+      } else if (aIdx < shuffledA.length) {
+        sents.push(shuffledA[aIdx++]);
+      } else {
+        sents.push(`${c1} and ${c2} pressed forward, determined to uncover the truth behind the mystery.`);
       }
     }
 
-    let currentWords = partSentences.join(" ").split(/\s+/).length;
-    for (const exp of shuffledExp) {
-      if (currentWords >= targetWordsPerPart - 40) {
-        break;
-      }
-      if (!partSentences.includes(exp)) {
-        partSentences.push(exp);
-        currentWords += exp.split(/\s+/).length;
-      }
-    }
-
+    // Climax / Cliffhanger
     if (!isLast) {
-      const cliffList = archetype.cliffhangers && archetype.cliffhangers.length > 0
-        ? archetype.cliffhangers
-        : ["What happened next stunned everyone... Follow right now for Part {next_part}!"];
-      const cliffTemplate = rng.choice(cliffList);
-      const cliff = cliffTemplate
-        .replace(/\{c1\}/g, c1)
-        .replace(/\{c2\}/g, c2)
-        .replace(/\{next_part\}/g, String(pNum + 1));
-      partSentences.push(cliff);
+      const cliffhangers = [
+        `Just as ${c1} reached for the master switch, a sudden sound from the shadows froze both of them in place... Follow right now for Part ${pNum + 1} to see what happened next!`,
+        `Before ${c2} could answer, the primary monitor flashed with an urgent countdown... Follow for Part ${pNum + 1} as the revelation unfolds!`,
+        `As the final barrier slid open, what they saw waiting inside changed everything... Follow right now for Part ${pNum + 1}!`,
+      ];
+      sents.push(rng.choice(cliffhangers));
     } else {
-      const resList = archetype.resolutions && archetype.resolutions.length > 0
-        ? archetype.resolutions
-        : ["Against all odds, they proved that courage and faith conquer all."];
-      const resTemplate = rng.choice(resList);
-      const resolution = resTemplate.replace(/\{c1\}/g, c1).replace(/\{c2\}/g, c2);
-      partSentences.push(resolution);
-      const cta = archetype.cta || "Save this video right now and follow for more daily stories!";
-      partSentences.push(cta);
+      const resolutions = [
+        `Standing side by side, ${c1} and ${c2} looked upon what they had accomplished, knowing they had altered the course of tomorrow.`,
+        `Against all odds, their perseverance had unlocked a truth that would resonate for generations to come.`,
+        `As dawn broke over the horizon, peace and clarity finally settled over ${setting}.`,
+      ];
+      sents.push(rng.choice(resolutions));
+      const ctas = [
+        `Save this video right now and follow for more daily ${effectiveCat.toLowerCase()} stories!`,
+        `What would you have done in ${c1}'s place? Drop your thoughts in the comments and follow for more!`,
+        `Share this with someone who loves a great ${effectiveCat.toLowerCase()} story, and follow for daily adventures!`,
+      ];
+      sents.push(rng.choice(ctas));
     }
 
-    const scriptText = partSentences.join(" ");
+    const scriptText = sents.join(" ");
 
+    // Partition sentences cleanly into numImages scenes
     const scenes: SceneItem[] = [];
-    const nSents = partSentences.length;
+    const nSents = sents.length;
     for (let sIdx = 0; sIdx < clampedImages; sIdx++) {
       const start = Math.floor((sIdx * nSents) / clampedImages);
       let end = Math.floor(((sIdx + 1) * nSents) / clampedImages);
       if (start === end) end = Math.min(nSents, start + 1);
-      const chunk = partSentences.slice(start, end);
-      const sceneText = chunk.length > 0 ? chunk.join(" ") : partSentences[Math.min(sIdx, nSents - 1)];
+      const chunk = sents.slice(start, end);
+      const sceneText = chunk.length > 0 ? chunk.join(" ") : sents[Math.min(sIdx, nSents - 1)];
 
       const vPrompt = buildCleanVisualPrompt(
         sceneText,
-        `${c1}, ${c2}, ${setting}`,
-        `${sceneStyle} style, ${archetype.style_prompt || "photorealistic 8k"}`
+        `${c1} and ${c2}, ${setting}`,
+        sceneStyle
       );
 
       scenes.push({
@@ -362,7 +473,7 @@ export async function generateStoryParts(params: {
       partNumber: pNum,
       title: partTitle,
       script: scriptText,
-      sentences: partSentences,
+      sentences: sents,
       scenes,
       isLastPart: isLast,
     });
@@ -379,20 +490,21 @@ export async function generateStoryParts(params: {
     Educational: ["sciencefacts", "quantumphysics", "deepdive", "stem", "learnsomethingnew", "discovery", "astronomy", "curiousminds"],
     Food: ["foodie", "streetfood", "masterchef", "culinaryarts", "recipes", "deliciousfood", "foodtok", "comfortfood"],
     Music: ["musichistory", "analogwarmth", "behindthetrack", "producertok", "sounddesign", "vintageaudio", "legendarybeats", "musicdiscovery"],
+    Trending: ["viral", "fyp", "storytime", "foryou", "trending", "explore"],
   };
 
-  const hashtags = categoryTags[catKey] || ["viral", "trending", "shorts", "fyp", "storytime"];
+  const hashtags = categoryTags[effectiveCat] || categoryTags["Trending"];
+  const factId = `ml_${effectiveCat.toLowerCase()}_${seedVal}`;
 
   return {
     category: effectiveCat,
-    factId: `ml_${catKey.toLowerCase()}_${seedVal}`,
+    factId,
     overallTitle: baseTitle,
     numParts: clampedParts,
     durationPerPart: clampedDuration,
     parts: partsData,
     hashtags,
     latent_score: latentNorm,
-    archetype_theme: archetype.theme || "Original Story",
     source: "user_trained_onnx_ml_model",
   };
 }
