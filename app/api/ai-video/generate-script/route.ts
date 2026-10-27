@@ -9,6 +9,19 @@ const execFileAsync = promisify(execFile);
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
+async function getPythonCommand(): Promise<string> {
+  const candidates = process.platform === "win32"
+    ? ["py", "python", "C:\\Python314\\python.exe", "python3"]
+    : ["python3", "python"];
+  for (const c of candidates) {
+    try {
+      await execFileAsync(c, ["--version"]);
+      return c;
+    } catch {}
+  }
+  return process.platform === "win32" ? "py" : "python3";
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -26,7 +39,7 @@ export async function POST(req: NextRequest) {
 
     // 1. Try running ML story engine via Python CLI (utilizes trained ONNX model latent vectors)
     try {
-      const pyExe = process.platform === "win32" ? "py" : "python3";
+      const pyExe = await getPythonCommand();
       const scriptPath = path.join(process.cwd(), "scripts", "story_engine.py");
 
       const args: string[] = [
