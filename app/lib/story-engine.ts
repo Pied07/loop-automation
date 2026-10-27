@@ -1,6 +1,6 @@
-import configData from "@/scripts/models/ai_video_config.json";
-import weightsData from "@/scripts/models/ai_video_weights.json";
-import archetypesData from "@/scripts/models/narrative_archetypes.json";
+import configData from "./models/ai_video_config.json";
+import weightsData from "./models/ai_video_weights.json";
+import archetypesData from "./models/narrative_archetypes.json";
 
 export interface StoryPart {
   partNumber: number;
