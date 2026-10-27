@@ -28,10 +28,11 @@ export async function POST(req: NextRequest) {
       const pyExe = process.platform === "win32" ? "py" : "python3";
       const scriptPath = path.join(process.cwd(), "scripts", "story_engine.py");
       const safeCat = category.replace(/"/g, '\\"');
+      const safeCustomTag = customTag.replace(/"/g, '\\"');
       const safePrompt = prompt.replace(/"/g, '\\"');
       const safeStyle = sceneStyle.replace(/"/g, '\\"');
 
-      const cmd = `"${pyExe}" "${scriptPath}" --category "${safeCat}" --prompt "${safePrompt}" --duration ${duration} --num-images ${numImages} --num-parts ${numParts} --scene-style "${safeStyle}"`;
+      const cmd = `"${pyExe}" "${scriptPath}" --category "${safeCat}" --custom-tag "${safeCustomTag}" --prompt "${safePrompt}" --duration ${duration} --num-images ${numImages} --num-parts ${numParts} --scene-style "${safeStyle}"`;
       const { stdout } = await execAsync(cmd, { maxBuffer: 10 * 1024 * 1024 });
       const jsonStart = stdout.indexOf("{");
       if (jsonStart !== -1) {
