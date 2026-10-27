@@ -243,6 +243,21 @@ def train():
     file_size_kb = onnx_path.stat().st_size / 1024
     print(f"✅ Exported ONNX Model: {onnx_path} ({file_size_kb:.1f} KB)")
 
+    print("\n📦 Step 5b: Exporting Neural Weights to JSON (for In-Process TS Engine)...")
+    weights = {
+        "coefficient": mlp.coefs_[0].tolist(),
+        "intercepts": mlp.intercepts_[0].reshape(1, -1).tolist(),
+        "coefficient1": mlp.coefs_[1].tolist(),
+        "intercepts1": mlp.intercepts_[1].reshape(1, -1).tolist(),
+        "coefficient2": mlp.coefs_[2].tolist(),
+        "intercepts2": mlp.intercepts_[2].reshape(1, -1).tolist(),
+        "shape_tensor": [64, 1],
+    }
+    weights_path = MODELS_DIR / "ai_video_weights.json"
+    with open(weights_path, "w", encoding="utf-8") as f:
+        json.dump(weights, f)
+    print(f"✅ Exported Neural Weights: {weights_path} ({weights_path.stat().st_size / 1024:.1f} KB)")
+
     print("\n💾 Step 6: Saving Model Config and Knowledge Base...")
     config_payload = {
         "categories": CATEGORIES,
