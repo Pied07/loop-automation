@@ -1,13 +1,13 @@
 """
 =============================================================================
   STORY SCENE PROMPT SYNTHESIZER
-  Translates conversational story script narration into rich, cinematic
-  visual prompts that image generation models can accurately render.
+  Translates story script narration into rich, cinematic visual prompts
+  that accurately match each scene without distorted, melting, or weird faces.
 =============================================================================
 """
 
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 # Conversational fillers, video hooks, and narration noise to strip
 FILLER_PATTERNS = [
@@ -24,81 +24,124 @@ FILLER_PATTERNS = [
     r"\bnumber\s+\d+[:\s]*\b",
     r"\blet'?s\s+dive\s+in\b",
     r"\bstay\s+tuned\b",
+    r"\bfollow\s+(?:right\s+now\s+)?for\s+part\s+\d+.*$",
 ]
 
-GENRE_VISUAL_STYLES: Dict[str, Dict[str, str]] = {
-    "Action": {
-        "lighting": "explosive dynamic rim lighting, flying orange sparks, intense cinematic contrast, atmospheric battle haze",
-        "camera": "wide-angle dynamic action shot, sweeping cinematic perspective, high-speed tracking camera",
-        "keywords": ["action", "battle", "fight", "chase", "combat", "explosion", "warzone", "infiltrate", "rooftop"],
-        "suffix": "Hollywood blockbuster action cinematography, high-octane scene, dynamic motion, debris and sparks, 8k octane render",
+# Character indicators to detect whether scene actually includes human subjects
+CHARACTER_PATTERNS = [
+    r"\b(?:man|woman|boy|girl|person|people|explorer|explorers|detective|scientist|astronaut|warrior|soldier|guard|knight|wanderer|operator|pilot|captain|figure|silhouette|traveler|stranger)\b",
+    r"\b(?:sarah|marcus|lucas|talia|finnian|kira|mark|alex|john|david|emma|elena|arthur|victor|clara)\b",
+    r"\b(?:he|she|they|him|her|them)\s+(?:walked|stepped|looked|gazed|ran|turned|whispered|froze|reached|stood|held|sat|saw|watched|crawled|pressed|backed)\b",
+]
+
+# Comprehensive cinematic and visual style definitions
+UNIFIED_STYLE_PRESETS: Dict[str, Dict[str, str]] = {
+    "Cinematic Film": {
+        "prefix": "cinematic film still, 35mm photography",
+        "lighting": "dramatic atmospheric lighting, natural depth of field, chiaroscuro contrast",
+        "suffix": "photorealistic 8k, Panavision anamorphic lens, award-winning cinematography, ultra-detailed textures",
+        "char_framing": "cinematic medium shot, natural posture, integrated with environment",
+        "env_framing": "wide establishing shot, atmospheric depth, rich environmental storytelling",
     },
-    "Horror": {
-        "lighting": "chilling moonlight piercing cold shadows, volumetric supernatural mist, dim flickering amber candlelight casting long terrifying silhouettes",
-        "camera": "creepy Dutch angle, wide eerie atmospheric perspective, 35mm horror movie film still",
-        "keywords": ["abandoned", "mist", "shadows", "darkness", "ghost", "spectral", "creepy", "haunted", "apparition", "phantom", "demon", "asylum", "horror"],
-        "suffix": "spine-chilling horror masterpiece, terrifying paranormal presence, pale ghostly apparition with haunting hollow dark eyes, James Wan and Guillermo del Toro cinematography, 8k atmospheric dread, terrifyingly creepy scene",
+    "Realism": {
+        "prefix": "cinematic 35mm film still, photorealistic",
+        "lighting": "dramatic natural rim lighting, volumetric atmospheric depth",
+        "suffix": "photorealistic 8k UHD, masterpiece, award-winning cinematography",
+        "char_framing": "cinematic medium angle shot, natural posture, cinematic staging",
+        "env_framing": "wide establishing shot, breathtaking perspective, rich realistic textures",
     },
-    "Mystery": {
-        "lighting": "moody chiaroscuro lighting, heavy atmospheric fog, warm streetlamp glow reflecting on wet cobblestones",
-        "camera": "cinematic film still, 35mm lens, shallow depth of field",
-        "keywords": ["fog", "detective", "shadow", "rain", "clue", "silhouette", "alley"],
-        "suffix": "cinematic neo-noir aesthetic, 8k UHD, ultra-detailed",
+    "Epic Fantasy": {
+        "prefix": "epic fantasy digital concept art, masterpiece",
+        "lighting": "volumetric mist, ethereal god rays, ancient majesty",
+        "suffix": "artstation trending, 8k resolution, highly detailed fantasy scenery, breathtaking scale",
+        "char_framing": "heroic cinematic shot, fantasy adventurer in context, sweeping perspective",
+        "env_framing": "grand sweeping landscape, monumental ancient architecture, mythical atmosphere",
     },
-    "Sci-Fi": {
-        "lighting": "vibrant neon glow, cyan and magenta reflections, atmospheric haze, holographic illumination",
-        "camera": "wide cinematic establishing shot, anamorphic lens flare",
-        "keywords": ["cyberpunk", "hologram", "futuristic", "skyscraper", "neon", "robot", "spaceship"],
-        "suffix": "Blade Runner aesthetic, Unreal Engine 5 render, sharp focus, 8k",
+    "Sci-Fi Cyberpunk": {
+        "prefix": "cyberpunk film still, sharp focus",
+        "lighting": "glowing neon reflections, futuristic atmospheric haze, moody rain-slicked lighting",
+        "suffix": "Blade Runner aesthetic, Unreal Engine 5 render, high tech atmosphere, 8k",
+        "char_framing": "cyber operative in tactical gear, natural dynamic angle, neon reflections",
+        "env_framing": "towering futuristic skyline, intricate cybernetic details, atmospheric haze",
     },
-    "Fantasy": {
-        "lighting": "ethereal golden god rays, glowing magical particles, luminous enchanted dusk",
-        "camera": "sweeping grand cinematic scale, concept art masterpiece",
-        "keywords": ["ancient", "castle", "magic", "dragon", "enchanted", "forest", "fortress"],
-        "suffix": "ArtStation trending, Lord of the Rings aesthetic, photorealistic, 8k",
+    "Dark Mystery": {
+        "prefix": "dark mystery film still, ominous cinematic mood",
+        "lighting": "dramatic deep shadows, amber lantern glow, chilling atmospheric contrast",
+        "suffix": "cinematic neo-noir aesthetic, 8k UHD, suspenseful atmospheric tension",
+        "char_framing": "atmospheric silhouette in the shadows, mysterious cinematic framing",
+        "env_framing": "shadowy interior, moody volumetric fog, intense dramatic ambiance",
     },
-    "Historical": {
-        "lighting": "dramatic late afternoon sunlight, dusty golden rays, authentic period atmospheric haze",
-        "camera": "historical epic movie still, Panavision 70mm cinematography",
-        "keywords": ["ancient", "temple", "warrior", "emperor", "monument", "stone", "ruins"],
+    "Historical Epic": {
+        "prefix": "epic historical movie still, authentic period atmosphere",
+        "lighting": "dramatic late afternoon sunlight, dusty golden rays, 35mm film grain",
         "suffix": "award-winning historical cinematography, highly detailed textures, 8k",
+        "char_framing": "historical traveler in period attire, natural cinematic composition",
+        "env_framing": "authentic ancient architecture, monumental stone ruins, sweeping vista",
     },
-    "Educational": {
-        "lighting": "crystal clear studio lighting, brilliant celestial glow, vivid high contrast",
-        "camera": "macro documentary photography, National Geographic style",
-        "keywords": ["cosmos", "galaxy", "laboratory", "specimen", "microscope", "earth", "nature"],
-        "suffix": "National Geographic documentary photography, ultra-sharp detail, 8k UHD",
+    "Anime / Storybook": {
+        "prefix": "Studio Ghibli inspired anime scenery, gorgeous hand-painted art",
+        "lighting": "lush vibrant color palette, atmospheric golden light, soft whimsical glow",
+        "suffix": "masterpiece animation still, clean line art, beautiful scenic landscape",
+        "char_framing": "expressive animated character, stylized natural pose, harmonious composition",
+        "env_framing": "breathtaking animated landscape, lush scenic details, peaceful atmosphere",
     },
-    "Motivational": {
-        "lighting": "triumphant golden hour sunrise, radiant sunlight breaking through mountain mist",
-        "camera": "heroic low-angle perspective, wide panoramic vista",
-        "keywords": ["summit", "peak", "athlete", "horizon", "sunrise", "champion", "mountain"],
-        "suffix": "inspirational cinematic film still, breathtaking scenery, 8k",
+    "Photorealistic Nature": {
+        "prefix": "National Geographic documentary photography, crisp organic details",
+        "lighting": "golden hour sunlight, clean natural illumination, high contrast",
+        "suffix": "8k UHD, pin-sharp focus, award-winning nature photography",
+        "char_framing": "documentary field explorer observed from natural distance, environmental context",
+        "env_framing": "pristine wilderness, breathtaking natural formations, ultra-fine foliage textures",
     },
-    "Comedy": {
-        "lighting": "bright cheerful daylight, warm vibrant color palette, clear expressive illumination",
-        "camera": "medium expressive character shot, Pixar style or crisp portrait",
-        "keywords": ["expressive", "playful", "colorful", "surprised", "funny", "smiling"],
-        "suffix": "vibrant colors, clean sharp lighting, delightful expression",
+    "Retro Comic": {
+        "prefix": "vintage retro comic book art panel, classic graphic novel illustration",
+        "lighting": "bold black ink contour lines, dramatic comic noir shadows, pop-art halftone dots",
+        "suffix": "detailed cross-hatching, classic comic book aesthetic, 8k comic artwork",
+        "char_framing": "dynamic comic character stance, classic illustrative style",
+        "env_framing": "stylized graphic novel background, dramatic ink perspectives",
+    },
+    "Disney 3D": {
+        "prefix": "Pixar Disney 3D animation style, beautifully rendered CGI scene",
+        "lighting": "warm cinematic studio 3D lighting, subsurface scattering, soft volumetric rim light",
+        "suffix": "Unreal Engine 5 Octane render 8k, polished animated movie still",
+        "char_framing": "expressive 3D animated character, charming stylized features, natural pose",
+        "env_framing": "whimsical 3D animated environment, rich warm textures, delightful atmosphere",
+    },
+    "Dark Fantasy": {
+        "prefix": "dark fantasy cinematic digital concept art, gothic painterly illustration",
+        "lighting": "volumetric dark mist, glowing magical runes, dramatic torchlight and moonlit shadows",
+        "suffix": "Elden Ring aesthetic, ArtStation trending, seamless painterly rendering, 8k",
+        "char_framing": "lone knight in ornate plate armor, atmospheric concept art composition",
+        "env_framing": "monumental gothic fortress, ominous misty ruins, dark enchanted wilderness",
     },
 }
 
 
 def clean_narration(text: str) -> str:
-    """Removes conversational filler, greetings, quantity multipliers, medical/injury triggers, and call-to-actions."""
+    """Removes conversational filler, greetings, quantity multipliers, medical/injury triggers, and speech tags."""
     clean = text.strip()
     for pat in FILLER_PATTERNS:
         clean = re.sub(pat, "", clean, flags=re.IGNORECASE)
-    # Remove quantity multipliers like 'eighteen times', '300 doors', '5000 times' that confuse diffusion models into duplicating eyes/limbs
-    clean = re.sub(r"\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|eighteen|twenty|thirty|forty|fifty|hundred|thousand|million)\s+(?:times|doors|days|hours|years|copies|rejections)\b", "", clean, flags=re.IGNORECASE)
-    # Aggressively filter physical trauma, injury, hospital, and medical deformity keywords that trigger mutilated/distorted face renders
+
+    # Remove dialogue attribution tags that add noise without visual meaning
+    clean = re.sub(r"\b(?:whispered|remarked|urged|choked out|shouted|screamed|exclaimed|said|muttered|cried)\b", "", clean, flags=re.IGNORECASE)
+
+    # Remove quantity multipliers like 'eighteen times', '300 doors' that trigger duplicate heads/limbs
+    clean = re.sub(
+        r"\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|eighteen|twenty|thirty|forty|fifty|hundred|thousand|million)\s+(?:times|doors|days|hours|years|copies|rejections)\b",
+        "",
+        clean,
+        flags=re.IGNORECASE,
+    )
+
+    # Aggressively filter physical trauma and injury triggers that cause mutilated/distorted face renders
     clean = re.sub(
         r"\b(?:spinal mobility|highway crash|car crash|crash|paralysis|paralyzed|wheelchair|crutches|rehabilitation|hospital|amputation|injured|injury|deformity|deformed|broken|surgery|disease|sick|illness|twisted|severed|bleeding|wound)\b",
         "",
         clean,
         flags=re.IGNORECASE,
     )
-    # Remove markdown symbols and extra punctuation
+
+    # Clean punctuation and quotes
     clean = re.sub(r'["\'*_#`~]', "", clean)
     clean = re.sub(r"\s+", " ", clean).strip()
     return clean
@@ -107,69 +150,51 @@ def clean_narration(text: str) -> str:
 def infer_genre(category: str, topic: str, text: str) -> str:
     """Identifies the dominant storytelling genre from context."""
     combined = f"{category} {topic} {text}".lower()
-    if any(w in combined for w in ["action", "combat", "fight", "battle", "chase", "warzone", "tactical", "stunt", "explosion", "gun", "operative", "infiltrat"]):
+    if any(w in combined for w in ["action", "combat", "fight", "battle", "chase", "warzone", "tactical", "explosion", "gun"]):
         return "Action"
-    if any(w in combined for w in ["horror", "scary", "ghost", "creepy", "haunted", "blood", "monster", "demon", "abandoned"]):
+    if any(w in combined for w in ["horror", "scary", "ghost", "creepy", "haunted", "monster", "demon", "asylum", "spectral", "phantom"]):
         return "Horror"
-    if any(w in combined for w in ["detective", "mystery", "crime", "secret", "clue", "murder", "unsolved"]):
+    if any(w in combined for w in ["detective", "mystery", "crime", "secret", "clue", "investigat", "unsolved"]):
         return "Mystery"
-    if any(w in combined for w in ["scifi", "tech", "cyber", "ai", "future", "robot", "space", "alien", "neon"]):
+    if any(w in combined for w in ["scifi", "sci-fi", "tech", "cyber", "ai", "future", "robot", "space", "alien", "neon"]):
         return "Sci-Fi"
-    if any(w in combined for w in ["fantasy", "magic", "dragon", "wizard", "spell", "myth", "kingdom", "sword"]):
+    if any(w in combined for w in ["fantasy", "magic", "dragon", "wizard", "spell", "myth", "kingdom", "sword", "castle"]):
         return "Fantasy"
-    if any(w in combined for w in ["history", "ancient", "war", "century", "empire", "king", "pharaoh", "gladiator"]):
+    if any(w in combined for w in ["history", "ancient", "war", "century", "empire", "king", "pharaoh", "gladiator", "temple"]):
         return "Historical"
-    if any(w in combined for w in ["motivat", "success", "inspire", "athlete", "champion", "discipline", "hard work"]):
+    if any(w in combined for w in ["motivat", "success", "inspire", "athlete", "champion", "discipline", "mountain"]):
         return "Motivational"
     if any(w in combined for w in ["funny", "comedy", "hilarious", "laugh", "prank", "humor"]):
         return "Comedy"
     return "Educational"
 
 
-CHARACTER_STYLE_PRESETS: Dict[str, Dict[str, str]] = {
-    "Retro Comic": {
-        "style_prefix": "vintage retro comic book art panel, classic graphic novel illustration, bold black ink contour lines, pop-art halftone dots",
-        "character": "illustrated superhero in dynamic comic action stance",
-        "lighting": "dramatic comic noir lighting, stylized shadows, halftone print texture",
-        "suffix": "detailed cross-hatching, classic comic book aesthetic, 8k comic artwork",
-        "horror_style": "vintage retro horror comic book panel, classic graphic novel illustration, bold black ink contour lines, dramatic comic noir shadows, 8k comic artwork",
-    },
-    "Anime": {
-        "style_prefix": "Japanese anime movie still, beautiful 2D anime illustration, clean line art, Makoto Shinkai aesthetic",
-        "character": "expressive anime protagonist in dynamic stance, symmetrical anime face",
-        "lighting": "vibrant anime lighting, atmospheric god rays, glowing embers",
-        "suffix": "crisp line art, beautiful high quality Japanese animation scenery, unified anime still",
-        "horror_style": "dark psychological horror anime movie still, high quality Japanese animation scenery, eerie atmospheric lighting, deep moody shadows",
-    },
-    "Disney 3D": {
-        "style_prefix": "Pixar Disney 3D animation style, beautifully sculpted 3D animated character, smooth CGI render",
-        "character": "expressive 3D animated character with symmetrical charming features",
-        "lighting": "warm cinematic studio 3D lighting, subsurface scattering, soft volumetric rim light",
-        "suffix": "Pixar 3D animation movie still, Unreal Engine 5 Octane render 8k, polished animated scene",
-        "horror_style": "spooky dark 3D animation, stylized atmospheric scene, volumetric cinematic shadows, Unreal Engine 5 render",
-    },
-    "Mecha": {
-        "style_prefix": "cyberpunk mecha concept art, sleek futuristic exoskeleton armor, glowing cyber helmet",
-        "character": "cyber operative in tactical mecha armor, symmetrical anatomy",
-        "lighting": "neon reflections in the rain, atmospheric cyan and magenta haze, dramatic sci-fi lighting",
-        "suffix": "cinematic sci-fi mecha concept art, intricate mechanical armor, sharp focus, 8k wide scene",
-        "horror_style": "biomechanical sci-fi concept art, ominous dark industrial mist, glowing atmospheric lighting, sharp focus, 8k",
-    },
-    "Dark Fantasy": {
-        "style_prefix": "dark fantasy cinematic digital concept art, Elden Ring and Witcher aesthetic, gothic painterly illustration",
-        "character": "medieval knight in ornate dark plate armor, cohesive concept art character",
-        "lighting": "volumetric dark mist, glowing magical runes, dramatic torchlight and moonlit deep shadows",
-        "suffix": "dark fantasy concept art, ArtStation trending, seamless painterly rendering",
-        "horror_style": "dark fantasy cinematic digital concept art, gothic painterly illustration, volumetric dark mist, dramatic torchlight and moonlit deep shadows",
-    },
-    "Realism": {
-        "style_prefix": "cinematic 35mm film still, photorealistic wide establishing shot",
-        "character": "authentic human with symmetrical facial features and natural posture",
-        "lighting": "dramatic natural rim lighting, volumetric atmospheric depth",
-        "suffix": "photorealistic 8k UHD, award-winning cinematic storytelling, natural skin texture, masterpiece",
-        "horror_style": "cinematic horror film still, chilling atmospheric lighting, deep dramatic shadows, 35mm film photography, photorealistic 8k",
-    },
-}
+def find_style_preset(style_name: Optional[str]) -> Dict[str, str]:
+    """Finds matching style preset or defaults to Cinematic Film."""
+    if not style_name:
+        return UNIFIED_STYLE_PRESETS["Cinematic Film"]
+
+    s_lower = style_name.strip().lower()
+    for key, val in UNIFIED_STYLE_PRESETS.items():
+        k_lower = key.lower()
+        if k_lower == s_lower or k_lower in s_lower or s_lower in k_lower:
+            return val
+
+    # Common aliases
+    if "cyber" in s_lower or "sci" in s_lower:
+        return UNIFIED_STYLE_PRESETS["Sci-Fi Cyberpunk"]
+    if "fantasy" in s_lower:
+        return UNIFIED_STYLE_PRESETS["Epic Fantasy"]
+    if "mystery" in s_lower or "dark" in s_lower:
+        return UNIFIED_STYLE_PRESETS["Dark Mystery"]
+    if "history" in s_lower or "period" in s_lower:
+        return UNIFIED_STYLE_PRESETS["Historical Epic"]
+    if "anime" in s_lower or "ghibli" in s_lower:
+        return UNIFIED_STYLE_PRESETS["Anime / Storybook"]
+    if "nature" in s_lower or "photo" in s_lower:
+        return UNIFIED_STYLE_PRESETS["Photorealistic Nature"]
+
+    return UNIFIED_STYLE_PRESETS["Cinematic Film"]
 
 
 def synthesize_scene_prompt(
@@ -177,41 +202,35 @@ def synthesize_scene_prompt(
     topic: str = "",
     category: str = "Interesting Facts",
     aspect_ratio: str = "9:16",
-    style_preset: Optional[str] = "Realism",
+    style_preset: Optional[str] = "Cinematic Film",
 ) -> str:
     """
-    Transforms any story script sentence into a rich, style-accurate,
-    scene-specific prompt that image generators will faithfully render.
-    CRITICAL: Preserves actual scene subject, characters, and setting.
+    Transforms any story script sentence into a clean, cinematic, scene-accurate prompt.
+    CRITICAL:
+    - Never injects toxic portrait phrases ('authentic human with symmetrical facial features').
+    - Distinguishes environmental/object shots from character shots.
+    - Accurately renders props, architecture, atmosphere, and action.
     """
     clean_raw = script_sentence.strip()
-    # If already a crafted visual prompt, preserve it directly
-    if clean_raw.lower().startswith("cinematic") or "vertical 9:16" in clean_raw.lower() or "8k" in clean_raw.lower():
+    if clean_raw.lower().startswith("cinematic") and ("8k" in clean_raw.lower() or "shot" in clean_raw.lower()):
         return clean_raw
 
     clean = clean_narration(script_sentence)
     genre = infer_genre(category, topic, script_sentence)
 
-    # Fallback to topic if script sentence was mostly filler
     visual_core = clean if len(clean) > 8 else clean_narration(topic)
     if not visual_core or len(visual_core) < 4:
         visual_core = f"{category} scene, {topic}"
 
-    # Allow up to 35 words for visual_core to preserve character names, props, and actions
+    # Limit visual core to 32 words to avoid diluting diffusion attention
     words = visual_core.split()
-    if len(words) > 35:
-        visual_core = " ".join(words[:35])
+    if len(words) > 32:
+        visual_core = " ".join(words[:32])
 
-    # 1. Match style preset
-    matched_preset = None
-    if style_preset:
-        for k, v in CHARACTER_STYLE_PRESETS.items():
-            if k.lower() in style_preset.lower() or style_preset.lower() in k.lower():
-                matched_preset = v
-                break
+    preset = find_style_preset(style_preset)
 
-    if matched_preset is None:
-        matched_preset = CHARACTER_STYLE_PRESETS["Realism"]
+    # Check whether the scene describes human characters or inanimate objects/environments
+    has_characters = any(re.search(pat, visual_core, re.IGNORECASE) for pat in CHARACTER_PATTERNS)
 
     is_horror = (
         genre == "Horror"
@@ -221,27 +240,33 @@ def synthesize_scene_prompt(
 
     framing_tag = "vertical 9:16 composition" if "9:16" in aspect_ratio else "widescreen 16:9 composition"
 
+    staging = preset["char_framing"] if has_characters else preset["env_framing"]
+
     if is_horror:
-        style_lead = matched_preset.get("horror_style", matched_preset["style_prefix"])
+        horror_lighting = "chilling moonlight piercing cold shadows, volumetric supernatural mist, eerie amber glow"
         prompt_parts = [
-            f"Cinematic scene of {visual_core}",
-            style_lead,
+            f"Cinematic atmospheric scene of {visual_core}",
+            preset["prefix"],
+            staging,
             framing_tag,
-            matched_preset["lighting"],
+            horror_lighting,
+            "dramatic dread, 35mm film photography, 8k",
         ]
     else:
         prompt_parts = [
             f"Cinematic scene of {visual_core}",
-            matched_preset["style_prefix"],
-            matched_preset["character"],
+            preset["prefix"],
+            staging,
             framing_tag,
-            matched_preset["lighting"],
-            matched_preset["suffix"],
+            preset["lighting"],
+            preset["suffix"],
         ]
 
     full_prompt = ", ".join(p for p in prompt_parts if p)
-    tokens_approx = full_prompt.split()
-    if len(tokens_approx) > 65:
-        full_prompt = " ".join(tokens_approx[:65])
+
+    # Cap to optimal 65 tokens for text encoder
+    tokens = full_prompt.split()
+    if len(tokens) > 65:
+        full_prompt = " ".join(tokens[:65])
 
     return full_prompt

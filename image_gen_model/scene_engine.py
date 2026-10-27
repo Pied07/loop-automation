@@ -221,9 +221,13 @@ class StorySceneEngine:
                     self.load_lora(self.active_lora)
                 print(f"[SCENE ENGINE] CUDA SDXL pipeline ready in {time.time() - t0:.1f}s")
             else:
-                # 1-Step Fast Turbo CPU Pipeline for unattended GitHub Actions / CPU runner
+                # Fast Diffusion CPU Pipeline with multi-threaded PyTorch
+                try:
+                    torch.set_num_threads(os.cpu_count() or 4)
+                except Exception:
+                    pass
                 turbo_model = "stabilityai/sd-turbo"
-                print(f"[SCENE ENGINE] ⚡ Initializing 1-Step Fast Turbo Diffusion on CPU ({turbo_model})...")
+                print(f"[SCENE ENGINE] ⚡ Initializing Fast Diffusion on CPU ({turbo_model}, {torch.get_num_threads()} threads)...")
                 t0 = time.time()
                 self.pipe = AutoPipelineForText2Image.from_pretrained(
                     turbo_model,
@@ -338,9 +342,20 @@ class StorySceneEngine:
         is_turbo = "turbo" in getattr(self, "current_model_id", "").lower()
         inf_steps = 1 if is_turbo else steps
         inf_guidance = 0.0 if is_turbo else guidance_scale
-        inf_w = 512 if is_turbo else (width // 8) * 8
-        inf_h = 512 if is_turbo else (height // 8) * 8
-        eff_neg = None if is_turbo else (negative_prompt or COMPREHENSIVE_NEGATIVE_PROMPT)
+
+        if is_turbo:
+            # Native aspect ratios without destructive 2.6x center-zooming
+            if height > width:
+                inf_w, inf_h = 448, 768
+            elif width > height:
+                inf_w, inf_h = 768, 448
+            else:
+                inf_w, inf_h = 512, 512
+        else:
+            inf_w = (width // 8) * 8
+            inf_h = (height // 8) * 8
+
+        eff_neg = (negative_prompt or COMPREHENSIVE_NEGATIVE_PROMPT) if inf_guidance > 0.0 else None
 
         try:
             with torch.inference_mode():
@@ -358,15 +373,9 @@ class StorySceneEngine:
                 result = self.pipe(**pipe_kwargs)
                 img = result.images[0]
 
-                # If turbo 512x512, adapt to requested aspect ratio (e.g. 9:16 vertical)
-                if is_turbo and (width != 512 or height != 512):
-                    tw, th = width, height
-                    scale = max(tw / img.width, th / img.height)
-                    nw, nh = int(img.width * scale), int(img.height * scale)
-                    resized = img.resize((nw, nh), Image.Resampling.LANCZOS)
-                    cx = (nw - tw) // 2
-                    cy = (nh - th) // 2
-                    img = resized.crop((cx, cy, cx + tw, cy + th))
+                # High-fidelity lanczos resize to target resolution without cropping
+                if img.width != width or img.height != height:
+                    img = img.resize((width, height), Image.Resampling.LANCZOS)
 
                 return img
         except Exception as e:

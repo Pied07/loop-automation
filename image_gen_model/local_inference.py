@@ -88,7 +88,7 @@ def main():
             import json
             print(json.dumps({
                 "success": False,
-                "error": "Custom model not connected via GPU bridge. Run Cell 9 in Colab or pre-generate scenes.",
+                "error": "Local diffusion pipeline was unable to synthesize the scene image.",
                 "elapsed": round(elapsed, 2)
             }))
         else:
