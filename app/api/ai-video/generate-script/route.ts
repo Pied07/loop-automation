@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateStoryParts } from "@/app/lib/story-engine";
 import path from "path";
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -28,14 +28,21 @@ export async function POST(req: NextRequest) {
     try {
       const pyExe = process.platform === "win32" ? "py" : "python3";
       const scriptPath = path.join(process.cwd(), "scripts", "story_engine.py");
-      const safeCat = category.replace(/"/g, '\\"');
-      const safeCustomTag = customTag.replace(/"/g, '\\"');
-      const safePrompt = prompt.replace(/"/g, '\\"');
-      const safeStyle = sceneStyle.replace(/"/g, '\\"');
-      const safeExclude = excludeId.replace(/"/g, '\\"');
 
-      const cmd = `"${pyExe}" "${scriptPath}" --category "${safeCat}" --custom-tag "${safeCustomTag}" --prompt "${safePrompt}" --duration ${duration} --num-images ${numImages} --num-parts ${numParts} --scene-style "${safeStyle}" --exclude-id "${safeExclude}" --seed ${seed}`;
-      const { stdout } = await execAsync(cmd, { maxBuffer: 10 * 1024 * 1024 });
+      const args: string[] = [
+        scriptPath,
+        "--category", category,
+        "--duration", String(duration),
+        "--num-images", String(numImages),
+        "--num-parts", String(numParts),
+        "--scene-style", sceneStyle,
+        "--seed", String(seed),
+      ];
+      if (customTag) args.push("--custom-tag", customTag);
+      if (prompt) args.push("--prompt", prompt);
+      if (excludeId) args.push("--exclude-id", excludeId);
+
+      const { stdout } = await execFileAsync(pyExe, args, { maxBuffer: 10 * 1024 * 1024 });
       const jsonStart = stdout.indexOf("{");
       if (jsonStart !== -1) {
         result = JSON.parse(stdout.slice(jsonStart));

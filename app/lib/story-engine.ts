@@ -63,6 +63,24 @@ interface MLModelData {
   archetypes: Record<string, Archetype[]>;
 }
 
+const DEFAULT_FALLBACK_ARCHETYPE: Archetype = {
+  theme: "Original Story",
+  title_template: "The Untold Journey",
+  c1_pool: [["Julian", "an explorer"], ["Liam", "an architect"], ["Ethan", "a researcher"]],
+  c2_pool: [["Elena", "a specialist"], ["Sophia", "a scientist"], ["Clara", "an archivist"]],
+  settings: ["an ancient sanctuary bathed in golden light"],
+  openings: ["{c1}, {r1}, and {c2}, {r2}, stood together in {setting}."],
+  beats: [
+    "{c1} looked at {c2}, realizing that everything they had searched for was right in front of them.",
+    "Together, they stepped forward, ready to face whatever tomorrow would bring.",
+  ],
+  expansions: ["The quiet evening settled around them, filled with peace and purpose."],
+  cliffhangers: ["What happened next stunned everyone... Follow right now for Part {next_part}!"],
+  resolutions: ["Against all odds, they proved that courage and faith conquer all."],
+  cta: "Save this video right now and follow for more daily stories!",
+  style_prompt: "warm golden hour cinematic emotional atmosphere 8k masterpiece natural beauty",
+};
+
 let cachedModelData: MLModelData | null = null;
 
 function loadMLModelData(): MLModelData {
@@ -70,7 +88,12 @@ function loadMLModelData(): MLModelData {
 
   const configPath = path.join(process.cwd(), "scripts", "models", "ai_video_config.json");
   const weightsPath = path.join(process.cwd(), "scripts", "models", "ai_video_weights.json");
-  const archetypesPath = path.join(process.cwd(), "scripts", "models", "narrative_archetypes.json");
+  const potentialArchetypePaths = [
+    path.join(process.cwd(), "scripts", "models", "narrative_archetypes.json"),
+    path.resolve(process.cwd(), "scripts", "models", "narrative_archetypes.json"),
+    path.resolve(__dirname, "../../scripts/models/narrative_archetypes.json"),
+    path.resolve(__dirname, "../../../scripts/models/narrative_archetypes.json"),
+  ];
 
   let config: any = { vocabulary: {}, idf: [], vocab_size: 512, categories: [] };
   let weights: any = null;
@@ -92,12 +115,31 @@ function loadMLModelData(): MLModelData {
     console.error("Failed to load ai_video_weights.json:", e);
   }
 
-  try {
-    if (fs.existsSync(archetypesPath)) {
-      archetypes = JSON.parse(fs.readFileSync(archetypesPath, "utf-8"));
-    }
-  } catch (e) {
-    console.error("Failed to load narrative_archetypes.json:", e);
+  for (const p of potentialArchetypePaths) {
+    try {
+      if (fs.existsSync(p)) {
+        const loaded = JSON.parse(fs.readFileSync(p, "utf-8"));
+        if (loaded && Object.keys(loaded).length > 0) {
+          archetypes = loaded;
+          break;
+        }
+      }
+    } catch {}
+  }
+
+  if (Object.keys(archetypes).length === 0) {
+    archetypes = {
+      Romance: [DEFAULT_FALLBACK_ARCHETYPE],
+      Horror: [DEFAULT_FALLBACK_ARCHETYPE],
+      Action: [DEFAULT_FALLBACK_ARCHETYPE],
+      Adventure: [DEFAULT_FALLBACK_ARCHETYPE],
+      Motivational: [DEFAULT_FALLBACK_ARCHETYPE],
+      "Interesting Facts": [DEFAULT_FALLBACK_ARCHETYPE],
+      Comedy: [DEFAULT_FALLBACK_ARCHETYPE],
+      Educational: [DEFAULT_FALLBACK_ARCHETYPE],
+      Food: [DEFAULT_FALLBACK_ARCHETYPE],
+      Music: [DEFAULT_FALLBACK_ARCHETYPE],
+    };
   }
 
   cachedModelData = { config, weights, archetypes };
@@ -253,7 +295,11 @@ export async function generateStoryParts(params: {
     }
   }
 
-  const archetypeList = archetypesDb[catKey] || archetypesDb["Romance"] || [];
+  let archetypeList = archetypesDb[catKey] || archetypesDb["Romance"] || [];
+  if (!archetypeList || archetypeList.length === 0) {
+    archetypeList = [DEFAULT_FALLBACK_ARCHETYPE];
+  }
+
   const prompt = (params.prompt || "").trim();
   const clampedDuration = Math.max(60, Math.min(600, Number(params.duration) || 60));
   const clampedParts = Math.max(1, Math.min(5, Number(params.numParts) || 1));
@@ -281,19 +327,23 @@ export async function generateStoryParts(params: {
   // Neural Archetype Selector
   let latentSum = 0;
   for (let i = 0; i < Math.min(16, latentPred.length); i++) latentSum += Math.abs(latentPred[i]);
-  const archetypeIdx = Math.floor(latentSum * 10000 + seedOffset) % Math.max(1, archetypeList.length);
-  const archetype = archetypeList[archetypeIdx] || archetypeList[0];
+  const archetypeIdx = Math.floor(latentSum * 10000 + seedOffset) % archetypeList.length;
+  const archetype = archetypeList[archetypeIdx] || archetypeList[0] || DEFAULT_FALLBACK_ARCHETYPE;
 
   const rng = createPseudoRandom(seedVal);
 
   // Dynamic Character & Setting Selection from Chosen Archetype
-  const c1Pair = rng.choice(archetype.c1_pool);
-  const c2Pair = rng.choice(archetype.c2_pool);
+  const c1Pool = (archetype.c1_pool && archetype.c1_pool.length > 0) ? archetype.c1_pool : DEFAULT_FALLBACK_ARCHETYPE.c1_pool;
+  const c2Pool = (archetype.c2_pool && archetype.c2_pool.length > 0) ? archetype.c2_pool : DEFAULT_FALLBACK_ARCHETYPE.c2_pool;
+  const settingsList = (archetype.settings && archetype.settings.length > 0) ? archetype.settings : DEFAULT_FALLBACK_ARCHETYPE.settings;
+
+  const c1Pair = rng.choice(c1Pool);
+  const c2Pair = rng.choice(c2Pool);
   const c1 = Array.isArray(c1Pair) ? c1Pair[0] : c1Pair;
   const r1 = Array.isArray(c1Pair) && c1Pair.length > 1 ? c1Pair[1] : "specialist";
   const c2 = Array.isArray(c2Pair) ? c2Pair[0] : c2Pair;
   const r2 = Array.isArray(c2Pair) && c2Pair.length > 1 ? c2Pair[1] : "specialist";
-  let setting = rng.choice(archetype.settings);
+  let setting = rng.choice(settingsList);
 
   let baseTitle = "";
   if (prompt && prompt.length > 4) {
@@ -312,8 +362,10 @@ export async function generateStoryParts(params: {
     const isLast = pNum === clampedParts;
     const partSentences: string[] = [];
 
+    const openingsList = (archetype.openings && archetype.openings.length > 0) ? archetype.openings : DEFAULT_FALLBACK_ARCHETYPE.openings;
+
     if (pNum === 1) {
-      const rawOpen = rng.choice(archetype.openings);
+      const rawOpen = rng.choice(openingsList);
       const opening = rawOpen
         .replace(/\{c1\}/g, c1)
         .replace(/\{r1\}/g, r1)
@@ -325,7 +377,8 @@ export async function generateStoryParts(params: {
       partSentences.push(`Welcome back to Part ${pNum}. Picking up right as ${c1} and ${c2} pushed deeper into the mystery...`);
     }
 
-    const coreBeatsPool = (archetype.beats || []).map((b) =>
+    const beatsList = (archetype.beats && archetype.beats.length > 0) ? archetype.beats : DEFAULT_FALLBACK_ARCHETYPE.beats;
+    const coreBeatsPool = beatsList.map((b) =>
       b.replace(/\{c1\}/g, c1).replace(/\{c2\}/g, c2).replace(/\{setting\}/g, setting)
     );
     const shuffledBeats = rng.shuffle(coreBeatsPool);
