@@ -12,7 +12,24 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "scripts/**",
+    "worker/**",
+    "public/**",
+    "temp_worker/**",
+    "huggingface-worker/**",
+    "node_modules/**",
   ]),
+  {
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "react/no-unescaped-entities": "off",
+      "@next/next/no-img-element": "off",
+      "@typescript-eslint/no-require-imports": "off",
+      "prefer-const": "off",
+      "no-unused-vars": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

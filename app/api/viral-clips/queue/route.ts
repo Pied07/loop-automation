@@ -14,7 +14,6 @@ interface QueueJob {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __viralJobQueue: Map<string, QueueJob> | undefined;
 }
 
