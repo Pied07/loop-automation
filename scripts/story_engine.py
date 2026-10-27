@@ -945,7 +945,14 @@ def synthesize_story_script(
         sents: List[str] = []
 
         def add_sentence(raw_text: str) -> bool:
-            formatted = raw_text.replace("{c1}", c1).replace("{c2}", c2).replace("{setting}", setting).replace("{p_num}", str(p_num))
+            formatted = (
+                raw_text
+                .replace("{c1}", c1)
+                .replace("{c2}", c2)
+                .replace("{setting}", setting)
+                .replace("{p_num + 1}", str(p_num + 1))
+                .replace("{p_num}", str(p_num))
+            )
             clean = re.sub(r"\s+", " ", formatted).strip()
             if not clean:
                 return False

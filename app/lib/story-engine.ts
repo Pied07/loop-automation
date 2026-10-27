@@ -919,6 +919,7 @@ export async function generateStoryParts(params: {
         .replace(/\{c1\}/g, c1)
         .replace(/\{c2\}/g, c2)
         .replace(/\{setting\}/g, setting)
+        .replace(/\{p_num \+ 1\}/g, String(pNum + 1))
         .replace(/\{p_num\}/g, String(pNum));
       const clean = formatted.replace(/\s+/g, " ").trim();
       if (!clean) return false;
