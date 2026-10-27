@@ -132,42 +132,42 @@ CHARACTER_STYLE_PRESETS: Dict[str, Dict[str, str]] = {
         "character": "illustrated superhero in dynamic comic action stance",
         "lighting": "dramatic comic noir lighting, stylized shadows, halftone print texture",
         "suffix": "detailed cross-hatching, classic comic book aesthetic, 8k comic artwork",
-        "horror_style": "vintage retro horror comic book panel, Tales from the Crypt comic style, bold black ink contour lines, halftone print texture, creepy spectral entity with hollow dark eyes, eerie comic noir shadows",
+        "horror_style": "vintage retro horror comic book panel, classic graphic novel illustration, bold black ink contour lines, dramatic comic noir shadows, 8k comic artwork",
     },
     "Anime": {
         "style_prefix": "Japanese anime movie still, beautiful 2D anime illustration, clean line art, Makoto Shinkai aesthetic",
         "character": "expressive anime protagonist in dynamic stance, symmetrical anime face",
         "lighting": "vibrant anime lighting, atmospheric god rays, glowing embers",
         "suffix": "crisp line art, beautiful high quality Japanese animation scenery, unified anime still",
-        "horror_style": "dark psychological horror anime movie still, creepy hand-drawn anime aesthetic, pale spectral apparition with hollow haunting eyes, eerie shadowy entity",
+        "horror_style": "dark psychological horror anime movie still, high quality Japanese animation scenery, eerie atmospheric lighting, deep moody shadows",
     },
     "Disney 3D": {
         "style_prefix": "Pixar Disney 3D animation style, beautifully sculpted 3D animated character, smooth CGI render",
         "character": "expressive 3D animated character with symmetrical charming features",
         "lighting": "warm cinematic studio 3D lighting, subsurface scattering, soft volumetric rim light",
         "suffix": "Pixar 3D animation movie still, Unreal Engine 5 Octane render 8k, polished animated scene",
-        "horror_style": "spooky dark 3D animation, stylized haunted scene, creepy glowing apparitions, moody volumetric shadows, Tim Burton Pixar aesthetic",
+        "horror_style": "spooky dark 3D animation, stylized atmospheric scene, volumetric cinematic shadows, Unreal Engine 5 render",
     },
     "Mecha": {
         "style_prefix": "cyberpunk mecha concept art, sleek futuristic exoskeleton armor, glowing cyber helmet",
         "character": "cyber operative in tactical mecha armor, symmetrical anatomy",
         "lighting": "neon reflections in the rain, atmospheric cyan and magenta haze, dramatic sci-fi lighting",
         "suffix": "cinematic sci-fi mecha concept art, intricate mechanical armor, sharp focus, 8k wide scene",
-        "horror_style": "biomechanical horror mecha concept art, corrupted cybernetic entity with glowing malevolent visor, ominous dark industrial mist",
+        "horror_style": "biomechanical sci-fi concept art, ominous dark industrial mist, glowing atmospheric lighting, sharp focus, 8k",
     },
     "Dark Fantasy": {
         "style_prefix": "dark fantasy cinematic digital concept art, Elden Ring and Witcher aesthetic, gothic painterly illustration",
         "character": "medieval knight in ornate dark plate armor, cohesive concept art character",
         "lighting": "volumetric dark mist, glowing magical runes, dramatic torchlight and moonlit deep shadows",
         "suffix": "dark fantasy concept art, ArtStation trending, seamless painterly rendering",
-        "horror_style": "grim dark fantasy horror art, terrifying necromantic specter, cursed undead knight with glowing malevolent eyes, gothic graveyard mist",
+        "horror_style": "dark fantasy cinematic digital concept art, gothic painterly illustration, volumetric dark mist, dramatic torchlight and moonlit deep shadows",
     },
     "Realism": {
         "style_prefix": "cinematic 35mm film still, photorealistic wide establishing shot",
         "character": "authentic human with symmetrical facial features and natural posture",
         "lighting": "dramatic natural rim lighting, volumetric atmospheric depth",
         "suffix": "photorealistic 8k UHD, award-winning cinematic storytelling, natural skin texture, masterpiece",
-        "horror_style": "cinematic horror film still, terrifyingly creepy atmosphere, pale spectral apparition with hollow haunting dark eyes, creepy ghostly face, eerie shadowy entity, deeply unnerving paranormal dread, 35mm film grain, 8k",
+        "horror_style": "cinematic horror film still, chilling atmospheric lighting, deep dramatic shadows, 35mm film photography, photorealistic 8k",
     },
 }
 
@@ -182,24 +182,27 @@ def synthesize_scene_prompt(
     """
     Transforms any story script sentence into a rich, style-accurate,
     scene-specific prompt that image generators will faithfully render.
-    CRITICAL: Keeps total tokens under 70 so CLIP never truncates visual style.
-    Style keywords appear at the VERY START of the prompt for maximum diffusion weight.
+    CRITICAL: Preserves actual scene subject, characters, and setting.
     """
+    clean_raw = script_sentence.strip()
+    # If already a crafted visual prompt, preserve it directly
+    if clean_raw.lower().startswith("cinematic") or "vertical 9:16" in clean_raw.lower() or "8k" in clean_raw.lower():
+        return clean_raw
+
     clean = clean_narration(script_sentence)
     genre = infer_genre(category, topic, script_sentence)
-    genre_style = GENRE_VISUAL_STYLES.get(genre, GENRE_VISUAL_STYLES["Action"] if genre == "Action" else GENRE_VISUAL_STYLES["Horror"])
 
     # Fallback to topic if script sentence was mostly filler
     visual_core = clean if len(clean) > 8 else clean_narration(topic)
     if not visual_core or len(visual_core) < 4:
         visual_core = f"{category} scene, {topic}"
 
-    # Truncate visual_core if excessively long to preserve CLIP token budget
+    # Allow up to 35 words for visual_core to preserve character names, props, and actions
     words = visual_core.split()
-    if len(words) > 18:
-        visual_core = " ".join(words[:18])
+    if len(words) > 35:
+        visual_core = " ".join(words[:35])
 
-    # 1. Match style preset if specified (e.g. Retro Comic, Anime, Disney 3D, Realism, Mecha, Dark Fantasy)
+    # 1. Match style preset
     matched_preset = None
     if style_preset:
         for k, v in CHARACTER_STYLE_PRESETS.items():
@@ -207,11 +210,9 @@ def synthesize_scene_prompt(
                 matched_preset = v
                 break
 
-    # Default to Realism if no preset matched
     if matched_preset is None:
         matched_preset = CHARACTER_STYLE_PRESETS["Realism"]
 
-    # 2. Check if this is a horror narrative
     is_horror = (
         genre == "Horror"
         or "horror" in category.lower()
@@ -220,30 +221,27 @@ def synthesize_scene_prompt(
 
     framing_tag = "vertical 9:16 composition" if "9:16" in aspect_ratio else "widescreen 16:9 composition"
 
-    # Assemble compact, high-impact prompt where STYLE ALWAYS COMES FIRST
     if is_horror:
         style_lead = matched_preset.get("horror_style", matched_preset["style_prefix"])
         prompt_parts = [
+            f"Cinematic scene of {visual_core}",
             style_lead,
-            f"scene of {visual_core}",
             framing_tag,
             matched_preset["lighting"],
         ]
     else:
         prompt_parts = [
+            f"Cinematic scene of {visual_core}",
             matched_preset["style_prefix"],
-            f"scene depicting {visual_core}",
             matched_preset["character"],
             framing_tag,
             matched_preset["lighting"],
             matched_preset["suffix"],
         ]
 
-    # Clean and assemble - keep under 65 words (~70 tokens)
     full_prompt = ", ".join(p for p in prompt_parts if p)
     tokens_approx = full_prompt.split()
-    if len(tokens_approx) > 55:
-        full_prompt = " ".join(tokens_approx[:55])
+    if len(tokens_approx) > 65:
+        full_prompt = " ".join(tokens_approx[:65])
 
     return full_prompt
-

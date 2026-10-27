@@ -1,4 +1,5 @@
 import os
+import math
 import sys
 import re
 import json
@@ -879,6 +880,8 @@ class AIVideoEngine:
             y_expr = f"(ih/zoom)*(on/{total_frames})*0.2"
 
         filter_str = (
+            f"scale=1080:1920:force_original_aspect_ratio=increase,"
+            f"crop=1080:1920,"
             f"zoompan=z='{zoom_expr}':x='{x_expr}':y='{y_expr}':"
             f"d={total_frames}:s=1080x1920:fps={fps}"
         )
@@ -1216,11 +1219,15 @@ class AIVideoEngine:
             sentences = [final_script]
 
         scenes = []
-        sentences_per_scene = max(1, len(sentences) // num_images)
+        n_sents = len(sentences)
         for s_idx in range(num_images):
-            sub_sent = sentences[s_idx * sentences_per_scene : (s_idx + 1) * sentences_per_scene]
+            start = math.floor((s_idx * n_sents) / num_images)
+            end = math.floor(((s_idx + 1) * n_sents) / num_images)
+            if start == end:
+                end = min(n_sents, start + 1)
+            sub_sent = sentences[start:end]
             if not sub_sent:
-                sub_sent = [sentences[-1]]
+                sub_sent = [sentences[min(s_idx, n_sents - 1)]]
             scene_text = " ".join(sub_sent)
 
             if build_clean_visual_prompt is not None:
@@ -1228,12 +1235,14 @@ class AIVideoEngine:
             else:
                 key_tokens = extract_scene_keywords(scene_text)
                 scene_subject = " ".join(key_tokens[:4]) if key_tokens else cat_clean.lower()
-                visual_prompt = f"Cinematic scene of {scene_subject}, cinematic wide-angle environmental establishing shot, dynamic action in full scene, {theme['style_prompt']}, vertical 9:16 framing, photorealistic 8k"
+                visual_prompt = f"Cinematic shot of {scene_subject}, {theme['style_prompt']}, vertical 9:16 composition, photorealistic 8k"
 
             scenes.append({
                 "scene_index": s_idx,
                 "text": scene_text,
                 "visual_prompt": visual_prompt,
+                "sent_start_idx": start,
+                "sent_end_idx": end,
             })
 
         meta = {
@@ -1267,8 +1276,35 @@ class AIVideoEngine:
         else:
             total_dur = float(duration)
 
-        # 3. Generate AI Images & Render Animated Scene Clips
-        scene_duration = total_dur / float(num_images)
+        # 3. Synchronize Scene Durations directly to spoken voiceover timing
+        n_scenes = len(meta["scenes"])
+        scene_durations = []
+        if timing and len(timing) >= n_scenes:
+            scene_cuts = [0.0]
+            for s_idx in range(1, n_scenes):
+                scn_obj = meta["scenes"][s_idx]
+                t_idx = scn_obj.get("sent_start_idx", math.floor((s_idx * len(timing)) / n_scenes))
+                cut_time = timing[min(t_idx, len(timing) - 1)]["start"]
+                if cut_time - scene_cuts[-1] < 1.5:
+                    cut_time = scene_cuts[-1] + 1.5
+                scene_cuts.append(cut_time)
+            scene_cuts.append(total_dur)
+
+            for s_idx in range(n_scenes):
+                d = max(1.5, scene_cuts[s_idx + 1] - scene_cuts[s_idx])
+                scene_durations.append(d)
+
+            cur_sum = sum(scene_durations)
+            if cur_sum > 0:
+                scene_durations = [round(d * (total_dur / cur_sum), 3) for d in scene_durations]
+                diff = total_dur - sum(scene_durations)
+                scene_durations[-1] = max(1.0, round(scene_durations[-1] + diff, 3))
+        else:
+            uniform_d = round(total_dur / float(max(1, n_scenes)), 3)
+            scene_durations = [uniform_d] * n_scenes
+            diff = total_dur - sum(scene_durations)
+            scene_durations[-1] = max(1.0, round(scene_durations[-1] + diff, 3))
+
         scene_clips = []
         concat_txt = work_dir / "scenes_concat.txt"
         concat_lines = []
@@ -1276,6 +1312,7 @@ class AIVideoEngine:
         pre_images = [p.strip() for p in scene_images.split(",") if p.strip()] if scene_images else []
 
         for idx, scn in enumerate(meta["scenes"]):
+            cur_scene_dur = scene_durations[idx]
             img_file = work_dir / f"scene_{idx}.jpg"
             clip_file = work_dir / f"scene_{idx}.mp4"
 
@@ -1313,7 +1350,7 @@ class AIVideoEngine:
                 )
 
             # Render Ken Burns motion clip
-            self._render_scene_clip(img_file, scene_duration, clip_file, motion_type=idx)
+            self._render_scene_clip(img_file, cur_scene_dur, clip_file, motion_type=idx)
             if clip_file.exists():
                 scene_clips.append(clip_file)
                 # FFmpeg concat requires forward slashes on Windows

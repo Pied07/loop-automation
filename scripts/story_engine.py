@@ -186,36 +186,41 @@ def build_clean_visual_prompt(scene_text: str, fallback_subject: str, style_desc
     """Builds clean, high-impact visual prompts with specialized styling for the requested sceneStyle."""
     clean = re.sub(r"\b(?:Part\s+\d+|Welcome back to Part\s+\d+|Follow for Part\s+\d+|Watch Part\s+\d+|Save this video|follow for more|subscribe|share this|comment below)[^.]*", "", scene_text, flags=re.IGNORECASE)
     clean = re.sub(r"\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|eighteen|twenty|thirty|forty|fifty|hundred|thousand|million)\s+(?:times|doors|days|hours|years|copies|rejections)\b", "", clean, flags=re.IGNORECASE)
-    clean = re.sub(r"\b(?:spinal mobility|highway crash|car crash|crash|paralysis|paralyzed|wheelchair|crutches|rehabilitation|hospital|amputation|injured|injury|deformity|deformed|broken|surgery|disease|sick|illness|twisted|severed|bleeding|wound)\b", "", clean, flags=re.IGNORECASE)
-    clean = re.sub(r'["\'\*_#`~]', " ", clean)
+    clean = re.sub(r'["\'*_#`~]', " ", clean)
     clean = re.sub(r"[^a-zA-Z0-9\s,.-]", " ", clean)
     clean = re.sub(r"\s+", " ", clean).strip()
 
-    if len(clean) < 12:
-        clean = fallback_subject
-    else:
-        sentences = [s.strip() for s in re.split(r"[.!?]", clean) if len(s.strip()) > 8]
-        clean = sentences[0] if sentences else clean
-        if len(clean) > 120:
-            clean = clean[:120].rsplit(" ", 1)[0]
+    visual_action = ""
+    if len(clean) >= 10:
+        sents = [s.strip() for s in re.split(r"[.!?]", clean) if len(s.strip()) > 5]
+        visual_action = ". ".join(sents[:2])
+        if len(visual_action) > 160:
+            visual_action = visual_action[:160].rsplit(" ", 1)[0]
+
+    if not visual_action or len(visual_action) < 8:
+        visual_action = fallback_subject
+    elif fallback_subject and fallback_subject.lower().split(",")[0].strip() not in visual_action.lower():
+        setting_part = fallback_subject.split(",")[-1].strip()
+        if len(setting_part) > 3:
+            visual_action = f"{visual_action}, set in {setting_part}"
 
     is_horror = bool(re.search(r"horror|haunted|ghost|demon|creepy|paranormal|nightmare|asylum|spectral|phantom|shadow", f"{scene_text} {fallback_subject} {style_descriptor}", re.IGNORECASE))
     is_realism = bool(re.search(r"realism|photoreal|35mm", style_descriptor, re.IGNORECASE))
+    is_anime = bool(re.search(r"anime|manga|ghibli", style_descriptor, re.IGNORECASE))
+    is_disney = bool(re.search(r"disney|pixar|3d", style_descriptor, re.IGNORECASE))
 
     if is_horror:
-        scene_composition = (
-            "cinematic wide-angle horror film still, terrifyingly creepy atmosphere, pale ghostly apparition with hollow dark eyes, "
-            "creepy spectral face in the shadows, supernatural mist, haunted abandoned environment, spine-chilling horror movie cinematography, "
-            "James Wan and Guillermo del Toro aesthetic, 35mm film grain, 8k scary masterpiece"
-        )
+        style_tag = "cinematic horror film still, chilling atmospheric lighting, deep shadows, 35mm film photography, 8k"
+    elif is_anime:
+        style_tag = "Makoto Shinkai anime movie still, beautiful high quality Japanese animation scenery, vivid cinematic lighting"
+    elif is_disney:
+        style_tag = "Pixar 3D animated film still, Unreal Engine 5 render, volumetric studio lighting"
     elif is_realism:
-        face_quality = "perfect facial symmetry, symmetrical almond eyes, centered focused pupils, harmonious facial features, beautiful natural smile, clean human anatomy"
-        scene_composition = f"cinematic wide-angle environmental establishing shot, dynamic action in full scene, deep background architecture and scenery, atmospheric environmental storytelling, {face_quality}, natural skin texture, photorealistic 8k"
+        style_tag = "cinematic 35mm film still, natural atmospheric lighting, high detail, photorealistic 8k"
     else:
-        face_quality = "perfect facial symmetry, symmetrical almond eyes, centered focused pupils, harmonious facial features, beautiful natural smile, clean human anatomy"
-        scene_composition = f"cinematic wide-angle environmental establishing shot, dynamic action in full scene, deep background architecture and scenery, atmospheric environmental storytelling, {face_quality}, unified artistic illustration, seamless character rendering, no deformed face, no collage"
+        style_tag = f"{style_descriptor}, cinematic lighting, photorealistic 8k"
 
-    return f"Cinematic scene of {clean}, {scene_composition}, {style_descriptor}, vertical 9:16 framing"
+    return f"Cinematic shot of {visual_action}, {style_tag}, vertical 9:16 composition"
 
 def generate_story_parts(
     category: str = "Romance",

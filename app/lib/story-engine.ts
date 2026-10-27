@@ -129,41 +129,53 @@ function createPseudoRandom(seed: number) {
 }
 
 function buildCleanVisualPrompt(sceneText: string, fallbackSubject: string, styleDescriptor: string): string {
+  // 1. Remove script artifacts, fillers, and CTA noise
   let clean = sceneText.replace(/\b(?:Part\s+\d+|Welcome back to Part\s+\d+|Follow for Part\s+\d+|Watch Part\s+\d+|Save this video|follow for more|subscribe|share this|comment below)[^.]*/gi, "");
   clean = clean.replace(/\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|eighteen|twenty|thirty|forty|fifty|hundred|thousand|million)\s+(?:times|doors|days|hours|years|copies|rejections)\b/gi, "");
-  clean = clean.replace(/\b(?:spinal mobility|highway crash|car crash|crash|paralysis|paralyzed|wheelchair|crutches|rehabilitation|hospital|amputation|injured|injury|deformity|deformed|broken|surgery|disease|sick|illness|twisted|severed|bleeding|wound)\b/gi, "");
-  clean = clean.replace(/["\'\*_#`~]/g, " ");
+  clean = clean.replace(/["'*_#`~]/g, " ");
   clean = clean.replace(/[^a-zA-Z0-9\s,.-]/g, " ");
   clean = clean.replace(/\s+/g, " ").trim();
 
-  if (clean.length < 12) {
-    clean = fallbackSubject;
-  } else {
-    const sentences = clean.split(/[.!?]/).map((s) => s.trim()).filter((s) => s.length > 8);
-    clean = sentences[0] || clean;
-    if (clean.length > 120) {
-      clean = clean.slice(0, 120).replace(/\s+\S*$/, "");
+  // 2. Extract vivid narrative action sentences up to 160 chars
+  let visualAction = "";
+  if (clean.length >= 10) {
+    const sents = clean.split(/[.!?]/).map((s) => s.trim()).filter((s) => s.length > 5);
+    visualAction = sents.slice(0, 2).join(". ");
+    if (visualAction.length > 160) {
+      visualAction = visualAction.slice(0, 160).replace(/\s+\S*$/, "");
     }
   }
 
-  const isHorror = /horror|haunted|ghost|demon|creepy|paranormal|nightmare|asylum|spectral|phantom|shadow/i.test(`${sceneText} ${fallbackSubject} ${styleDescriptor}`);
-  const isRealism = /realism|photoreal|35mm/i.test(styleDescriptor);
-
-  let sceneComposition = "";
-  if (isHorror) {
-    sceneComposition =
-      "cinematic wide-angle horror film still, terrifyingly creepy atmosphere, pale ghostly apparition with hollow dark eyes, " +
-      "creepy spectral face in the shadows, supernatural mist, haunted abandoned environment, spine-chilling horror movie cinematography, " +
-      "James Wan and Guillermo del Toro aesthetic, 35mm film grain, 8k scary masterpiece";
-  } else if (isRealism) {
-    const faceQuality = "perfect facial symmetry, symmetrical almond eyes, centered focused pupils, harmonious facial features, beautiful natural smile, clean human anatomy";
-    sceneComposition = `cinematic wide-angle environmental establishing shot, dynamic action in full scene, deep background architecture and scenery, atmospheric environmental storytelling, ${faceQuality}, natural skin texture, photorealistic 8k`;
-  } else {
-    const faceQuality = "perfect facial symmetry, symmetrical almond eyes, centered focused pupils, harmonious facial features, beautiful natural smile, clean human anatomy";
-    sceneComposition = `cinematic wide-angle environmental establishing shot, dynamic action in full scene, deep background architecture and scenery, atmospheric environmental storytelling, ${faceQuality}, unified artistic illustration, seamless character rendering, no deformed face, no collage`;
+  // Fallback to characters & setting if sentence was sparse
+  if (!visualAction || visualAction.length < 8) {
+    visualAction = fallbackSubject;
+  } else if (fallbackSubject && !visualAction.toLowerCase().includes(fallbackSubject.toLowerCase().split(",")[0].trim())) {
+    const settingPart = fallbackSubject.split(",").slice(-1)[0]?.trim();
+    if (settingPart && settingPart.length > 3) {
+      visualAction = `${visualAction}, set in ${settingPart}`;
+    }
   }
 
-  return `Cinematic scene of ${clean}, ${sceneComposition}, ${styleDescriptor}, vertical 9:16 framing`;
+  // 3. Crisp, genre-accurate cinematic aesthetic (concise, avoiding prompt bloat)
+  const isHorror = /horror|haunted|ghost|demon|creepy|paranormal|nightmare|asylum|spectral|phantom|shadow/i.test(`${sceneText} ${fallbackSubject} ${styleDescriptor}`);
+  const isRealism = /realism|photoreal|35mm/i.test(styleDescriptor);
+  const isAnime = /anime|manga|ghibli/i.test(styleDescriptor);
+  const isDisney = /disney|pixar|3d/i.test(styleDescriptor);
+
+  let styleTag = "";
+  if (isHorror) {
+    styleTag = "cinematic horror film still, chilling atmospheric lighting, deep shadows, 35mm film photography, 8k";
+  } else if (isAnime) {
+    styleTag = "Makoto Shinkai anime movie still, beautiful high quality Japanese animation scenery, vivid cinematic lighting";
+  } else if (isDisney) {
+    styleTag = "Pixar 3D animated film still, Unreal Engine 5 render, volumetric studio lighting";
+  } else if (isRealism) {
+    styleTag = "cinematic 35mm film still, natural atmospheric lighting, high detail, photorealistic 8k";
+  } else {
+    styleTag = `${styleDescriptor}, cinematic lighting, photorealistic 8k`;
+  }
+
+  return `Cinematic shot of ${visualAction}, ${styleTag}, vertical 9:16 composition`;
 }
 
 export async function generateStoryParts(params: {
