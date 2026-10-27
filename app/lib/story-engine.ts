@@ -133,7 +133,8 @@ export function buildCleanVisualPrompt(sceneText: string, fallbackSubject: strin
     }
   }
 
-  const isHorror = /horror|haunted|ghost|demon|creepy|paranormal|nightmare|asylum|spectral|phantom|shadow/i.test(`${sceneText} ${fallbackSubject} ${styleDescriptor}`);
+  const isHorror = /horror|haunted|ghost|demon|creepy|paranormal|nightmare|asylum|spectral|phantom/i.test(`${sceneText} ${fallbackSubject}`) && !/romance|love|heart|dating|comedy|food/i.test(`${fallbackSubject} ${styleDescriptor}`);
+  const isRomance = /romance|love|heart|dating|relationship|soulmate|affection/i.test(`${fallbackSubject} ${styleDescriptor}`);
   const isRealism = /realism|photoreal|35mm/i.test(styleDescriptor);
   const isAnime = /anime|manga|ghibli/i.test(styleDescriptor);
   const isDisney = /disney|pixar|3d/i.test(styleDescriptor);
@@ -141,6 +142,8 @@ export function buildCleanVisualPrompt(sceneText: string, fallbackSubject: strin
   let styleTag = "";
   if (isHorror) {
     styleTag = "cinematic horror film still, chilling atmospheric lighting, deep shadows, 35mm film photography, 8k";
+  } else if (isRomance) {
+    styleTag = "warm golden hour cinematic romance still, soft sunset bokeh, intimate natural lighting, 35mm film photography, 8k";
   } else if (isAnime) {
     styleTag = "Makoto Shinkai anime movie still, beautiful high quality Japanese animation scenery, vivid cinematic lighting";
   } else if (isDisney) {
@@ -906,7 +909,27 @@ export async function generateStoryParts(params: {
 
   const genreData = GENRE_NARRATIVE_DATA[effectiveCat] || GENRE_NARRATIVE_DATA["Trending"];
   const partsData: StoryPart[] = [];
-  const baseTitle = prompt ? `${prompt.slice(0, 45)}: The Untold Story` : `${c1} and ${c2}: The Mystery of ${effectiveCat}`;
+  let baseTitle = "";
+  if (prompt) {
+    baseTitle = prompt.slice(0, 45);
+  } else if (effectiveCat === "Romance") {
+    baseTitle = `${c1} and ${c2}'s Love Story`;
+  } else if (effectiveCat === "Comedy") {
+    baseTitle = `${c1} and ${c2}'s Misadventure`;
+  } else if (effectiveCat === "Motivational") {
+    baseTitle = `${c1} and ${c2}: The Unstoppable Journey`;
+  } else if (effectiveCat === "Action") {
+    baseTitle = `${c1} and ${c2}: High-Stakes Mission`;
+  } else if (effectiveCat === "Educational") {
+    baseTitle = `${c1} and ${c2}: The Untold Discovery`;
+  } else if (effectiveCat === "Food") {
+    baseTitle = `${c1} and ${c2}: The Culinary Quest`;
+  } else if (effectiveCat === "Music") {
+    baseTitle = `${c1} and ${c2}: The Lost Harmony`;
+  } else {
+    baseTitle = `${c1} and ${c2}: The Mystery of ${effectiveCat}`;
+  }
+
   const globalUsedSignatures = new Set<string>();
 
   for (let pIdx = 0; pIdx < clampedParts; pIdx++) {
@@ -937,7 +960,18 @@ export async function generateStoryParts(params: {
         if (addSentence(op)) break;
       }
     } else {
-      addSentence(`Welcome back to Part ${pNum}. The situation inside ${setting} had escalated far beyond anything ${c1} and ${c2} could have anticipated.`);
+      const continuationHooks: Record<string, string> = {
+        Romance: `Welcome back to Part ${pNum}. Returning to ${setting}, the unspoken connection between ${c1} and ${c2} had only deepened with every passing moment.`,
+        Horror: `Welcome back to Part ${pNum}. Inside ${setting}, the shadows had lengthened, and the silence now held an unmistakable, chilling presence.`,
+        Comedy: `Welcome back to Part ${pNum}. Just when ${c1} thought things couldn't get more out of hand inside ${setting}, the chaos doubled.`,
+        Motivational: `Welcome back to Part ${pNum}. Back at ${setting}, the challenge was steeper than ever, but neither ${c1} nor ${c2} was willing to surrender.`,
+        Action: `Welcome back to Part ${pNum}. The situation inside ${setting} had escalated into an all-out tactical race against time for ${c1} and ${c2}.`,
+        Educational: `Welcome back to Part ${pNum}. Delving further into ${setting}, ${c1} and ${c2} uncovered data pointing toward an even more astonishing breakthrough.`,
+        Food: `Welcome back to Part ${pNum}. Back inside the kitchen of ${setting}, ${c1} and ${c2} prepared to face the ultimate culinary trial.`,
+        Music: `Welcome back to Part ${pNum}. Inside the studio at ${setting}, the melody ${c1} and {c2} were crafting was taking on a life of its own.`,
+      };
+      const hookLine = continuationHooks[effectiveCat] || `Welcome back to Part ${pNum}. Returning to ${setting}, ${c1} and ${c2} were ready to face whatever lay ahead.`;
+      addSentence(hookLine);
     }
 
     // Phase 2: Inciting Incident / Catalyst
@@ -1043,7 +1077,7 @@ export async function generateStoryParts(params: {
 
     partsData.push({
       partNumber: pNum,
-      title: clampedParts > 1 ? `${baseTitle}: Part ${pNum}` : baseTitle,
+      title: clampedParts > 1 ? `${baseTitle} (Part ${pNum}/${clampedParts})` : baseTitle,
       script: scriptText,
       sentences: sents,
       scenes,

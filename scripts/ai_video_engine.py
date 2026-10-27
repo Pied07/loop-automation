@@ -157,6 +157,7 @@ def extract_topic_from_text(text: str, category: str = "") -> str:
     clean = re.sub(r"\s*\(Part\s*\d+[/]?\d*\)", "", text, flags=re.IGNORECASE).strip()
     clean = re.sub(r":\s*The\s+Untold.*", "", clean, flags=re.IGNORECASE).strip()
     clean = re.sub(r":\s*The\s+True.*", "", clean, flags=re.IGNORECASE).strip()
+    clean = re.sub(r"^Welcome\s+back\s+to\s+Part\s+\d+[\.,:]?\s*", "", clean, flags=re.IGNORECASE).strip()
     clean = re.sub(r":.*", "", clean).strip()
 
     # If it is already a clean concise topic (under 60 chars) with no multiple sentences

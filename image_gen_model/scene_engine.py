@@ -415,7 +415,10 @@ class StorySceneEngine:
         print(f"           Resolution: {w}x{h} | Aspect: {aspect_ratio}")
         t0 = time.time()
 
-        is_horror = category.lower() == "horror" or any(w in f"{prompt} {topic}".lower() for w in ["horror", "ghost", "haunt", "demon", "creepy", "spectral", "phantom", "asylum"])
+        is_horror = (
+            category.lower() == "horror"
+            or any(w in f"{prompt} {topic}".lower() for w in ["horror", "ghost", "haunt", "demon", "creepy", "spectral", "phantom", "asylum"])
+        ) and category.lower() not in ["romance", "comedy", "food", "motivational", "music"]
         effective_negative = negative_prompt or (HORROR_NEGATIVE_PROMPT if is_horror else COMPREHENSIVE_NEGATIVE_PROMPT)
 
         raw_img = None

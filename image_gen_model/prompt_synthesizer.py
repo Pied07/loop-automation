@@ -150,9 +150,11 @@ def clean_narration(text: str) -> str:
 def infer_genre(category: str, topic: str, text: str) -> str:
     """Identifies the dominant storytelling genre from context."""
     combined = f"{category} {topic} {text}".lower()
+    if "romance" in category.lower() or any(w in combined for w in ["romance", "love", "romantic", "couple", "kiss", "embrace", "soulmate", "dating", "sweetheart", "holding hands"]):
+        return "Romance"
     if any(w in combined for w in ["action", "combat", "fight", "battle", "chase", "warzone", "tactical", "explosion", "gun"]):
         return "Action"
-    if any(w in combined for w in ["horror", "scary", "ghost", "creepy", "haunted", "monster", "demon", "asylum", "spectral", "phantom"]):
+    if "horror" in category.lower() or any(w in combined for w in ["horror", "scary", "ghost", "creepy", "haunted", "monster", "demon", "asylum", "spectral", "phantom"]):
         return "Horror"
     if any(w in combined for w in ["detective", "mystery", "crime", "secret", "clue", "investigat", "unsolved"]):
         return "Mystery"
@@ -233,10 +235,15 @@ def synthesize_scene_prompt(
     has_characters = any(re.search(pat, visual_core, re.IGNORECASE) for pat in CHARACTER_PATTERNS)
 
     is_horror = (
-        genre == "Horror"
-        or "horror" in category.lower()
+        (genre == "Horror" or "horror" in category.lower())
         or any(w in f"{script_sentence} {topic}".lower() for w in ["ghost", "specter", "haunt", "demon", "creepy", "phantom", "apparition", "asylum", "curse", "shadowy figure", "entity"])
-    )
+    ) and category.lower() not in ["romance", "comedy", "food", "motivational", "music"]
+
+    is_romance = (
+        genre == "Romance"
+        or "romance" in category.lower()
+        or any(w in f"{script_sentence} {topic}".lower() for w in ["romance", "love", "romantic", "couple", "kiss", "embrace", "soulmate", "dating", "sweetheart", "holding hands"])
+    ) and not is_horror
 
     framing_tag = "vertical 9:16 composition" if "9:16" in aspect_ratio else "widescreen 16:9 composition"
 
@@ -251,6 +258,16 @@ def synthesize_scene_prompt(
             framing_tag,
             horror_lighting,
             "dramatic dread, 35mm film photography, 8k",
+        ]
+    elif is_romance:
+        romance_lighting = "warm golden hour lighting, soft sunset bokeh, intimate natural amber glow"
+        prompt_parts = [
+            f"Cinematic romantic scene of {visual_core}",
+            preset["prefix"],
+            staging,
+            framing_tag,
+            romance_lighting,
+            "warm 35mm film photography, emotional depth, 8k",
         ]
     else:
         prompt_parts = [

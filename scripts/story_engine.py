@@ -69,7 +69,10 @@ def build_clean_visual_prompt(scene_text: str, fallback_subject: str, style_desc
         if len(setting_part) > 3:
             visual_action = f"{visual_action}, set in {setting_part}"
 
-    is_horror = bool(re.search(r"horror|haunted|ghost|demon|creepy|paranormal|nightmare|asylum|spectral|phantom|shadow", f"{scene_text} {fallback_subject} {style_descriptor}", re.IGNORECASE))
+    is_horror = category.lower() == "horror" or (
+        bool(re.search(r"\b(?:haunted|ghost|demon|creepy|paranormal|nightmare|asylum|spectral|phantom)\b", f"{scene_text} {fallback_subject}", re.IGNORECASE))
+        and category.lower() not in ["romance", "comedy", "food", "motivational", "music"]
+    )
     is_realism = bool(re.search(r"realism|photoreal|35mm", style_descriptor, re.IGNORECASE))
     is_anime = bool(re.search(r"anime|manga|ghibli", style_descriptor, re.IGNORECASE))
     is_disney = bool(re.search(r"disney|pixar|3d", style_descriptor, re.IGNORECASE))
@@ -971,7 +974,18 @@ def synthesize_story_script(
                 if add_sentence(op):
                     break
         else:
-            add_sentence(f"Welcome back to Part {p_num}. The situation inside {setting} had escalated far beyond anything {c1} and {c2} could have anticipated.")
+            continuation_hooks = {
+                "Romance": f"Welcome back to Part {p_num}. Returning to {setting}, the unspoken connection between {c1} and {c2} had only deepened with every passing moment.",
+                "Horror": f"Welcome back to Part {p_num}. Inside {setting}, the shadows had lengthened, and the silence now held an unmistakable, chilling presence.",
+                "Comedy": f"Welcome back to Part {p_num}. Just when {c1} thought things couldn't get more out of hand inside {setting}, the chaos doubled.",
+                "Motivational": f"Welcome back to Part {p_num}. Back at {setting}, the challenge was steeper than ever, but neither {c1} nor {c2} was willing to surrender.",
+                "Action": f"Welcome back to Part {p_num}. The situation inside {setting} had escalated into an all-out tactical race against time for {c1} and {c2}.",
+                "Educational": f"Welcome back to Part {p_num}. Delving further into {setting}, {c1} and {c2} uncovered data pointing toward an even more astonishing breakthrough.",
+                "Food": f"Welcome back to Part {p_num}. Back inside the kitchen of {setting}, {c1} and {c2} prepared to face the ultimate culinary trial.",
+                "Music": f"Welcome back to Part {p_num}. Inside the studio at {setting}, the melody {c1} and {c2} were crafting was taking on a life of its own.",
+            }
+            hook_line = continuation_hooks.get(category, f"Welcome back to Part {p_num}. Returning to {setting}, {c1} and {c2} were ready to face whatever lay ahead.")
+            add_sentence(hook_line)
 
         # Phase 2: Inciting Discovery / Catalyst
         shuffled_incitings = list(genre_data["incitings"])
@@ -1055,11 +1069,31 @@ def synthesize_story_script(
                     break
 
         script_text = " ".join(sents)
-        base_title = prompt[:45] if prompt else f"{c1} and {c2}: The Mystery of {category}"
+        if not prompt:
+            if category == "Romance":
+                base_title = f"{c1} and {c2}'s Love Story"
+            elif category == "Comedy":
+                base_title = f"{c1} and {c2}'s Misadventure"
+            elif category == "Motivational":
+                base_title = f"{c1} and {c2}: The Unstoppable Journey"
+            elif category == "Action":
+                base_title = f"{c1} and {c2}: High-Stakes Mission"
+            elif category == "Educational":
+                base_title = f"{c1} and {c2}: The Untold Discovery"
+            elif category == "Food":
+                base_title = f"{c1} and {c2}: The Culinary Quest"
+            elif category == "Music":
+                base_title = f"{c1} and {c2}: The Lost Harmony"
+            else:
+                base_title = f"{c1} and {c2}: The Mystery of {category}"
+        else:
+            base_title = prompt[:45]
+
+        part_title = f"{base_title} (Part {p_num}/{num_parts})" if num_parts > 1 else base_title
 
         parts.append({
             "partNumber": p_num,
-            "title": f"{base_title}: Part {p_num}" if num_parts > 1 else base_title,
+            "title": part_title,
             "script": script_text,
             "sentences": sents,
             "isLastPart": is_last,
@@ -1161,6 +1195,33 @@ def generate_story(
         "latent_score": latent_score,
         "source": "user_trained_onnx_ml_model",
     }
+
+
+def generate_story_parts(
+    category: str = "Interesting Facts",
+    custom_tag: str = "",
+    prompt: str = "",
+    duration: int = 60,
+    duration_per_part: Optional[int] = None,
+    num_images: int = 5,
+    num_images_per_part: Optional[int] = None,
+    num_parts: int = 1,
+    exclude_id: str = "",
+    scene_style: str = "Realism",
+    seed: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Compatibility wrapper matching signature used in ai_video_engine."""
+    return generate_story(
+        category=category,
+        custom_tag=custom_tag,
+        prompt=prompt,
+        duration=duration_per_part or duration,
+        num_images=num_images_per_part or num_images,
+        num_parts=num_parts,
+        exclude_id=exclude_id,
+        scene_style=scene_style,
+        seed=seed,
+    )
 
 
 def main():
