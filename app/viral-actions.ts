@@ -776,7 +776,17 @@ export async function publishClipAndCleanup(params: {
   error?: string;
   logs: string[];
 }> {
-  const { clipPath, partNumber, title, description, hashtags, platforms, userEmail } = params;
+  const { clipPath, partNumber, title, description, hashtags, userEmail } = params;
+  const normalizePlatform = (name: string): string => {
+    const s = String(name || "").trim().toLowerCase();
+    if (s === "youtube") return "YouTube";
+    if (s === "facebook") return "Facebook";
+    if (s === "instagram") return "Instagram";
+    if (s === "gmail") return "Gmail";
+    return String(name || "").trim();
+  };
+  const platforms = (params.platforms || []).map(normalizePlatform);
+  const connections = (params.connections || []).map(normalizePlatform);
   const logs: string[] = [];
 
   // Verify clip file exists (supports local files or remote Hugging Face cloud URLs)

@@ -742,6 +742,7 @@ def run():
                     "category": CONTENT_CATEGORY,
                     "userId": USER_ID,
                     "userEmail": USER_EMAIL,
+                    "platforms": ["YouTube", "Facebook", "Instagram"],
                     "connections": ["YouTube", "Facebook", "Instagram", "Gmail"],
                 }
                 pub_req = urllib.request.Request(
@@ -762,6 +763,9 @@ def run():
                     if pdata.get("facebookStoryId"): clip_item["facebookStoryId"] = pdata["facebookStoryId"]
                     if pdata.get("facebookPostId"): clip_item["facebookPostId"] = pdata["facebookPostId"]
                     if pdata.get("instagramStoryId"): clip_item["instagramStoryId"] = pdata["instagramStoryId"]
+                # Throttle slightly between parts to respect YouTube rate limits
+                if len(clips) > 1 and clip_item != clips[-1]:
+                    time.sleep(5)
             except Exception as pe:
                 print(f"Notice: Auto-publish part {clip_item['partNumber']} notice: {pe}")
 

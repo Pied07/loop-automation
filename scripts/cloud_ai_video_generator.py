@@ -277,11 +277,19 @@ def run():
             update_status(status="processing", progress=92, step="Auto-publishing AI video to connected platforms...", source_title=result["title"])
             try:
                 active_platforms = ["YouTube", "Facebook", "Instagram", "Gmail"]
+                platform_map = {
+                    "youtube": "YouTube",
+                    "facebook": "Facebook",
+                    "instagram": "Instagram",
+                    "gmail": "Gmail",
+                }
                 if PLATFORMS_RAW:
                     try:
                         p_obj = json.loads(PLATFORMS_RAW)
                         if isinstance(p_obj, dict):
-                            active_platforms = [k.capitalize() for k, v in p_obj.items() if v]
+                            parsed_plats = [platform_map.get(str(k).lower(), str(k).capitalize()) for k, v in p_obj.items() if v]
+                            if parsed_plats:
+                                active_platforms = parsed_plats
                     except:
                         pass
 

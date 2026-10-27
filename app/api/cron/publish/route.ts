@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { database } from "@/app/firebase";
 import { collection, doc, getDoc, getDocs, limit, query, setDoc } from "firebase/firestore";
 import { scrapeOnlineViralVideo, cleanViralTitle, generateAiVideoAction } from "@/app/viral-actions";
+import { generateStoryParts } from "@/app/lib/story-engine";
 import { extractUrlSignatures, isUrlDuplicate, isAudioOnlyUrl } from "@/app/lib/url-utils";
 
 export const maxDuration = 300;
@@ -124,31 +125,72 @@ async function handleCronPublish(req: NextRequest) {
 
       console.log(`[Cron Auto-Pilot] Running AI Video: Category="${effectiveCategory}", Duration=${effectiveDuration}s, Parts=${effectiveParts}, Caption="${effectiveCaption}", Style="${effectiveStyle}", Images=${calculatedImages}`);
 
-      const aiResult = await generateAiVideoAction({
+      // Synthesize connected multi-part procedural story scripts
+      const storyRes = await generateStoryParts({
         category: effectiveCategory,
-        voice: effectiveVoice,
-        captionStyle: effectiveCaption,
-        stylePreset: effectiveStyle,
-        numImages: calculatedImages,
         duration: effectiveDuration,
+        numImages: calculatedImages,
         numParts: effectiveParts,
-        userId: ownerUserId,
-        userEmail: ownerEmail,
-        autoPublish: true,
-        platforms: { youtube: true, facebook: true, instagram: true },
+        sceneStyle: effectiveStyle,
       });
 
-      console.log(`[Cron Auto-Pilot] AI Video generation completed. Title="${aiResult?.title}", YT Upload=${aiResult?.publishResult?.youtubeVideoId || aiResult?.publishResult?.youtubeUrl || "none"}`);
+      const partResults = [];
+      const generatedParts = Array.isArray(storyRes?.parts) && storyRes.parts.length > 0
+        ? storyRes.parts
+        : [{ partNumber: 1, title: `${effectiveCategory} Mystery`, script: "" }];
+
+      for (let pIdx = 0; pIdx < effectiveParts; pIdx++) {
+        const partData = generatedParts[pIdx] || generatedParts[0];
+        const pNum = pIdx + 1;
+        console.log(`[Cron Auto-Pilot] Generating Part ${pNum}/${effectiveParts}: "${partData.title}"...`);
+
+        const pResult = await generateAiVideoAction({
+          category: effectiveCategory,
+          voice: effectiveVoice,
+          captionStyle: effectiveCaption,
+          stylePreset: effectiveStyle,
+          numImages: calculatedImages,
+          duration: effectiveDuration,
+          numParts: effectiveParts,
+          partNumber: pNum,
+          prompt: partData.title,
+          script: partData.script,
+          userId: ownerUserId,
+          userEmail: ownerEmail,
+          autoPublish: true,
+          platforms: { youtube: true, facebook: true, instagram: true },
+        });
+
+        partResults.push(pResult);
+        console.log(`[Cron Auto-Pilot] Part ${pNum}/${effectiveParts} done. Title="${pResult?.title}", YT Upload=${pResult?.publishResult?.youtubeVideoId || pResult?.publishResult?.youtubeUrl || "none"}`);
+
+        // Small throttle between dispatching/generating parts to prevent API rate spikes
+        if (pIdx < effectiveParts - 1) {
+          await new Promise((res) => setTimeout(res, 2500));
+        }
+      }
+
+      const primaryResult = partResults[0] || {};
+      const allYtUrls = partResults
+        .map((p) => p?.publishResult?.youtubeUrl || (p?.publishResult?.youtubeVideoId ? `https://www.youtube.com/shorts/${p.publishResult.youtubeVideoId}` : ""))
+        .filter(Boolean);
 
       if (database) {
         try {
           const cronHistoryRef = doc(database, "app_config", "cron_history");
           await setDoc(cronHistoryRef, {
             lastRunAt: new Date().toISOString(),
-            lastTitle: aiResult.title || "AI Story Video",
+            lastTitle: primaryResult.title || "AI Story Video",
             lastCategory: effectiveCategory,
             lastCronType: "ai",
-            lastYoutubeUrl: aiResult?.publishResult?.youtubeUrl || (aiResult?.publishResult?.youtubeVideoId ? `https://www.youtube.com/shorts/${aiResult.publishResult.youtubeVideoId}` : ""),
+            totalParts: effectiveParts,
+            partsPublished: partResults.map((p) => ({
+              partNumber: p.partNumber || 1,
+              title: p.title || "",
+              videoUrl: p.videoUrl || "",
+              youtubeUrl: p.publishResult?.youtubeUrl || (p.publishResult?.youtubeVideoId ? `https://www.youtube.com/shorts/${p.publishResult.youtubeVideoId}` : ""),
+            })),
+            lastYoutubeUrl: allYtUrls[0] || "",
           }, { merge: true });
         } catch {}
       }
@@ -160,11 +202,13 @@ async function handleCronPublish(req: NextRequest) {
         duration: effectiveDuration,
         parts: effectiveParts,
         captionStyle: effectiveCaption,
-        title: aiResult.title,
-        videoUrl: aiResult.videoUrl,
-        youtubeUrl: aiResult?.publishResult?.youtubeUrl || (aiResult?.publishResult?.youtubeVideoId ? `https://www.youtube.com/shorts/${aiResult.publishResult.youtubeVideoId}` : ""),
-        message: `[Cron Auto-Pilot] AI Story "${aiResult.title}" synthesized and published across YouTube & socials!`,
-        result: aiResult,
+        title: primaryResult.title,
+        videoUrl: primaryResult.videoUrl,
+        youtubeUrl: allYtUrls[0] || "",
+        allYoutubeUrls: allYtUrls,
+        message: `[Cron Auto-Pilot] AI Story (${effectiveParts} part${effectiveParts > 1 ? "s" : ""}) synthesized and auto-published across YouTube & socials!`,
+        results: partResults,
+        result: primaryResult,
       });
     }
 

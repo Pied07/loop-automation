@@ -16,19 +16,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Clip path is required." }, { status: 400 });
     }
 
+    const normalizePlatform = (name: string): string => {
+      const s = String(name || "").trim().toLowerCase();
+      if (s === "youtube") return "YouTube";
+      if (s === "facebook") return "Facebook";
+      if (s === "instagram") return "Instagram";
+      if (s === "gmail") return "Gmail";
+      return String(name || "").trim();
+    };
+
     const tokens: any = await readTokens();
     const serverPlatforms: string[] = [];
     if (tokens.youtube?.access_token || tokens.youtube?.refresh_token) serverPlatforms.push("YouTube");
     if (tokens.facebook?.page_id && tokens.facebook?.page_access_token) serverPlatforms.push("Facebook");
     if (tokens.facebook?.instagram_user_id || tokens.instagram?.access_token) serverPlatforms.push("Instagram");
 
-    const requestedPlatforms = Array.isArray(body.platforms) && body.platforms.length > 0 ? body.platforms : [];
+    const requestedPlatforms = (Array.isArray(body.platforms) && body.platforms.length > 0 ? body.platforms : [])
+      .map(normalizePlatform)
+      .filter(Boolean);
+
     const detectedPlatforms = requestedPlatforms.length > 0
       ? requestedPlatforms.filter((p: string) => serverPlatforms.includes(p))
       : serverPlatforms;
 
     const serverConnections = [...serverPlatforms, ...(tokens.gmail?.access_token || tokens.gmail?.refresh_token ? ["Gmail"] : [])];
-    const detectedConnections = Array.from(new Set([...(Array.isArray(body.connections) ? body.connections : []), ...serverConnections]));
+    const incomingConnections = (Array.isArray(body.connections) ? body.connections : []).map(normalizePlatform);
+    const detectedConnections = Array.from(new Set([...incomingConnections, ...serverConnections]));
 
     if (!detectedPlatforms.length) {
       const missingName = requestedPlatforms.length > 0 ? requestedPlatforms.join(", ") : "social platform";
