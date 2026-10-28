@@ -14,8 +14,9 @@ export const dynamic = "force-dynamic";
 const LOCAL_DAEMON_URL = "http://127.0.0.1:5055";
 
 const COMPREHENSIVE_NEGATIVE_PROMPT =
-  "duplicate person, multiple people, two characters, stacked body, double torso, second body, conjoined, " +
-  "multiple heads, two heads, extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, " +
+  "duplicate person, multiple people, two characters, three characters, 3 people, multiple clones, clone duplication, totem pole, stacked characters, stacked body, double torso, second body, conjoined, " +
+  "multiple heads, two heads, three heads, stacked heads, vertical repetition, extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, " +
+  "plain sky background, only sky, blank sky, blue sky only, simple sky background, empty background, solid color background, " +
   "hazy hands, blurry hands, indistinct hands, hands hidden in sleeves, missing fingers, fused fingers, deformed hands, poorly drawn hands, " +
   "floating sword, disconnected sword, hazy sword, blurry blade, multiple blades, extra swords, double katana, translucent sword, dull blade, miniature sword, blunt blade, " +
   "messy, chaotic, visual noise, grainy, noisy, haphazard, cluttered composition, debris, floating junk, distorted shapes, messy lines, " +
