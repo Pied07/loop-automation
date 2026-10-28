@@ -2072,6 +2072,7 @@ export default function Home() {
     }
     setIsGeneratingCustomImage(true);
     setImageGenError("");
+    setCurrentCustomImage(null);
     setImageGenStatus("Submitting prompt to native ML pipeline...");
     try {
       const res = await fetch("/api/ai-video/generate-scene-image", {
@@ -4878,6 +4879,18 @@ export default function Home() {
                       <img
                         src={currentCustomImage.imageUrl}
                         alt={currentCustomImage.prompt}
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent && !parent.querySelector('.img-error-box')) {
+                            const err = document.createElement('div');
+                            err.className = 'img-error-box';
+                            err.style.cssText = 'padding: 40px 20px; text-align: center; color: #ef4444;';
+                            err.innerHTML = '<div style="font-size:32px;margin-bottom:8px;">⚠️</div><div style="font-weight:700;font-size:14px;">Image failed to load</div><div style="font-size:11px;color:#94a3b8;margin-top:6px;">The previous cloud runner run encountered an issue or expired. Please click <strong>Generate Image with ML Model</strong> to generate anew.</div>';
+                            parent.appendChild(err);
+                          }
+                        }}
                         style={{ width: '100%', height: 'auto', maxHeight: '520px', objectFit: 'contain', display: 'block' }}
                       />
                     </div>

@@ -97,7 +97,7 @@ jobs:
 
       - name: Install Python ML Libraries
         run: |
-          pip install --upgrade requests numpy pillow
+          pip install --upgrade requests numpy pillow peft
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install --upgrade diffusers transformers accelerate safetensors
 

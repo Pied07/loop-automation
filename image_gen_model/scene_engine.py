@@ -402,6 +402,8 @@ class StorySceneEngine:
         topic: str = "",
         colab_gpu_url: Optional[str] = None,
         negative_prompt: Optional[str] = None,
+        steps: Optional[int] = None,
+        guidance_scale: Optional[float] = None,
     ) -> Optional[Image.Image]:
         """
         Main entry point for generating authentic scene visuals.
@@ -450,12 +452,15 @@ class StorySceneEngine:
             if self.pipe is not None:
                 model_name = getattr(self, "current_model_id", "local diffusion")
                 print(f"[SCENE ENGINE] 🎯 Synthesizing with Local Diffusion Pipeline ({model_name})...")
+                is_turbo = "turbo" in str(model_name).lower()
+                inf_steps = steps if steps is not None else (1 if is_turbo else 15)
+                inf_guidance = guidance_scale if guidance_scale is not None else (0.0 if is_turbo else 7.0)
                 raw_img = self.generate_local_image(
                     prompt=rich_prompt,
                     width=w,
                     height=h,
-                    steps=15,
-                    guidance_scale=7.0,
+                    steps=inf_steps,
+                    guidance_scale=inf_guidance,
                     seed=seed,
                     negative_prompt=effective_negative,
                 )

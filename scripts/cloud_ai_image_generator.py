@@ -211,6 +211,9 @@ def main():
             negative_prompt=NEGATIVE_PROMPT or None,
         )
 
+        if img is not None and not out_file.exists():
+            img.save(str(out_file), quality=95)
+
         if not out_file.exists():
             raise RuntimeError("ML model completed without outputting an image file.")
 
