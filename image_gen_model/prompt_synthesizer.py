@@ -473,7 +473,7 @@ def synthesize_scene_prompt(
 
         style_core = "Masterpiece 2D anime, clean crisp lineart, Ufotable visual"
         framing_part = (
-            f"solo, strictly one person on screen, single {char_tag}, no second warrior, no spirit behind, authentic human anatomy, two arms only"
+            f"solo, single character focus, centered lone {char_tag}, solo portrait framing, authentic human anatomy, two arms only"
             if has_characters
             else preset["env_framing"]
         )
@@ -528,7 +528,7 @@ def synthesize_scene_prompt(
 
         style_core = "Masterpiece 35mm DSLR photograph, award winning portrait photography, 85mm f/1.4 lens"
         real_framing_part = (
-            f"solo, strictly one person in frame, single {real_char_tag}, no second warrior, no spirit behind, authentic human anatomy, two arms only"
+            f"solo, single character focus, centered lone {real_char_tag}, solo portrait framing, authentic human anatomy, two arms only"
             if has_characters
             else preset["env_framing"]
         )
