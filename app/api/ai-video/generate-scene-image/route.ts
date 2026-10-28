@@ -14,9 +14,7 @@ export const dynamic = "force-dynamic";
 const LOCAL_DAEMON_URL = "http://127.0.0.1:5055";
 
 const COMPREHENSIVE_NEGATIVE_PROMPT =
-  "extra arms, third arm, 3 arms, arm behind shoulder, arm behind head, extra hands, three hands, 3 hands, extra limbs, multiple swords, extra swords, two swords, 2 swords, multiple blades, duplicate blade, double blade, split blade, twin swords, extra weapons, " +
-  "two people, 2 characters, background people, background characters, crowd, bystanders, group, second person, clone, " +
-  "blank background, plain background, white background, solid color background, empty background, border, frame, margin, parchment, scroll, " +
+  "bent sword, crooked sword, warped blade, rubber sword, curved blade, duplicate blade, split blade, double blade, multiple swords, extra swords, extra arms, third arm, 3 arms, arm behind shoulder, extra hands, three hands, distorted face, smudged face, melted face, deformed eyes, crossed eyes, bad eyes, blurry face, messy face, two people, 2 characters, background people, crowd, blank background, plain background, white background, border, frame, margin, parchment, " +
   "deformed hands, poorly drawn hands, mutated hands, extra fingers, missing fingers, fused fingers, too many fingers, conjoined fingers, claw hands, mangled hands, deformed wrists, disembodied hands, floating hands, disconnected hands, malformed hands, webbed fingers, broken fingers, twisted fingers, overlapping fingers, amputated hands, " +
   "anatomical dissimilarity, figure dissimilarity, mutated figure, deformed body, asymmetrical body, non-human anatomy, grotesque anatomy, disproportionate body, malformed torso, extra limbs, conjoined limbs, unnatural body shape, distorted figure, " +
   "three arms, extra arms, multi-armed, third arm, arm behind head, three hands, extra hands, " +

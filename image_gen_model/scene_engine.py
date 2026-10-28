@@ -75,9 +75,7 @@ ASPECT_RATIOS = {
 
 # Industry standard anti-distortion negative prompt prioritizing anatomical integrity & limb correctness
 COMPREHENSIVE_NEGATIVE_PROMPT = (
-    "extra arms, third arm, 3 arms, arm behind shoulder, arm behind head, extra hands, three hands, 3 hands, extra limbs, multiple swords, extra swords, two swords, 2 swords, multiple blades, duplicate blade, double blade, split blade, twin swords, extra weapons, "
-    "two people, 2 characters, background people, background characters, crowd, bystanders, group, second person, clone, "
-    "blank background, plain background, white background, solid color background, empty background, border, frame, margin, parchment, scroll, "
+    "bent sword, crooked sword, warped blade, rubber sword, curved blade, duplicate blade, split blade, double blade, multiple swords, extra swords, extra arms, third arm, 3 arms, arm behind shoulder, extra hands, three hands, distorted face, smudged face, melted face, deformed eyes, crossed eyes, bad eyes, blurry face, messy face, two people, 2 characters, background people, crowd, blank background, plain background, white background, border, frame, margin, parchment, "
     "deformed hands, poorly drawn hands, mutated hands, extra fingers, missing fingers, fused fingers, too many fingers, conjoined fingers, claw hands, mangled hands, deformed wrists, disembodied hands, floating hands, disconnected hands, malformed hands, webbed fingers, broken fingers, twisted fingers, overlapping fingers, amputated hands, "
     "anatomical dissimilarity, figure dissimilarity, mutated figure, deformed body, asymmetrical body, non-human anatomy, grotesque anatomy, disproportionate body, malformed torso, conjoined limbs, unnatural body shape, distorted figure, "
     "three arms, extra arms, multi-armed, third arm, arm behind head, three hands, extra hands, "
@@ -264,12 +262,12 @@ class StorySceneEngine:
                 turbo_model = "stabilityai/sd-turbo"
                 print(f"[SCENE ENGINE] ⚡ Initializing Fast Diffusion on CPU ({turbo_model}, {torch.get_num_threads()} threads)...")
                 t0 = time.time()
-                from diffusers import EulerAncestralDiscreteScheduler
+                from diffusers import EulerDiscreteScheduler
                 self.pipe = AutoPipelineForText2Image.from_pretrained(
                     turbo_model,
                     torch_dtype=torch.float32,
                 )
-                self.pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(self.pipe.scheduler.config)
+                self.pipe.scheduler = EulerDiscreteScheduler.from_config(self.pipe.scheduler.config)
                 self.pipe.to("cpu")
                 self.current_model_id = turbo_model
                 if self.active_lora and os.path.exists(self.active_lora):
@@ -379,9 +377,9 @@ class StorySceneEngine:
         is_turbo = "turbo" in getattr(self, "current_model_id", "").lower()
 
         if is_turbo:
-            # SD-Turbo optimal 2-step inference at 448x640 with mild guidance to prevent character vertical repetition and clone tiling
+            # SD-Turbo deterministic Euler inference at 448x640 for crisp defined facial features and straight sword blade
             inf_steps = 2
-            inf_guidance = 1.2
+            inf_guidance = 1.05
             if height > width:
                 inf_w, inf_h = 448, 640
             elif width > height:

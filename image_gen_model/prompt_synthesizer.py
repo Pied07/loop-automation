@@ -481,18 +481,18 @@ def synthesize_scene_prompt(
         if has_characters:
             if is_ronin or is_rough:
                 if has_scars:
-                    face_part = "sharp weathered face, ruthless glare, prominent deep jagged battle scar across cheek, battle-scarred skin"
+                    face_part = "sharp detailed anime face, piercing eyes, defined facial features, prominent jagged battle scar across cheek"
                 else:
-                    face_part = "sharp weathered face, ruthless glare, chiseled jawline"
+                    face_part = "sharp detailed anime face, piercing eyes, defined jawline, intense focused glare"
             elif has_scars:
-                face_part = "sharp anime face, intense luminous eyes, prominent deep jagged battle scar on cheek"
+                face_part = "sharp detailed anime face, expressive eyes, prominent jagged battle scar across cheek"
             else:
-                face_part = "sharp anime face, luminous amber eyes, clean jawline, smooth skin"
+                face_part = "sharp detailed anime face, expressive eyes, clean defined jawline"
         else:
             face_part = ""
 
         weapon_part = (
-            "holding single katana blade firmly at side, exactly two arms total, two hands only"
+            "holding authentic straight Japanese steel katana blade, sharp straight metal edge, tsuka hilt, single sword only"
             if has_weapon
             else (pose_guidance if has_characters else "")
         )
@@ -536,18 +536,18 @@ def synthesize_scene_prompt(
         if has_characters:
             if is_ronin or is_rough:
                 if has_scars:
-                    real_face_part = "weathered male face, intense ruthless expression, prominent deep jagged battle scar visible on cheek, battle-scarred skin texture"
+                    real_face_part = "sharp realistic male face, piercing eyes, authentic skin, prominent jagged battle scar on cheek"
                 else:
-                    real_face_part = "weathered male face, intense ruthless expression, rugged masculine features, natural skin texture"
+                    real_face_part = "sharp realistic male face, piercing eyes, defined rugged jawline, intense expression"
             elif has_scars:
-                real_face_part = "exquisite human face, authentic realistic eyes, prominent deep jagged battle scar on cheek, authentic skin texture"
+                real_face_part = "sharp realistic human face, authentic eyes, prominent jagged battle scar on cheek"
             else:
-                real_face_part = "exquisite human face, authentic realistic eyes, clean jawline, natural skin texture"
+                real_face_part = "sharp realistic human face, authentic eyes, clean defined features"
         else:
             real_face_part = ""
 
         real_weapon_part = (
-            "holding single katana blade firmly at side, exactly two arms total, two hands only"
+            "holding authentic straight Japanese steel katana blade, sharp straight metal edge, tsuka hilt, single sword only"
             if has_weapon
             else (pose_guidance if has_characters else "")
         )
