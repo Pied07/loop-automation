@@ -50,8 +50,8 @@ STYLE_PRESETS = {
     "Cinematic Film": "cinematic film still, 35mm photography, dramatic atmospheric lighting, natural depth of field, photorealistic, 8k",
     "Realism": "cinematic 35mm film still, photorealistic, dramatic natural rim lighting, volumetric atmospheric depth, photorealistic 8k UHD, masterpiece",
     "Realistic": "cinematic 35mm film still, photorealistic, dramatic natural rim lighting, volumetric atmospheric depth, photorealistic 8k UHD, masterpiece",
-    "Anime": "masterpiece modern Japanese digital anime illustration, high-end anime key visual art, Ufotable Genshin style, glowing katana, 8k",
-    "Anime / Manga": "masterpiece modern Japanese digital anime illustration, high-end anime key visual art, Ufotable Genshin style, glowing katana, 8k",
+    "Anime": "masterpiece modern Japanese digital anime painting, high-end anime key visual art, Ufotable Genshin style, glowing luminous katana, vibrant 8k",
+    "Anime / Manga": "masterpiece modern Japanese digital anime painting, high-end anime key visual art, Ufotable Genshin style, glowing luminous katana, vibrant 8k",
     "Anime / Storybook": "Studio Ghibli inspired anime landscape, lush vibrant color palette, gorgeous hand-painted scenery, masterpiece",
     "3D Animation": "Pixar Disney 3D animation style, beautifully rendered CGI scene, warm cinematic studio 3D lighting, subsurface scattering, Octane render 8k",
     "3D Animation / Pixar": "Pixar Disney 3D animation style, beautifully rendered CGI scene, warm cinematic studio 3D lighting, subsurface scattering, Octane render 8k",
@@ -75,6 +75,7 @@ ASPECT_RATIOS = {
 
 # Industry standard anti-distortion negative prompt targeting horrifying faces, eye strabismus, anatomy mutations, and static portrait headshots
 COMPREHENSIVE_NEGATIVE_PROMPT = (
+    "dull colors, washed out, desaturated, muted colors, drab lighting, flat shading, 2d vector, clip art, low contrast, gray background, plain slate background, monochrome, "
     "retro comic, vintage comic, western comic, comic book panel, ink hatching, crosshatching, heavy linework, flat coloring, posterized, sketch, line drawing, "
     "distant character, tiny person, miniature character, zoomed out wide shot, full body far away, walking down path, long shot, "
     "neon pink, oversaturated pink, bright pink flowers, cherry blossom overload, cartoonish garden, children book illustration, 8-bit, pixel art, "
@@ -448,7 +449,8 @@ class StorySceneEngine:
 
         if is_anime:
             style_negative_prefix = (
-                "retro comic, vintage comic, western comic, american comic, comic book panel, ink hatching, crosshatching, heavy linework, woodblock print, ukiyo-e, flat color, posterized, sketch, line drawing, scribbles, doodle, low quality anime, "
+                "dull colors, washed out, desaturated, muted colors, drab lighting, flat shading, 2d vector, clip art, low contrast, gray background, flat colors, posterized, "
+                "retro comic, vintage comic, western comic, american comic, comic book panel, ink hatching, crosshatching, heavy linework, woodblock print, ukiyo-e, sketch, line drawing, scribbles, doodle, low quality anime, "
                 "photorealistic, photograph, 35mm photograph, realism, real life, realistic skin texture, pores, live action film, real human photo, 3d render, cgi, "
             )
         elif is_realistic:
@@ -507,9 +509,14 @@ class StorySceneEngine:
 
         # Post-processing: Enhance contrast, color saturation, and sharpness
         processed = raw_img.copy()
-        processed = ImageEnhance.Contrast(processed).enhance(1.05)
-        processed = ImageEnhance.Color(processed).enhance(1.04)
-        processed = ImageEnhance.Sharpness(processed).enhance(1.10)
+        if is_anime:
+            processed = ImageEnhance.Color(processed).enhance(1.18)
+            processed = ImageEnhance.Contrast(processed).enhance(1.12)
+            processed = ImageEnhance.Sharpness(processed).enhance(1.12)
+        else:
+            processed = ImageEnhance.Contrast(processed).enhance(1.06)
+            processed = ImageEnhance.Color(processed).enhance(1.06)
+            processed = ImageEnhance.Sharpness(processed).enhance(1.10)
 
         # Ensure exact requested output dimensions
         if target_resolution and (processed.width != target_resolution[0] or processed.height != target_resolution[1]):

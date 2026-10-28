@@ -80,11 +80,11 @@ UNIFIED_STYLE_PRESETS: Dict[str, Dict[str, str]] = {
         "env_framing": "authentic ancient architecture, monumental stone ruins, sweeping vista",
     },
     "Anime / Manga": {
-        "prefix": "masterpiece modern Japanese digital anime illustration, high-end anime key visual art, stunning anime aesthetic",
-        "lighting": "cinematic anime lighting, warm ambient lantern glow, glowing luminous katana blade, soft volumetric rim light",
-        "suffix": "trending on Pixiv Fanbox, Ufotable and Genshin anime visual art style, breathtaking gorgeous anime illustration, 8k resolution",
+        "prefix": "masterpiece modern Japanese digital anime painting, high-end anime key visual art, luminous vibrant anime aesthetic",
+        "lighting": "luminous vibrant anime lighting, glowing electric-blue katana edge, warm ambient golden lantern glow, radiant volumetric bloom, dynamic rim light",
+        "suffix": "trending on Pixiv Fanbox, Ufotable and Genshin visual art style, breathtaking gorgeous digital anime illustration, rich saturated colors, 8k resolution",
         "char_framing": "cinematic medium close-up shot, character filling the frame, waist-up composition, prominent hero focus",
-        "env_framing": "atmospheric traditional Japanese wooden temple pavilion, glowing paper lanterns, soft depth of field background blur",
+        "env_framing": "atmospheric traditional Japanese wooden temple pavilion, glowing paper lanterns, floating embers, soft depth of field background blur",
     },
     "Anime / Storybook": {
         "prefix": "Studio Ghibli inspired anime scenery, gorgeous hand-painted art",
@@ -373,9 +373,9 @@ def synthesize_scene_prompt(
         staging = preset["char_framing"] if has_characters else preset["env_framing"]
 
     if is_anime:
-        anime_lighting = "cinematic moody rain lighting, dramatic rim light, volumetric dark mist, deep atmospheric chiaroscuro shadows"
+        anime_lighting = "luminous vibrant anime lighting, glowing electric-blue katana edge, warm ambient golden lantern glow, rich vibrant saturated colors, dramatic volumetric bloom, gorgeous specular rim light"
         prompt_parts = [
-            f"Masterpiece Japanese anime visual artwork of {visual_core}",
+            f"Breathtaking digital anime key visual of {visual_core}",
             preset["prefix"],
             env_setting,
             human_enhancement,
