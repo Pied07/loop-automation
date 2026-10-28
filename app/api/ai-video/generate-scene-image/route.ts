@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 const LOCAL_DAEMON_URL = "http://127.0.0.1:5055";
 
 const COMPREHENSIVE_NEGATIVE_PROMPT =
+  "retro comic, vintage comic, western comic, comic book panel, ink hatching, crosshatching, heavy linework, flat coloring, posterized, sketch, line drawing, " +
   "distant character, tiny person, miniature character, zoomed out wide shot, full body far away, walking down path, long shot, " +
   "neon pink, oversaturated pink, bright pink flowers, cherry blossom overload, cartoonish garden, children book illustration, 8-bit, pixel art, " +
   "dark void, empty black background, plain black background, solid black background, studio backdrop, indoor stage, stage lighting, spotlights, spotlight beams, disco lights, floating sparkles, yellow laser line, floating glitter, " +
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
     const isAnime = /anime|manga|ghibli|comic|cartoon/i.test(style);
     const isRealistic = /real|photo|cinematic film/i.test(style);
     const styleNegPrefix = isAnime
-      ? "photorealistic, photograph, 35mm photograph, realism, real life, realistic skin texture, skin pores, live action film still, real human photo, 3d render, cgi, "
+      ? "retro comic, vintage comic, western comic, american comic, comic book panel, ink hatching, crosshatching, heavy linework, woodblock print, ukiyo-e, flat color, posterized, sketch, line drawing, scribbles, doodle, low quality anime, photorealistic, photograph, 35mm photograph, realism, real life, realistic skin texture, skin pores, live action film still, real human photo, 3d render, cgi, "
       : (isRealistic
         ? "anime, manga, cartoon, 3d render, cgi, digital illustration, digital painting, drawing, vector art, graphic novel, artificial, videogame, unreal engine, octane render, airbrushed, "
         : "");

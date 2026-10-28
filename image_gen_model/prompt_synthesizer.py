@@ -80,11 +80,11 @@ UNIFIED_STYLE_PRESETS: Dict[str, Dict[str, str]] = {
         "env_framing": "authentic ancient architecture, monumental stone ruins, sweeping vista",
     },
     "Anime / Manga": {
-        "prefix": "cinematic dark anime illustration, masterpiece Japanese anime character art, sharp clean linework",
-        "lighting": "cinematic moody rain lighting, dramatic atmospheric rim light, volumetric dark mist, deep contrast shadows",
-        "suffix": "trending on Pixiv, highly detailed dark anime aesthetic, Demon Slayer and Dororo style, 8k",
-        "char_framing": "cinematic medium close-up shot, character dominating the frame, waist-up composition, prominent hero focus",
-        "env_framing": "atmospheric dark anime background, cinematic rain streaks, moody misty forest with depth of field blur",
+        "prefix": "masterpiece modern Japanese digital anime illustration, high-end anime key visual art, stunning anime aesthetic",
+        "lighting": "cinematic anime lighting, warm ambient lantern glow, glowing luminous katana blade, soft volumetric rim light",
+        "suffix": "trending on Pixiv Fanbox, Ufotable and Genshin anime visual art style, breathtaking gorgeous anime illustration, 8k resolution",
+        "char_framing": "cinematic medium close-up shot, character filling the frame, waist-up composition, prominent hero focus",
+        "env_framing": "atmospheric traditional Japanese wooden temple pavilion, glowing paper lanterns, soft depth of field background blur",
     },
     "Anime / Storybook": {
         "prefix": "Studio Ghibli inspired anime scenery, gorgeous hand-painted art",
@@ -289,7 +289,7 @@ def synthesize_scene_prompt(
 
     if has_combat_action:
         if has_weapon:
-            pose_guidance = "dynamic martial arts combat stance, hands firmly gripping katana hilt drawing blade, intense focused downward gaze, windblown tied hair with loose bangs over face, leaning forward ready to strike, prominent upper body posture"
+            pose_guidance = "dynamic combat pose, holding sharp katana blade diagonally in battle ready stance, glowing luminous blade edge, intense captivating anime gaze, windblown hair with ribbon, prominent upper body posture"
         else:
             pose_guidance = "dynamic fighting stance, athletic combat posture with bent knees, low center of gravity, raised defensive guard, angled dynamic action pose"
     elif has_characters:
@@ -315,7 +315,7 @@ def synthesize_scene_prompt(
         is_eastern_warrior = bool(re.search(r"\b(?:ronin|samurai|ninja|katana|warrior|swordsman|blade|martial\s*arts)\b", f"{visual_core} {script_sentence}", re.IGNORECASE))
         if is_eastern_warrior:
             if is_anime:
-                env_setting = "moody dark rain-drenched misty forest background, cinematic falling rain streaks, atmospheric mist and subtle floating embers, soft depth of field blur"
+                env_setting = "atmospheric traditional Japanese wooden temple pavilion with glowing hanging paper lanterns, shoji screens, soft background depth of field blur"
             elif is_realistic:
                 env_setting = "outdoors on location in a misty rain-drenched bamboo grove, moody atmosphere, natural outdoor lighting"
             else:
@@ -332,8 +332,8 @@ def synthesize_scene_prompt(
 
     if is_anime:
         human_enhancement = (
-            "handsome attractive anime male protagonist, gorgeous anime face, sharp clean jawline, large expressive anime eyes, "
-            "smooth flawless blemish-free skin, no scars, perfectly drawn anime hair, "
+            "handsome gorgeous anime character, captivating luminous anime eyes, sharp clean anime facial features, "
+            "silky glossy anime hair tied with red ribbon, smooth flawless porcelain skin, no scars, ornate Japanese silk kimono with golden embroidery, "
             "authentic human anatomy, exactly two arms, two hands only, well-drawn anime hands, "
             + pose_guidance
             + (f", {weapon_guidance}" if weapon_guidance else "")
