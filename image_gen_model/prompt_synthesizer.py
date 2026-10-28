@@ -332,8 +332,8 @@ def synthesize_scene_prompt(
         re.IGNORECASE,
     ))
 
-    is_anime = any(w in (style_preset or "").lower() for w in ["anime", "manga", "ghibli", "comic", "cartoon"])
-    is_realistic = any(w in (style_preset or "").lower() for w in ["real", "photo", "cinematic film"])
+    is_anime = any(w in (style_preset or "").lower() for w in ["anime", "manga", "ghibli", "cartoon"]) and "comic" not in (style_preset or "").lower()
+    is_realistic = any(w in (style_preset or "").lower() for w in ["real", "photorealism"]) and not any(w in (style_preset or "").lower() for w in ["nature", "comic", "3d", "pixar"])
 
     anatomy_rule = "authentic anatomy, exactly two arms, two hands only, five fingers per hand, natural body proportions"
 
@@ -473,7 +473,7 @@ def synthesize_scene_prompt(
 
         style_core = "Masterpiece 2D anime, clean crisp lineart, Ufotable visual"
         framing_part = (
-            f"solo, single character focus, centered lone {char_tag}, solo portrait framing, authentic human anatomy, exactly two arms, two hands only, single sword"
+            f"solo, centered lone {char_tag}, single sword, exactly two arms, two hands only"
             if has_characters
             else preset["env_framing"]
         )
@@ -481,18 +481,18 @@ def synthesize_scene_prompt(
         if has_characters:
             if is_ronin or is_rough:
                 if has_scars:
-                    face_part = "sharp weathered masculine face, ruthless fierce glare, prominent deep jagged battle scar across cheek, battle-scarred skin"
+                    face_part = "sharp weathered face, ruthless glare, prominent deep jagged battle scar across cheek, battle-scarred skin"
                 else:
-                    face_part = "sharp weathered masculine face, ruthless fierce glare, chiseled rugged jawline"
+                    face_part = "sharp weathered face, ruthless glare, chiseled jawline"
             elif has_scars:
-                face_part = "sharp anime face, intense luminous eyes, prominent deep jagged battle scar across cheek, battle-scarred skin"
+                face_part = "sharp anime face, intense luminous eyes, prominent deep jagged battle scar on cheek"
             else:
                 face_part = "sharp anime face, luminous amber eyes, clean jawline, smooth skin"
         else:
             face_part = ""
 
         weapon_part = (
-            "single katana blade only, right hand holding the katana tsuka hilt, left arm resting at side, exactly two arms total, two hands only"
+            "holding single katana blade firmly at side, exactly two arms total, two hands only"
             if has_weapon
             else (pose_guidance if has_characters else "")
         )
@@ -506,10 +506,10 @@ def synthesize_scene_prompt(
         prompt_parts = [
             style_core,
             framing_part,
+            env_bg,
             face_part,
             weapon_part,
             clothing_tag,
-            env_bg,
             "dramatic cinematic lighting, rich saturated colors",
         ]
     elif is_realistic:
@@ -526,9 +526,9 @@ def synthesize_scene_prompt(
         else:
             real_char_tag = "1person, warrior"
 
-        style_core = "Masterpiece 35mm DSLR photograph, award winning portrait photography, 85mm f/1.4 lens"
+        style_core = "Masterpiece raw 35mm DSLR photograph, award winning portrait, 85mm f/1.4 lens"
         real_framing_part = (
-            f"solo, single character focus, centered lone {real_char_tag}, solo portrait framing, authentic human anatomy, exactly two arms, two hands only, single sword"
+            f"solo, centered lone {real_char_tag}, single sword, exactly two arms, two hands only"
             if has_characters
             else preset["env_framing"]
         )
@@ -536,18 +536,18 @@ def synthesize_scene_prompt(
         if has_characters:
             if is_ronin or is_rough:
                 if has_scars:
-                    real_face_part = "weathered male face, intense ruthless expression, prominent deep jagged battle scar visible across cheek, battle-scarred skin texture"
+                    real_face_part = "weathered male face, intense ruthless expression, prominent deep jagged battle scar visible on cheek, battle-scarred skin texture"
                 else:
                     real_face_part = "weathered male face, intense ruthless expression, rugged masculine features, natural skin texture"
             elif has_scars:
-                real_face_part = "exquisite human face, authentic realistic eyes, prominent deep jagged battle scar across cheek, authentic skin texture"
+                real_face_part = "exquisite human face, authentic realistic eyes, prominent deep jagged battle scar on cheek, authentic skin texture"
             else:
                 real_face_part = "exquisite human face, authentic realistic eyes, clean jawline, natural skin texture"
         else:
             real_face_part = ""
 
         real_weapon_part = (
-            "single katana blade only, right hand holding the katana tsuka hilt, left arm resting at side, exactly two arms total, two hands only"
+            "holding single katana blade firmly at side, exactly two arms total, two hands only"
             if has_weapon
             else (pose_guidance if has_characters else "")
         )
@@ -561,10 +561,10 @@ def synthesize_scene_prompt(
         prompt_parts = [
             style_core,
             real_framing_part,
+            env_bg,
             real_face_part,
             real_weapon_part,
             clothing_tag,
-            env_bg,
             "natural golden hour lighting, cinematic rim light, authentic optical bokeh, 8k UHD",
         ]
     elif is_horror:
@@ -592,13 +592,13 @@ def synthesize_scene_prompt(
             "warm 35mm film photography, emotional depth, 8k",
         ]
     else:
+        subject_tag = f"solo, centered {visual_core}, exactly two arms, two hands only" if has_characters else f"scene of {visual_core}"
         prompt_parts = [
-            f"Cinematic scene of {visual_core}",
-            env_setting,
-            human_enhancement,
             preset["prefix"],
+            subject_tag,
+            env_bg if env_bg else env_setting,
+            human_enhancement if has_characters else "",
             staging,
-            framing_tag,
             preset["lighting"],
             preset["suffix"],
         ]
@@ -618,16 +618,12 @@ def synthesize_scene_prompt(
                 seen_clauses.add(c_lower)
                 filtered_clauses.append(c_clean)
 
-    # Safely fit within 95 words without cutting words in half, ensuring environment background is preserved
+    # Safely fit within 58 words to strictly guarantee within CLIP's 75 token context window
     fitted_clauses = []
     current_word_count = 0
     for clause in filtered_clauses:
         clause_words = len(clause.split())
-        if current_word_count + clause_words > 95 and fitted_clauses:
-            if any(env_key in clause.lower() for env_key in ["against", "battlefield", "battle ground", "background", "terrain"]):
-                if current_word_count + clause_words <= 105:
-                    fitted_clauses.append(clause)
-                    current_word_count += clause_words
+        if current_word_count + clause_words > 58 and fitted_clauses:
             break
         fitted_clauses.append(clause)
         current_word_count += clause_words
