@@ -19,12 +19,13 @@ from flask_cors import CORS
 from PIL import Image
 
 COMPREHENSIVE_NEGATIVE_PROMPT = (
+    "deformed hands, poorly drawn hands, mutated hands, extra fingers, missing fingers, fused fingers, too many fingers, conjoined fingers, claw hands, mangled hands, deformed wrists, disembodied hands, floating hands, disconnected hands, malformed hands, webbed fingers, broken fingers, twisted fingers, overlapping fingers, amputated hands, "
+    "anatomical dissimilarity, figure dissimilarity, mutated figure, deformed body, asymmetrical body, non-human anatomy, grotesque anatomy, disproportionate body, malformed torso, extra limbs, conjoined limbs, unnatural body shape, distorted figure, "
     "three arms, extra arms, multi-armed, third arm, arm behind head, three hands, extra hands, "
     "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, "
     "distorted torso, twisted body, elongated torso, bad anatomy, grotesque proportions, deformed body, unnatural posture, warped torso, deformed figure, non-human body, "
     "duplicate person, multiple people, two characters, three characters, 3 people, multiple clones, clone duplication, totem pole, stacked characters, stacked body, double torso, second body, conjoined, "
     "multiple heads, two heads, three heads, stacked heads, vertical repetition, extra limbs, extra legs, duplicate hands, duplicate arms, "
-    "hazy hands, blurry hands, indistinct hands, hands hidden in sleeves, missing fingers, fused fingers, deformed hands, poorly drawn hands, "
     "floating sword, disconnected sword, hazy sword, blurry blade, double katana, translucent sword, dull blade, miniature sword, blunt blade, "
     "messy, chaotic, visual noise, grainy, noisy, haphazard, cluttered composition, debris, floating junk, distorted shapes, messy lines, "
     "rough sketch, scribbles, jittery lines, jagged edges, "

@@ -75,12 +75,13 @@ ASPECT_RATIOS = {
 
 # Industry standard anti-distortion negative prompt prioritizing anatomical integrity & limb correctness
 COMPREHENSIVE_NEGATIVE_PROMPT = (
+    "deformed hands, poorly drawn hands, mutated hands, extra fingers, missing fingers, fused fingers, too many fingers, conjoined fingers, claw hands, mangled hands, deformed wrists, disembodied hands, floating hands, disconnected hands, malformed hands, webbed fingers, broken fingers, twisted fingers, overlapping fingers, amputated hands, "
+    "anatomical dissimilarity, figure dissimilarity, mutated figure, deformed body, asymmetrical body, non-human anatomy, grotesque anatomy, disproportionate body, malformed torso, extra limbs, conjoined limbs, unnatural body shape, distorted figure, "
     "three arms, extra arms, multi-armed, third arm, arm behind head, three hands, extra hands, "
     "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, "
     "distorted torso, twisted body, elongated torso, bad anatomy, grotesque proportions, deformed body, unnatural posture, warped torso, deformed figure, non-human body, "
     "duplicate person, multiple people, two characters, three characters, 3 people, multiple clones, clone duplication, totem pole, stacked characters, stacked body, double torso, second body, conjoined, "
     "multiple heads, two heads, three heads, stacked heads, vertical repetition, extra limbs, extra legs, duplicate hands, duplicate arms, "
-    "hazy hands, blurry hands, indistinct hands, hands hidden in sleeves, missing fingers, fused fingers, deformed hands, poorly drawn hands, "
     "floating sword, disconnected sword, hazy sword, blurry blade, double katana, translucent sword, dull blade, miniature sword, blunt blade, "
     "messy, chaotic, visual noise, grainy, noisy, haphazard, cluttered composition, debris, floating junk, distorted shapes, messy lines, "
     "rough sketch, scribbles, jittery lines, jagged edges, "
@@ -375,9 +376,9 @@ class StorySceneEngine:
         is_turbo = "turbo" in getattr(self, "current_model_id", "").lower()
 
         if is_turbo:
-            # SD-Turbo optimal 1-step inference at 512x768 to prevent receptive-field double-torso tiling
-            inf_steps = 1
-            inf_guidance = 0.0
+            # SD-Turbo optimal 2-step inference at 512x768 with mild guidance to enforce anti-deformed-hand negative prompt
+            inf_steps = 2
+            inf_guidance = 1.2
             if height > width:
                 inf_w, inf_h = 512, 768
             elif width > height:
@@ -402,7 +403,7 @@ class StorySceneEngine:
                     "width": inf_w,
                     "generator": gen,
                 }
-                if eff_neg is not None and inf_guidance > 0.0:
+                if eff_neg is not None and inf_guidance > 1.0:
                     pipe_kwargs["negative_prompt"] = eff_neg
 
                 result = self.pipe(**pipe_kwargs)

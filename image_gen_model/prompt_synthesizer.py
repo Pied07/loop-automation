@@ -453,14 +453,14 @@ def synthesize_scene_prompt(
     if is_anime:
         char_tag = "1girl, beautiful anime heroine" if is_female else ("1boy, handsome anime warrior" if is_male else "1character, anime hero")
         style_core = "Masterpiece 2D Japanese anime, clean crisp lineart, Ufotable key visual"
-        framing_part = f"solo, exactly one person, single {char_tag}, head and shoulders portrait, chest-up framing, centered composition, single human body" if has_characters else preset["env_framing"]
+        framing_part = f"solo, exactly one person, single {char_tag}, authentic human anatomy, perfectly proportioned figure, natural symmetrical shoulders, exactly two arms, no dissimilarities" if has_characters else preset["env_framing"]
         if has_scars:
             face_part = "sharp anime face, luminous amber eyes, clean jawline, iconic battle scar across cheek" if has_characters else ""
         else:
             face_part = "sharp anime face, luminous amber eyes, clean jawline, smooth skin" if has_characters else ""
 
         weapon_part = (
-            "holding a single katana firmly with both hands, single blade only, authentic grip"
+            "one hand gripping the katana tsuka hilt firmly with five clearly defined fingers and knuckles, single sword only, natural authentic grip"
             if has_weapon
             else (pose_guidance if has_characters else "")
         )
@@ -477,14 +477,14 @@ def synthesize_scene_prompt(
     elif is_realistic:
         real_char_tag = "1woman, beautiful female warrior" if is_female else ("1man, handsome samurai warrior" if is_eastern else "1man, handsome male warrior")
         style_core = "Masterpiece raw 35mm DSLR color photograph, award winning portrait photography, shot on Sony A7R V, 85mm f/1.4 GM lens"
-        real_framing_part = f"solo, exactly one person, single {real_char_tag}, head and shoulders portrait, chest-up framing, centered composition, single human body" if has_characters else preset["env_framing"]
+        real_framing_part = f"solo, exactly one person, single {real_char_tag}, authentic human anatomy, perfectly proportioned figure, natural symmetrical shoulders, exactly two arms, no dissimilarities" if has_characters else preset["env_framing"]
         if has_scars:
             real_face_part = "exquisite human face, authentic realistic eyes, clean jawline, iconic battle scar on cheek" if has_characters else ""
         else:
             real_face_part = "exquisite human face, authentic realistic eyes, clean jawline, natural skin texture" if has_characters else ""
 
         real_weapon_part = (
-            "holding a single katana firmly with both hands, single blade only, authentic grip"
+            "one hand gripping the katana tsuka hilt firmly with five clearly defined fingers and knuckles, single sword only, natural authentic grip"
             if has_weapon
             else (pose_guidance if has_characters else "")
         )
