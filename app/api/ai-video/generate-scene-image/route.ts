@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 const LOCAL_DAEMON_URL = "http://127.0.0.1:5055";
 
 const COMPREHENSIVE_NEGATIVE_PROMPT =
+  "standing straight, stiff pose, rigid posture, mannequin pose, t-pose, a-pose, static standing, boring pose, idle pose, straight upright posture, lifeless stance, neutral standing pose, standing upright, passport photo pose, symmetrical standing, " +
   "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, " +
   "elongated torso, long torso, stretched body, unnaturally tall torso, stacked torso, double torso, accordion torso, " +
   "repeating armor, ribbed armor distortion, repeating patterns, segmented body, " +
@@ -32,6 +33,9 @@ const COMPREHENSIVE_NEGATIVE_PROMPT =
   "low quality, worst quality, normal quality, jpeg artifacts, overexposed, underexposed, bad lighting";
 
 const HORROR_NEGATIVE_PROMPT =
+  "standing straight, stiff pose, rigid posture, mannequin pose, t-pose, a-pose, static standing, straight upright posture, " +
+  "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, " +
+  "elongated torso, long torso, stretched body, stacked torso, accordion torso, ribbed armor distortion, " +
   "happy smile, cheerful face, laughing, friendly smile, sunny day, bright cheerful lighting, pastel colors, " +
   "cartoon, 3d cute pixar, anime, childish, " +
   "collaged face, pasted face, cut-and-paste face, mismatched photo, cutout head, frankenstein collage, " +

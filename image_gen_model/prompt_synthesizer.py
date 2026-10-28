@@ -79,6 +79,13 @@ UNIFIED_STYLE_PRESETS: Dict[str, Dict[str, str]] = {
         "char_framing": "historical traveler in period attire, natural cinematic composition",
         "env_framing": "authentic ancient architecture, monumental stone ruins, sweeping vista",
     },
+    "Anime / Manga": {
+        "prefix": "cinematic anime manga art style, detailed Japanese anime illustration, crisp clean line art",
+        "lighting": "dramatic cinematic anime lighting, intense glowing highlights, volumetric contrast",
+        "suffix": "masterpiece anime artwork, trending on Pixiv, dynamic anime aesthetic, highly detailed 8k",
+        "char_framing": "dynamic anime action stance, expressive battle-ready pose, dramatic cinematic perspective",
+        "env_framing": "breathtaking anime environment, vivid colors, detailed scenic background",
+    },
     "Anime / Storybook": {
         "prefix": "Studio Ghibli inspired anime scenery, gorgeous hand-painted art",
         "lighting": "lush vibrant color palette, atmospheric golden light, soft whimsical glow",
@@ -142,6 +149,9 @@ def clean_narration(text: str) -> str:
         flags=re.IGNORECASE,
     )
 
+    # Convert passive standing phrases to dynamic stances so diffusion models don't render rigid vertical statues
+    clean = re.sub(r"\b(?:still\s+standing(?:\s+strongly)?|standing\s+(?:straight|upright|strongly|still))\b", "poised in combat stance", clean, flags=re.IGNORECASE)
+
     # Clean punctuation and quotes
     clean = re.sub(r'["\'*_#`~]', "", clean)
     clean = re.sub(r"\s+", " ", clean).strip()
@@ -193,7 +203,9 @@ def find_style_preset(style_name: Optional[str]) -> Dict[str, str]:
             "env_framing": "",
         }
     if "anime" in s_lower or "manga" in s_lower or "ghibli" in s_lower:
-        return UNIFIED_STYLE_PRESETS["Anime / Storybook"]
+        if "storybook" in s_lower or "ghibli" in s_lower:
+            return UNIFIED_STYLE_PRESETS["Anime / Storybook"]
+        return UNIFIED_STYLE_PRESETS["Anime / Manga"]
     if "real" in s_lower:
         return UNIFIED_STYLE_PRESETS["Realism"]
     if "3d" in s_lower or "pixar" in s_lower or "disney" in s_lower:
@@ -259,11 +271,30 @@ def synthesize_scene_prompt(
     has_characters = any(re.search(pat, visual_core, re.IGNORECASE) for pat in CHARACTER_PATTERNS) or any(re.search(pat, script_sentence, re.IGNORECASE) for pat in CHARACTER_PATTERNS)
 
     has_weapon = bool(re.search(r"\b(?:sword|blade|dagger|spear|axe|shield|bow|weapon|gun|pistol|rifle|saber|katana)\b", f"{visual_core} {script_sentence}", re.IGNORECASE))
-    weapon_guidance = "holding a single weapon in hand, single sword only, authentic natural grip" if has_weapon else ""
+
+    # Detect dynamic fighting, martial arts, warrior, combat, or action pose requests
+    has_combat_action = bool(re.search(
+        r"\b(?:fight|fighting|combat|battle|action|martial\s*arts|strike|striking|slash|slashing|attack|defend|defense|duel|clash|stance|pose|ready|ronin|samurai|warrior|ninja|knight|boxing|kick|dynamic)\b",
+        f"{visual_core} {script_sentence}",
+        re.IGNORECASE,
+    ))
+
+    if has_combat_action:
+        if has_weapon:
+            pose_guidance = "dynamic martial arts combat stance, fighting posture with bent knees, low center of gravity, angled body ready to strike, intense battle-ready action pose, wielding weapon in ready battle guard"
+        else:
+            pose_guidance = "dynamic martial arts fighting stance, athletic combat posture with bent knees, low center of gravity, raised defensive guard, angled dynamic action pose"
+    elif has_characters:
+        pose_guidance = "natural dynamic posture, relaxed organic body stance, expressive body language"
+    else:
+        pose_guidance = ""
+
+    weapon_guidance = "holding a single weapon in hand, single weapon only, authentic natural grip" if has_weapon else ""
 
     human_enhancement = (
         "detailed beautiful symmetrical face, clear expressive eyes with detailed pupils, "
-        "realistic skin texture, authentic human torso anatomy, natural body proportions, well-proportioned limbs and hands"
+        "realistic skin texture, authentic human torso anatomy, natural body proportions, well-proportioned limbs and hands, "
+        + pose_guidance
         + (f", {weapon_guidance}" if weapon_guidance else "")
     ) if has_characters else ""
 
@@ -280,7 +311,10 @@ def synthesize_scene_prompt(
 
     framing_tag = "vertical 9:16 composition" if "9:16" in aspect_ratio else "widescreen 16:9 composition"
 
-    staging = preset["char_framing"] if has_characters else preset["env_framing"]
+    if has_combat_action:
+        staging = "dynamic three-quarters angle action shot, full body fighting stance with bent legs, cinematic foreshortening, dramatic action composition"
+    else:
+        staging = preset["char_framing"] if has_characters else preset["env_framing"]
 
     if is_horror:
         horror_lighting = "chilling moonlight piercing cold shadows, volumetric supernatural mist, eerie amber glow"

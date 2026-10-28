@@ -4427,6 +4427,55 @@ export default function Home() {
                     ))}
                   </div>
                 </div>
+
+                {/* Quick Pose & Action Stance Chips */}
+                <div style={{ marginTop: '10px' }}>
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span>🥋 Action & Combat Stances:</span>
+                    <span style={{ fontSize: '10px', color: '#38bdf8', background: 'rgba(56,189,248,0.1)', padding: '1px 5px', borderRadius: '3px' }}>Click to append dynamic pose</span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {[
+                      { label: "⚔️ Katana Striking Stance", text: ", dynamic martial arts combat stance, bent knees, low center of gravity, blade angled ready to strike" },
+                      { label: "🥋 Martial Arts Fighting Pose", text: ", athletic combat fighting stance, raised defensive fists, angled dynamic action posture" },
+                      { label: "⚡ Heroic Battle Ready", text: ", dramatic battle-ready action pose, three-quarters angle, dynamic body tension, cinematic foreshortening" },
+                      { label: "🛡️ Defensive Guard Pose", text: ", low defensive guard stance, grounded footing, intense focused gaze, dynamic posture" },
+                      { label: "🏃 Leaping Action Strike", text: ", mid-air dynamic leaping slash, dramatic aerial combat pose, motion blur" },
+                    ].map((pose, pidx) => (
+                      <button
+                        key={pidx}
+                        type="button"
+                        onClick={() => {
+                          setImageGenPrompt(prev => {
+                            const trimmed = prev.trim();
+                            return trimmed ? `${trimmed}${pose.text}` : pose.text.replace(/^,\s*/, "");
+                          });
+                        }}
+                        style={{
+                          background: 'rgba(56, 189, 248, 0.08)',
+                          border: '1px solid rgba(56, 189, 248, 0.25)',
+                          borderRadius: '6px',
+                          color: '#38bdf8',
+                          fontSize: '11px',
+                          padding: '4px 8px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          fontWeight: 500,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#38bdf8';
+                          e.currentTarget.style.background = 'rgba(56, 189, 248, 0.18)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.25)';
+                          e.currentTarget.style.background = 'rgba(56, 189, 248, 0.08)';
+                        }}
+                      >
+                        {pose.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               {/* Image Type / Style Selection Card */}

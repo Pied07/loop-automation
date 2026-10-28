@@ -50,8 +50,8 @@ STYLE_PRESETS = {
     "Cinematic Film": "cinematic film still, 35mm photography, dramatic atmospheric lighting, natural depth of field, photorealistic, 8k",
     "Realism": "cinematic 35mm film still, photorealistic, dramatic natural rim lighting, volumetric atmospheric depth, photorealistic 8k UHD, masterpiece",
     "Realistic": "cinematic 35mm film still, photorealistic, dramatic natural rim lighting, volumetric atmospheric depth, photorealistic 8k UHD, masterpiece",
-    "Anime": "Studio Ghibli inspired anime landscape, lush vibrant color palette, gorgeous hand-painted scenery, masterpiece, clean line art",
-    "Anime / Manga": "Studio Ghibli inspired anime landscape, lush vibrant color palette, gorgeous hand-painted scenery, masterpiece, clean line art",
+    "Anime": "cinematic anime manga art style, detailed Japanese anime illustration, crisp clean line art, dramatic dynamic lighting, glowing highlights, masterpiece anime artwork, trending on Pixiv, 8k",
+    "Anime / Manga": "cinematic anime manga art style, detailed Japanese anime illustration, crisp clean line art, dramatic dynamic lighting, glowing highlights, masterpiece anime artwork, trending on Pixiv, 8k",
     "Anime / Storybook": "Studio Ghibli inspired anime landscape, lush vibrant color palette, gorgeous hand-painted scenery, masterpiece",
     "3D Animation": "Pixar Disney 3D animation style, beautifully rendered CGI scene, warm cinematic studio 3D lighting, subsurface scattering, Octane render 8k",
     "3D Animation / Pixar": "Pixar Disney 3D animation style, beautifully rendered CGI scene, warm cinematic studio 3D lighting, subsurface scattering, Octane render 8k",
@@ -75,6 +75,7 @@ ASPECT_RATIOS = {
 
 # Industry standard anti-distortion negative prompt targeting horrifying faces, eye strabismus, anatomy mutations, and static portrait headshots
 COMPREHENSIVE_NEGATIVE_PROMPT = (
+    "standing straight, stiff pose, rigid posture, mannequin pose, t-pose, a-pose, static standing, boring pose, idle pose, straight upright posture, lifeless stance, neutral standing pose, standing upright, passport photo pose, symmetrical standing, "
     "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, "
     "elongated torso, long torso, stretched body, unnaturally tall torso, stacked torso, double torso, accordion torso, repeating armor, ribbed armor distortion, repeating patterns, "
     "extra arms, multiple arms, extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, "
@@ -96,6 +97,7 @@ COMPREHENSIVE_NEGATIVE_PROMPT = (
 
 # Dedicated Horror negative prompt: prevents cheerful smiles and technical artifacts while ALLOWING scary/ghostly faces
 HORROR_NEGATIVE_PROMPT = (
+    "standing straight, stiff pose, rigid posture, mannequin pose, t-pose, a-pose, static standing, straight upright posture, "
     "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, "
     "elongated torso, long torso, stretched body, stacked torso, accordion torso, ribbed armor distortion, "
     "happy smile, cheerful face, laughing, friendly smile, sunny day, bright cheerful lighting, pastel colors, "
