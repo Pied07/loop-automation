@@ -75,16 +75,20 @@ ASPECT_RATIOS = {
 
 # Industry standard anti-distortion negative prompt prioritizing anatomical integrity & limb correctness
 COMPREHENSIVE_NEGATIVE_PROMPT = (
-    "extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, "
+    "duplicate person, multiple people, two characters, stacked body, double torso, second body, conjoined, "
+    "multiple heads, two heads, extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, "
     "deformed hands, poorly drawn hands, fused fingers, too many fingers, missing fingers, mutated hands, "
-    "mutated limbs, malformed limbs, disconnected limbs, floating limbs, duplicate person, multiple heads, multiple people, "
+    "mutated limbs, malformed limbs, disconnected limbs, floating limbs, "
     "bad anatomy, grotesque proportions, malformed facial features, disfigured, "
     "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, "
     "elongated torso, long torso, stretched body, unnaturally tall torso, stacked torso, double torso, accordion torso, repeating armor, ribbed armor distortion, repeating patterns, "
-    "horrifying face, grotesque face, scary distorted face, deformed face, disfigured face, twisted face, "
-    "hollow eyes, sunken eye sockets, dark eye sockets, black eye sockets, deformed pupils, missing eyes, blind eyes, mismatched eyes, "
+    "full body far away, distant tiny character, "
+    "retro comic, vintage comic, western comic, comic book panel, ink hatching, crosshatching, heavy linework, woodblock print, ukiyo-e, sketch, line drawing, "
+    "ugly face, deformed face, scary distorted face, disfigured face, twisted face, bad eyes, small eyes, "
+    "hollow eyes, sunken eye sockets, dark eye sockets, black eyes, deformed pupils, missing eyes, blind eyes, mismatched eyes, "
     "crossed eyes, strabismus, wall-eyed, cockeyed, misaligned eyes, lazy eye, asymmetrical eyes, crooked pupils, dilated pupils, "
     "deformed eyes, missing pupils, unnatural iris, crooked mouth, twisted jaw, deformed teeth, melted face, claymation face, "
+    "scars, scarred face, body scars, blemish, acne, rough skin, weathered face, wrinkles, aged skin, "
     "zombie face, plastic dummy, uncanny valley, malformed facial structure, "
     "spinal deformity, broken neck, mutilated neck, twisted spine, physical deformity, "
     "collaged face, pasted face, cut-and-paste face, mismatched face, photo collage, cutout head, frankenstein face, "
@@ -92,7 +96,6 @@ COMPREHENSIVE_NEGATIVE_PROMPT = (
     "elongated arms, rubbery arms, melted skin, mutated fingers, fused limbs, deformed body, unnatural posture, "
     "blurry, unnatural body, plastic skin, "
     "dull colors, washed out, desaturated, muted colors, drab lighting, flat shading, 2d vector, clip art, low contrast, gray background, plain slate background, monochrome, "
-    "retro comic, vintage comic, western comic, comic book panel, ink hatching, crosshatching, heavy linework, flat coloring, posterized, sketch, line drawing, "
     "blank background, solid color background, plain background, studio backdrop, cropped head, "
     "text, watermark, signature, username, error, "
     "low quality, worst quality, normal quality, jpeg artifacts, overexposed, underexposed, bad lighting"
@@ -100,12 +103,14 @@ COMPREHENSIVE_NEGATIVE_PROMPT = (
 
 # Dedicated Horror negative prompt prioritizing anatomical integrity while allowing spooky atmosphere
 HORROR_NEGATIVE_PROMPT = (
-    "extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, "
+    "duplicate person, multiple people, two characters, stacked body, double torso, second body, conjoined, "
+    "multiple heads, two heads, extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, "
     "deformed hands, poorly drawn hands, fused fingers, too many fingers, missing fingers, mutated hands, "
-    "mutated limbs, malformed limbs, disconnected limbs, floating limbs, duplicate person, multiple heads, multiple people, "
+    "mutated limbs, malformed limbs, disconnected limbs, floating limbs, "
     "bad anatomy, grotesque proportions, malformed facial features, "
     "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, "
     "elongated torso, long torso, stretched body, stacked torso, accordion torso, ribbed armor distortion, "
+    "full body far away, distant tiny character, "
     "happy smile, cheerful face, laughing, friendly smile, sunny day, bright cheerful lighting, pastel colors, "
     "cartoon, 3d cute pixar, anime, childish, "
     "collaged face, pasted face, cut-and-paste face, mismatched photo, cutout head, frankenstein collage, "
@@ -450,9 +455,10 @@ class StorySceneEngine:
 
         if is_anime:
             style_negative_prefix = (
-                "dull colors, washed out, desaturated, muted colors, drab lighting, flat shading, 2d vector, clip art, low contrast, gray background, flat colors, posterized, "
-                "retro comic, vintage comic, western comic, american comic, comic book panel, ink hatching, crosshatching, heavy linework, woodblock print, ukiyo-e, sketch, line drawing, scribbles, doodle, low quality anime, "
+                "retro comic, vintage comic, western comic, comic book panel, ink hatching, crosshatching, heavy linework, woodblock print, ukiyo-e, sketch, line drawing, scribbles, doodle, low quality anime, "
+                "ugly face, deformed face, bad eyes, small eyes, scars, rough skin, weathered face, wrinkles, "
                 "photorealistic, photograph, 35mm photograph, realism, real life, realistic skin texture, pores, live action film, real human photo, 3d render, cgi, "
+                "dull colors, washed out, desaturated, muted colors, drab lighting, flat shading, 2d vector, clip art, low contrast, gray background, flat colors, posterized, "
             )
         elif is_realistic:
             style_negative_prefix = (
@@ -462,9 +468,9 @@ class StorySceneEngine:
             style_negative_prefix = ""
 
         base_negative = HORROR_NEGATIVE_PROMPT if is_horror else COMPREHENSIVE_NEGATIVE_PROMPT
-        effective_negative = (
-            f"{style_negative_prefix}{negative_prompt}" if negative_prompt else f"{style_negative_prefix}{base_negative}"
-        )
+        user_neg = f", {negative_prompt.strip()}" if negative_prompt and negative_prompt.strip() else ""
+        style_neg = f", {style_negative_prefix.strip().rstrip(',')}" if style_negative_prefix.strip() else ""
+        effective_negative = f"{base_negative}{style_neg}{user_neg}"
 
         raw_img = None
 

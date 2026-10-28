@@ -14,13 +14,17 @@ export const dynamic = "force-dynamic";
 const LOCAL_DAEMON_URL = "http://127.0.0.1:5055";
 
 const COMPREHENSIVE_NEGATIVE_PROMPT =
-  "extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, " +
+  "duplicate person, multiple people, two characters, stacked body, double torso, second body, conjoined, " +
+  "multiple heads, two heads, extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, " +
   "deformed hands, poorly drawn hands, fused fingers, too many fingers, missing fingers, mutated hands, " +
-  "mutated limbs, malformed limbs, disconnected limbs, floating limbs, duplicate person, multiple heads, multiple people, " +
+  "mutated limbs, malformed limbs, disconnected limbs, floating limbs, " +
   "bad anatomy, grotesque proportions, malformed facial features, disfigured, " +
   "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, " +
   "elongated torso, long torso, stretched body, unnaturally tall torso, stacked torso, double torso, accordion torso, repeating armor, ribbed armor distortion, repeating patterns, " +
-  "horrifying face, grotesque face, scary distorted face, deformed face, disfigured face, twisted face, " +
+  "full body far away, distant tiny character, " +
+  "retro comic, vintage comic, western comic, comic book panel, ink hatching, crosshatching, heavy linework, woodblock print, ukiyo-e, sketch, line drawing, " +
+  "ugly face, deformed face, bad eyes, small eyes, scars, scarred face, rough skin, weathered face, wrinkles, " +
+  "horrifying face, grotesque face, scary distorted face, disfigured face, twisted face, " +
   "hollow eyes, sunken eye sockets, dark eye sockets, black eyes, deformed pupils, missing eyes, blind eyes, mismatched eyes, " +
   "crossed eyes, strabismus, wall-eyed, cockeyed, misaligned eyes, lazy eye, asymmetrical eyes, crooked pupils, dilated pupils, " +
   "deformed eyes, missing pupils, unnatural iris, crooked mouth, twisted jaw, deformed teeth, melted face, claymation face, " +
@@ -31,18 +35,19 @@ const COMPREHENSIVE_NEGATIVE_PROMPT =
   "elongated arms, rubbery arms, melted skin, mutated fingers, fused limbs, deformed body, unnatural posture, " +
   "blurry, bad proportions, gross proportions, unnatural body, plastic skin, " +
   "dull colors, washed out, desaturated, muted colors, drab lighting, flat shading, 2d vector, clip art, low contrast, gray background, plain slate background, monochrome, " +
-  "retro comic, vintage comic, western comic, comic book panel, ink hatching, crosshatching, heavy linework, flat coloring, posterized, sketch, line drawing, " +
   "blank background, solid color background, plain background, studio backdrop, cropped head, " +
   "text, watermark, signature, username, error, " +
   "low quality, worst quality, normal quality, jpeg artifacts, overexposed, underexposed, bad lighting";
 
 const HORROR_NEGATIVE_PROMPT =
-  "extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, " +
+  "duplicate person, multiple people, two characters, stacked body, double torso, second body, conjoined, " +
+  "multiple heads, two heads, extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, " +
   "deformed hands, poorly drawn hands, fused fingers, too many fingers, missing fingers, mutated hands, " +
-  "mutated limbs, malformed limbs, disconnected limbs, floating limbs, duplicate person, multiple heads, multiple people, " +
+  "mutated limbs, malformed limbs, disconnected limbs, floating limbs, " +
   "bad anatomy, grotesque proportions, malformed facial features, " +
   "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, " +
   "elongated torso, long torso, stretched body, stacked torso, accordion torso, ribbed armor distortion, " +
+  "full body far away, distant tiny character, " +
   "happy smile, cheerful face, laughing, friendly smile, sunny day, bright cheerful lighting, pastel colors, " +
   "cartoon, 3d cute pixar, anime, childish, " +
   "collaged face, pasted face, cut-and-paste face, mismatched photo, cutout head, frankenstein collage, " +

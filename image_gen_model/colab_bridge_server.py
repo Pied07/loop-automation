@@ -19,17 +19,20 @@ from flask_cors import CORS
 from PIL import Image
 
 COMPREHENSIVE_NEGATIVE_PROMPT = (
-    "extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, "
+    "duplicate person, multiple people, two characters, stacked body, double torso, second body, conjoined, "
+    "multiple heads, two heads, extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, "
     "deformed hands, poorly drawn hands, fused fingers, too many fingers, missing fingers, mutated hands, "
-    "mutated limbs, malformed limbs, disconnected limbs, floating limbs, duplicate person, multiple heads, multiple people, "
+    "mutated limbs, malformed limbs, disconnected limbs, floating limbs, "
     "bad anatomy, grotesque proportions, malformed facial features, disfigured, "
     "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, "
     "elongated torso, long torso, stretched body, unnaturally tall torso, stacked torso, double torso, accordion torso, repeating armor, ribbed armor distortion, repeating patterns, "
+    "full body far away, distant tiny character, "
+    "retro comic, vintage comic, western comic, comic book panel, ink hatching, crosshatching, heavy linework, woodblock print, ukiyo-e, sketch, "
+    "ugly face, deformed face, bad eyes, small eyes, scars, scarred face, rough skin, weathered face, wrinkles, "
     "collaged face, pasted face, cut-and-paste face, mismatched face, photo collage, cutout head, frankenstein face, "
     "extra eyes, multi eyes, mutated eyes, duplicate eyes, crossed eyes, fused eyes, deformed iris, deformed pupils, "
     "asymmetrical face, deformed face, bad face anatomy, distorted facial features, cloned face, morbid, mutilated, "
     "blurry, bad proportions, gross proportions, unnatural body, plastic skin, deformed jaw, uncanny valley, "
-    "close-up, headshot, portrait, passport photo, mugshot, ID photo, centered face, static pose, "
     "blank background, solid color background, plain background, studio backdrop, cropped head, "
     "text, watermark, signature, username, error, "
     "low quality, worst quality, normal quality, jpeg artifacts, overexposed, underexposed, bad lighting"
