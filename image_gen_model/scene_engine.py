@@ -75,6 +75,7 @@ ASPECT_RATIOS = {
 
 # Industry standard anti-distortion negative prompt prioritizing anatomical integrity & limb correctness
 COMPREHENSIVE_NEGATIVE_PROMPT = (
+    "cropped character, cropped feet, cropped legs, cut off at knees, cut off at waist, out of frame, close-up, zoom-in, macro shot, matte, dull colors, flat shading, washed out, drab lighting, low contrast, "
     "bent sword, crooked sword, warped blade, rubber sword, curved blade, duplicate blade, split blade, double blade, multiple swords, extra swords, extra arms, third arm, 3 arms, arm behind shoulder, extra hands, three hands, distorted face, smudged face, melted face, deformed eyes, crossed eyes, bad eyes, blurry face, messy face, two people, 2 characters, background people, crowd, blank background, plain background, white background, border, frame, margin, parchment, "
     "deformed hands, poorly drawn hands, mutated hands, extra fingers, missing fingers, fused fingers, too many fingers, conjoined fingers, claw hands, mangled hands, deformed wrists, disembodied hands, floating hands, disconnected hands, malformed hands, webbed fingers, broken fingers, twisted fingers, overlapping fingers, amputated hands, "
     "anatomical dissimilarity, figure dissimilarity, mutated figure, deformed body, asymmetrical body, non-human anatomy, grotesque anatomy, disproportionate body, malformed torso, conjoined limbs, unnatural body shape, distorted figure, "
@@ -539,8 +540,9 @@ class StorySceneEngine:
         # Post-processing: Enhance contrast and color saturation naturally without artificial sharpness noise
         processed = raw_img.copy()
         if is_anime:
-            processed = ImageEnhance.Color(processed).enhance(1.08)
-            processed = ImageEnhance.Contrast(processed).enhance(1.04)
+            processed = ImageEnhance.Color(processed).enhance(1.15)
+            processed = ImageEnhance.Contrast(processed).enhance(1.06)
+            processed = ImageEnhance.Brightness(processed).enhance(1.02)
         else:
             processed = ImageEnhance.Color(processed).enhance(1.06)
             processed = ImageEnhance.Contrast(processed).enhance(1.04)

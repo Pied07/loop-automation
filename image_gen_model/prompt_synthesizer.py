@@ -80,10 +80,10 @@ UNIFIED_STYLE_PRESETS: Dict[str, Dict[str, str]] = {
         "env_framing": "authentic ancient architecture, monumental stone ruins, sweeping vista",
     },
     "Anime / Manga": {
-        "prefix": "masterpiece authentic 2D Japanese anime visual art, high-end anime key visual, Makoto Shinkai and Ufotable style",
-        "lighting": "dynamic anime lighting, radiant luminous bloom, vibrant rich saturated colors, stunning ambient highlights",
-        "suffix": "trending on Pixiv, crisp cel-shaded anime line art, expressive luminous anime eyes, clean beautiful digital anime illustration, 8k anime wallpaper",
-        "char_framing": "cinematic anime key visual framing, prominent hero focus, dynamic anime composition, well-proportioned limbs",
+        "prefix": "masterpiece authentic vibrant 2D Japanese anime visual art, glossy luminous Ufotable key visual, Makoto Shinkai style",
+        "lighting": "radiant luminous bloom, glossy ambient highlights, vibrant rich saturated colors, high contrast reflections",
+        "suffix": "trending on Pixiv, glossy anime art, expressive luminous anime eyes, clean polished digital anime illustration, 8k anime wallpaper",
+        "char_framing": "cinematic anime full body shot, entire figure head to toe in frame, complete body visible, prominent hero focus, dynamic anime composition",
         "env_framing": "atmospheric anime scenery, beautifully painted background scenery, soft depth of field blur",
     },
     "Anime / Storybook": {
@@ -402,7 +402,7 @@ def synthesize_scene_prompt(
     framing_tag = "vertical 9:16 composition" if "9:16" in aspect_ratio else "widescreen 16:9 composition"
 
     if has_combat_action:
-        staging = "cinematic medium shot, dynamic battle pose, prominent subject focus"
+        staging = "cinematic full body shot, entire figure head to toe in frame, complete body visible, dynamic battle pose, prominent subject focus"
     else:
         staging = preset["char_framing"] if has_characters else preset["env_framing"]
 
@@ -434,13 +434,13 @@ def synthesize_scene_prompt(
 
     if user_bg:
         if re.search(r"\bbattle\s*(?:field|ground)\b", user_bg, re.I):
-            env_bg = "set against scorched earth battlefield terrain, battle debris, atmospheric smoke"
+            env_bg = "set against scorched earth battlefield, atmospheric smoke"
         else:
             env_bg = f"set against {user_bg} background, atmospheric depth"
     else:
         comb_lower = f"{script_sentence} {topic}".lower()
         if has_combat_action or any(w in comb_lower for w in ["ronin", "samurai", "katana", "ninja", "warrior", "sword"]):
-            env_bg = "set against scorched earth battlefield terrain, battle debris, atmospheric smoke"
+            env_bg = "set against scorched earth battlefield, atmospheric smoke"
         elif any(w in comb_lower for w in ["space", "alien", "planet", "cyber", "sci-fi"]):
             env_bg = "set against futuristic neon city background, atmospheric depth"
         elif "horror" in comb_lower or is_horror:
@@ -451,29 +451,29 @@ def synthesize_scene_prompt(
             env_bg = "set against detailed cinematic background, soft atmospheric depth"
 
     if is_ronin:
-        clothing_tag = "wearing dark frayed ronin kimono, weathered samurai garments, wrapped obi sash"
+        clothing_tag = "wearing dark frayed ronin kimono, wrapped obi sash"
     elif is_eastern:
-        clothing_tag = "wearing traditional dark Japanese samurai kimono, structured garments, wrapped obi sash"
+        clothing_tag = "wearing traditional dark samurai kimono, wrapped obi sash"
     else:
-        clothing_tag = "wearing authentic structured warrior attire, fitted clothing"
+        clothing_tag = "wearing authentic warrior attire"
 
     if is_anime:
         if is_female:
-            char_tag = "1girl, fierce battle-ready anime heroine" if is_rough else "1girl, beautiful anime heroine"
+            char_tag = "1girl, fierce anime heroine" if is_rough else "1girl, beautiful anime heroine"
         elif is_ronin:
-            char_tag = "1man, rugged battle-hardened ronin, ruthless masterless samurai, samurai topknot"
+            char_tag = "1man, rugged ruthless ronin samurai, topknot"
         elif is_eastern:
-            char_tag = "1man, rugged Japanese samurai warrior, samurai topknot"
+            char_tag = "1man, rugged Japanese samurai warrior, topknot"
         elif is_rough:
-            char_tag = "1man, rugged battle-hardened warrior, fierce ruthless expression"
+            char_tag = "1man, rugged warrior, fierce expression"
         elif is_male:
             char_tag = "1boy, anime warrior"
         else:
             char_tag = "1character, anime hero"
 
-        style_core = "Masterpiece 2D anime, clean crisp lineart, Ufotable visual"
+        style_core = "Masterpiece vibrant glossy 2D anime, luminous Ufotable visual"
         framing_part = (
-            f"solo, centered lone {char_tag}, single sword, exactly two arms, two hands only"
+            f"solo full body shot, entire figure head to toe in frame, lone {char_tag}, single sword, two arms only"
             if has_characters
             else preset["env_framing"]
         )
@@ -481,27 +481,23 @@ def synthesize_scene_prompt(
         if has_characters:
             if is_ronin or is_rough:
                 if has_scars:
-                    face_part = "sharp detailed anime face, piercing eyes, defined facial features, prominent jagged battle scar across cheek"
+                    face_part = "sharp anime face, piercing eyes, prominent battle scar on cheek"
                 else:
-                    face_part = "sharp detailed anime face, piercing eyes, defined jawline, intense focused glare"
+                    face_part = "sharp anime face, piercing eyes, intense glare"
             elif has_scars:
-                face_part = "sharp detailed anime face, expressive eyes, prominent jagged battle scar across cheek"
+                face_part = "sharp anime face, expressive eyes, prominent battle scar on cheek"
             else:
-                face_part = "sharp detailed anime face, expressive eyes, clean defined jawline"
+                face_part = "sharp anime face, expressive eyes, clean defined jawline"
         else:
             face_part = ""
 
         weapon_part = (
-            "holding authentic straight Japanese steel katana blade, sharp straight metal edge, tsuka hilt, single sword only"
+            "holding straight Japanese steel katana blade, sharp metal edge"
             if has_weapon
             else (pose_guidance if has_characters else "")
         )
 
-        clothing_tag = (
-            "wearing dark frayed ronin kimono, wrapped obi sash"
-            if is_ronin
-            else ("wearing traditional dark samurai kimono, wrapped obi sash" if is_eastern else clothing_tag)
-        )
+        lighting_part = "radiant luminous bloom, glossy highlights, rich saturated colors"
 
         prompt_parts = [
             style_core,
@@ -509,8 +505,7 @@ def synthesize_scene_prompt(
             env_bg,
             face_part,
             weapon_part,
-            clothing_tag,
-            "dramatic cinematic lighting, rich saturated colors",
+            lighting_part,
         ]
     elif is_realistic:
         if is_female:
@@ -528,7 +523,7 @@ def synthesize_scene_prompt(
 
         style_core = "Masterpiece raw 35mm DSLR photograph, award winning portrait, 85mm f/1.4 lens"
         real_framing_part = (
-            f"solo, centered lone {real_char_tag}, single sword, exactly two arms, two hands only"
+            f"solo full body shot, entire figure head to toe in frame, complete body visible, centered lone {real_char_tag}, single sword, exactly two arms, two hands only"
             if has_characters
             else preset["env_framing"]
         )
@@ -592,7 +587,7 @@ def synthesize_scene_prompt(
             "warm 35mm film photography, emotional depth, 8k",
         ]
     else:
-        subject_tag = f"solo, centered {visual_core}, exactly two arms, two hands only" if has_characters else f"scene of {visual_core}"
+        subject_tag = f"solo full body shot, entire figure head to toe in frame, complete body visible, centered {visual_core}, exactly two arms, two hands only" if has_characters else f"scene of {visual_core}"
         prompt_parts = [
             preset["prefix"],
             subject_tag,
@@ -618,12 +613,12 @@ def synthesize_scene_prompt(
                 seen_clauses.add(c_lower)
                 filtered_clauses.append(c_clean)
 
-    # Safely fit within 58 words to strictly guarantee within CLIP's 75 token context window
+    # Safely fit within 62 words to strictly guarantee within CLIP's 75 token context window
     fitted_clauses = []
     current_word_count = 0
     for clause in filtered_clauses:
         clause_words = len(clause.split())
-        if current_word_count + clause_words > 58 and fitted_clauses:
+        if current_word_count + clause_words > 62 and fitted_clauses:
             break
         fitted_clauses.append(clause)
         current_word_count += clause_words

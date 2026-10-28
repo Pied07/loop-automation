@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 const LOCAL_DAEMON_URL = "http://127.0.0.1:5055";
 
 const COMPREHENSIVE_NEGATIVE_PROMPT =
+  "cropped character, cropped feet, cropped legs, cut off at knees, cut off at waist, out of frame, close-up, zoom-in, macro shot, matte, dull colors, flat shading, washed out, drab lighting, low contrast, " +
   "bent sword, crooked sword, warped blade, rubber sword, curved blade, duplicate blade, split blade, double blade, multiple swords, extra swords, extra arms, third arm, 3 arms, arm behind shoulder, extra hands, three hands, distorted face, smudged face, melted face, deformed eyes, crossed eyes, bad eyes, blurry face, messy face, two people, 2 characters, background people, crowd, blank background, plain background, white background, border, frame, margin, parchment, " +
   "deformed hands, poorly drawn hands, mutated hands, extra fingers, missing fingers, fused fingers, too many fingers, conjoined fingers, claw hands, mangled hands, deformed wrists, disembodied hands, floating hands, disconnected hands, malformed hands, webbed fingers, broken fingers, twisted fingers, overlapping fingers, amputated hands, " +
   "anatomical dissimilarity, figure dissimilarity, mutated figure, deformed body, asymmetrical body, non-human anatomy, grotesque anatomy, disproportionate body, malformed torso, extra limbs, conjoined limbs, unnatural body shape, distorted figure, " +
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
     const isAnime = /anime|manga|ghibli|comic|cartoon/i.test(style);
     const isRealistic = /real|photo|cinematic film/i.test(style);
     const styleNegPrefix = isAnime
-      ? "photorealistic, photograph, 35mm photograph, realism, real life, realistic skin texture, skin pores, live action film still, real human photo, 3d render, cgi, low quality anime, poorly drawn anime, "
+      ? "matte, dull colors, flat shading, washed out, drab lighting, low contrast, photorealistic, photograph, 35mm photograph, realism, real life, realistic skin texture, skin pores, live action film still, real human photo, 3d render, cgi, low quality anime, poorly drawn anime, "
       : (isRealistic
         ? "anime, manga, cartoon, 3d render, cgi, digital illustration, digital painting, drawing, vector art, graphic novel, artificial, videogame, unreal engine, octane render, airbrushed, "
         : "");
