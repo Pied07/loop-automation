@@ -1,0 +1,123 @@
+name: Cloud AI Image Generator Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      jobId:
+        description: 'Job ID for tracking'
+        required: true
+        type: string
+      prompt:
+        description: 'Image generation prompt'
+        required: true
+        type: string
+      style:
+        description: 'Style preset'
+        required: false
+        default: 'Cinematic Film'
+        type: string
+      aspect:
+        description: 'Aspect ratio'
+        required: false
+        default: '9:16 (Shorts / Reels)'
+        type: string
+      steps:
+        description: 'Diffusion denoising steps'
+        required: false
+        default: '4'
+        type: string
+      seed:
+        description: 'Optional random seed'
+        required: false
+        default: ''
+        type: string
+      negativePrompt:
+        description: 'Negative prompt'
+        required: false
+        default: ''
+        type: string
+      isDirectPrompt:
+        description: 'Is direct prompt'
+        required: false
+        default: 'true'
+        type: string
+      category:
+        description: 'Category'
+        required: false
+        default: 'Custom'
+        type: string
+      userId:
+        description: 'User ID'
+        required: false
+        default: 'creator'
+        type: string
+      appUrl:
+        description: 'App URL for status reporting'
+        required: false
+        default: 'https://the-viral-desk.vercel.app'
+        type: string
+      cloudinaryCloudName:
+        description: 'Cloudinary Cloud Name'
+        required: false
+        type: string
+      cloudinaryApiKey:
+        description: 'Cloudinary API Key'
+        required: false
+        type: string
+      cloudinaryApiSecret:
+        description: 'Cloudinary API Secret'
+        required: false
+        type: string
+
+jobs:
+  generate-ai-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache Hugging Face models and Pip packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/huggingface
+          key: ${{ runner.os }}-ai-image-pipeline-v1
+          restore-keys: |
+            ${{ runner.os }}-ai-image-pipeline-
+
+      - name: Install Python ML Libraries
+        run: |
+          pip install --upgrade requests numpy pillow
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install --upgrade diffusers transformers accelerate safetensors
+
+      - name: Run Cloud AI Image Generation
+        env:
+          JOB_ID: ${{ inputs.jobId }}
+          PROMPT: ${{ inputs.prompt }}
+          STYLE: ${{ inputs.style }}
+          ASPECT: ${{ inputs.aspect }}
+          STEPS: ${{ inputs.steps }}
+          SEED: ${{ inputs.seed }}
+          NEGATIVE_PROMPT: ${{ inputs.negativePrompt }}
+          IS_DIRECT_PROMPT: ${{ inputs.isDirectPrompt }}
+          CATEGORY: ${{ inputs.category }}
+          USER_ID: ${{ inputs.userId }}
+          APP_URL: ${{ inputs.appUrl != '' && inputs.appUrl || 'https://the-viral-desk.vercel.app' }}
+          CLOUDINARY_CLOUD_NAME: ${{ inputs.cloudinaryCloudName != '' && inputs.cloudinaryCloudName || secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ inputs.cloudinaryApiKey != '' && inputs.cloudinaryApiKey || secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ inputs.cloudinaryApiSecret != '' && inputs.cloudinaryApiSecret || secrets.CLOUDINARY_API_SECRET }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python scripts/cloud_ai_image_generator.py

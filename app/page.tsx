@@ -591,6 +591,7 @@ export default function Home() {
   const [imageGenNegative, setImageGenNegative] = useState<string>("");
   const [isGeneratingCustomImage, setIsGeneratingCustomImage] = useState<boolean>(false);
   const [imageGenError, setImageGenError] = useState<string>("");
+  const [imageGenStatus, setImageGenStatus] = useState<string>("");
   const [currentCustomImage, setCurrentCustomImage] = useState<any>(null);
   const [imageGenHistory, setImageGenHistory] = useState<any[]>([]);
   const [showAdvancedImageGen, setShowAdvancedImageGen] = useState<boolean>(false);
@@ -2071,6 +2072,7 @@ export default function Home() {
     }
     setIsGeneratingCustomImage(true);
     setImageGenError("");
+    setImageGenStatus("Submitting prompt to native ML pipeline...");
     try {
       const res = await fetch("/api/ai-video/generate-scene-image", {
         method: "POST",
@@ -2085,12 +2087,80 @@ export default function Home() {
           isDirectPrompt: true,
           category: "Custom",
           colabGpuUrl: colabGpuUrl.trim(),
+          userId: auth?.currentUser?.uid || "creator",
         }),
       });
       const data = await res.json();
       if (!data.success) {
         throw new Error(data.error || "Image generation failed.");
       }
+
+      // If dispatched to GitHub Actions Cloud Runner
+      if (data.pending && data.jobId) {
+        setImageGenStatus("Queued in GitHub Actions cloud runner...");
+        notify("🚀 Dispatched to GitHub Actions native ML runner!");
+
+        const jobId = data.jobId;
+        let pollCount = 0;
+        const maxPolls = 120; // ~6 minutes max
+
+        const pollInterval = setInterval(async () => {
+          pollCount++;
+          if (pollCount > maxPolls) {
+            clearInterval(pollInterval);
+            setIsGeneratingCustomImage(false);
+            setImageGenStatus("");
+            setImageGenError("Generation timed out. Please check your GitHub Actions tab.");
+            return;
+          }
+
+          try {
+            const sRes = await fetch(`/api/viral-clips/status?jobId=${jobId}`);
+            if (sRes.ok) {
+              const job = await sRes.json();
+              if (job.step) {
+                setImageGenStatus(job.step);
+              }
+              if (job.status === "done") {
+                clearInterval(pollInterval);
+                const finalUrl = job.imageUrl || (Array.isArray(job.clips) && (job.clips[0]?.imageUrl || job.clips[0]?.url));
+                if (finalUrl) {
+                  const newImg = {
+                    id: jobId,
+                    imageUrl: finalUrl,
+                    prompt: imageGenPrompt.trim(),
+                    style: imageGenStyle,
+                    aspect: imageGenAspect,
+                    engine: "github-actions-ml",
+                    elapsed: job.elapsed,
+                    timestamp: Date.now(),
+                  };
+                  setCurrentCustomImage(newImg);
+                  handleSaveImageToHistory(newImg);
+                  notify("✨ Image generated successfully by your native ML model in GitHub Actions!");
+                } else {
+                  setImageGenError("GitHub Actions runner completed but no image URL was found.");
+                }
+                setIsGeneratingCustomImage(false);
+                setImageGenStatus("");
+              } else if (job.status === "failed") {
+                clearInterval(pollInterval);
+                setIsGeneratingCustomImage(false);
+                setImageGenStatus("");
+                const errMsg = job.error || "GitHub Actions image generation failed.";
+                setImageGenError(errMsg);
+                notify(errMsg);
+              }
+            }
+          } catch (pollErr) {
+            console.warn("Status polling notice:", pollErr);
+          }
+        }, 3000);
+
+        return;
+      }
+
+      // Synchronous completion (from Colab GPU or Local PC)
       const newImg = {
         id: `img_${Date.now()}`,
         imageUrl: data.imageUrl,
@@ -2104,13 +2174,15 @@ export default function Home() {
       setCurrentCustomImage(newImg);
       handleSaveImageToHistory(newImg);
       notify("✨ Image generated successfully by your ML model!");
+      setIsGeneratingCustomImage(false);
+      setImageGenStatus("");
     } catch (err: any) {
       console.error("Custom Image Generation error:", err);
       const msg = err.message || "Failed to generate image.";
       setImageGenError(msg);
       notify(msg);
-    } finally {
       setIsGeneratingCustomImage(false);
+      setImageGenStatus("");
     }
   };
 
@@ -4284,7 +4356,7 @@ export default function Home() {
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <span style={{ fontSize: '12px', color: colabGpuUrl ? '#10b981' : '#f59e0b', background: colabGpuUrl ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', padding: '6px 12px', borderRadius: '8px', border: `1px solid ${colabGpuUrl ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}`, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: colabGpuUrl ? '#10b981' : '#f59e0b' }} />
-                {colabGpuUrl ? 'Tesla T4 GPU Connected (2s)' : 'Local ML Pipeline Active'}
+                {colabGpuUrl ? 'Tesla T4 GPU Connected (2s)' : 'GitHub Actions ML Cloud Runner Active'}
               </span>
             </div>
           </div>
@@ -4759,7 +4831,7 @@ export default function Home() {
                 {isGeneratingCustomImage ? (
                   <>
                     <RefreshCw size={18} className="spin" />
-                    <span>Synthesizing with ML Model... (Diffusion inference)</span>
+                    <span>{imageGenStatus || "Synthesizing with ML Model..."}</span>
                   </>
                 ) : (
                   <>
@@ -4797,7 +4869,7 @@ export default function Home() {
                     </div>
                     <div style={{ fontSize: '15px', fontWeight: 700, color: '#f8fafc', marginBottom: '6px' }}>Running PyTorch ML Diffusion Model</div>
                     <div style={{ fontSize: '12px', color: '#94a3b8', maxWidth: '320px' }}>
-                      {colabGpuUrl ? "Synthesizing image on Colab Tesla T4 GPU in 2-3 seconds..." : "Synthesizing image on local diffusion pipeline..."}
+                      {imageGenStatus || (colabGpuUrl ? "Synthesizing image on Colab Tesla T4 GPU in 2-3 seconds..." : "Generating with GitHub Actions Native ML Cloud Runner...")}
                     </div>
                   </div>
                 ) : currentCustomImage ? (

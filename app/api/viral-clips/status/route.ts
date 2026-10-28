@@ -7,6 +7,7 @@ interface CachedJob {
   progress: number;
   step: string;
   clips?: any[];
+  imageUrl?: string;
   sourceTitle?: string;
   totalDuration?: number;
   error?: string;
@@ -51,8 +52,50 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Direct Cloudinary asset probe for AI video jobs (or any job with uploaded video)
+  // Direct Cloudinary asset probe for AI image jobs
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dbgvwyhdr";
+  if (cloudName && jobId.startsWith("img_")) {
+    const candidateUserIds = Array.from(new Set([
+      userId,
+      job?.userId,
+      "okWQqztlltfKTzJ2ATYDwnqCdo52",
+      "creator",
+    ].filter(Boolean) as string[]));
+
+    for (const candidateUid of candidateUserIds) {
+      const safeUid = candidateUid.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "creator";
+      const safeJid = jobId.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "job";
+      const candidateImageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/ai_images/${safeUid}/${safeJid}.png`;
+
+      try {
+        const headRes = await fetch(candidateImageUrl, {
+          method: "HEAD",
+          signal: AbortSignal.timeout(3000),
+        });
+        if (headRes.ok) {
+          const resolvedPayload: CachedJob = {
+            status: "done",
+            progress: 100,
+            step: "✅ Image generated successfully by your native ML model!",
+            imageUrl: candidateImageUrl,
+            clips: [{ id: jobId, url: candidateImageUrl, imageUrl: candidateImageUrl }],
+            sourceTitle: job?.sourceTitle || "AI Generated Image",
+            userId: safeUid,
+            updatedAt: Date.now(),
+          };
+          jobCache.set(jobId, resolvedPayload);
+          if (database) {
+            try {
+              await setDoc(doc(database, "jobs", jobId), resolvedPayload, { merge: true });
+            } catch {}
+          }
+          return NextResponse.json(resolvedPayload);
+        }
+      } catch {}
+    }
+  }
+
+  // Direct Cloudinary asset probe for AI video jobs (or any job with uploaded video)
   if (cloudName && (jobId.startsWith("ai_") || job?.step?.toLowerCase().includes("cloudinary"))) {
     const candidateUserIds = Array.from(new Set([
       userId,
@@ -132,7 +175,7 @@ export async function GET(req: NextRequest) {
         if (relData.body) {
           try {
             const parsed = JSON.parse(relData.body);
-            if (parsed.status === "done" && Array.isArray(parsed.clips)) {
+            if (parsed.status === "done") {
               jobCache.set(jobId, { ...parsed, updatedAt: Date.now() });
               if (database) {
                 try {
@@ -162,7 +205,7 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({
               status: "processing",
               progress: latestRun.status === "queued" ? 20 : 50,
-              step: latestRun.status === "queued" ? "Waiting for GitHub cloud runner to start..." : "Cloud runner processing video...",
+              step: latestRun.status === "queued" ? "Waiting for GitHub cloud runner to start..." : "Cloud runner processing media with native ML model...",
             });
           }
           if (latestRun.conclusion === "failure") {
@@ -172,8 +215,8 @@ export async function GET(req: NextRequest) {
             });
           }
           if (latestRun.status === "completed" && latestRun.conclusion === "success") {
-            if (job && Array.isArray(job.clips) && job.clips.length > 0) {
-              const donePayload: CachedJob = { ...job, status: "done", progress: 100, step: "✅ Video generated successfully!", updatedAt: Date.now() };
+            if (job && (job.imageUrl || (Array.isArray(job.clips) && job.clips.length > 0))) {
+              const donePayload: CachedJob = { ...job, status: "done", progress: 100, step: "✅ Asset generated successfully!", updatedAt: Date.now() };
               jobCache.set(jobId, donePayload);
               return NextResponse.json(donePayload);
             }
@@ -190,24 +233,27 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     status: "processing",
     progress: 25,
-    step: "Processing video...",
+    step: "Processing with native ML model...",
   });
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { jobId, status, progress, step, clips, sourceTitle, totalDuration, error, userId, partNumber, totalParts } = body;
+    const { jobId, status, progress, step, clips, imageUrl, sourceTitle, totalDuration, error, userId, partNumber, totalParts } = body;
 
     if (!jobId) {
       return NextResponse.json({ error: "jobId is required" }, { status: 400 });
     }
+
+    const resolvedImageUrl = imageUrl || (Array.isArray(clips) && (clips[0]?.imageUrl || clips[0]?.url)) || undefined;
 
     const payload: CachedJob = {
       status: status || "processing",
       progress: progress || 0,
       step: step || "",
       clips: clips || undefined,
+      imageUrl: resolvedImageUrl,
       sourceTitle: sourceTitle || undefined,
       totalDuration: totalDuration || undefined,
       error: error || undefined,

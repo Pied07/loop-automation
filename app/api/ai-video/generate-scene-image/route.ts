@@ -55,7 +55,9 @@ export async function POST(req: NextRequest) {
     const seed = typeof body.seed === "number" ? body.seed : undefined;
     const sceneIndex = typeof body.sceneIndex === "number" ? body.sceneIndex : 0;
     const partNumber = typeof body.partNumber === "number" ? body.partNumber : 1;
+    const userId = typeof body.userId === "string" ? body.userId.trim() : "creator";
     const colabGpuUrl = typeof body.colabGpuUrl === "string" ? body.colabGpuUrl.trim() : "";
+    const forceCloud = Boolean(body.forceCloud);
     const negativePrompt = typeof body.negativePrompt === "string" && body.negativePrompt.trim()
       ? body.negativePrompt.trim()
       : (/horror|ghost|haunt|creepy|demon|spectral|phantom/i.test(`${prompt} ${style}`) ? HORROR_NEGATIVE_PROMPT : COMPREHENSIVE_NEGATIVE_PROMPT);
@@ -64,7 +66,7 @@ export async function POST(req: NextRequest) {
 
     // 1. Try Live Colab GPU Bridge or warm local daemon service
     let activeBridgeUrl = colabGpuUrl;
-    if (!activeBridgeUrl && !isVercel) {
+    if (!activeBridgeUrl && !isVercel && !forceCloud) {
       const colabFile = path.join(process.cwd(), "image_gen_model", "colab_url.txt");
       if (fs.existsSync(colabFile)) {
         try {
@@ -76,7 +78,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (activeBridgeUrl) {
+    if (activeBridgeUrl && !forceCloud) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 60000); // 1 min timeout for GPU inference
@@ -139,23 +141,99 @@ export async function POST(req: NextRequest) {
         }
       } catch (bridgeErr: any) {
         console.warn("GPU Bridge call error:", bridgeErr?.message || bridgeErr);
-        // Fall through to local CLI inference if on local PC
       }
     }
 
-    // 2. Handling Vercel Serverless environment where local PyTorch GPU is unavailable
-    if (isVercel) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Colab GPU Bridge is not connected. To generate images with your native ML model from the live website, please paste your Google Colab URL (e.g. from Cloudflare Tunnel or ngrok) into the 'Colab GPU Bridge URL' input, or run the app locally on your PC via 'npm run dev'.",
-        },
-        { status: 503 }
-      );
+    // 2. Dispatch to GitHub Actions Cloud Runner (Serverless environment or cloud mode)
+    const githubPat = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
+    const githubRepo = process.env.GITHUB_REPO || "Pied07/loop-automation";
+
+    if (isVercel || forceCloud || !process.env.LOCAL_DEV) {
+      if (githubPat) {
+        const jobId = `img_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        const appUrl = (
+          process.env.APP_URL ||
+          (process.env.VERCEL_PROJECT_PRODUCTION_URL
+            ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+            : (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://the-viral-desk.vercel.app"))
+        ).replace(/\/$/, "");
+
+        // Report initial status to status tracker
+        try {
+          await fetch(`${appUrl}/api/viral-clips/status`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jobId,
+              userId,
+              status: "processing",
+              progress: 15,
+              step: "Starting native ML image generation in GitHub Actions cloud runner...",
+              sourceTitle: prompt ? prompt.slice(0, 60) : undefined,
+            }),
+          });
+        } catch (stErr) {
+          console.warn("Initial status update notice:", stErr);
+        }
+
+        const dispatchUrl = `https://api.github.com/repos/${githubRepo}/actions/workflows/generate-ai-image.yml/dispatches`;
+        const ghRes = await fetch(dispatchUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${githubPat}`,
+            Accept: "application/vnd.github.v3+json",
+            "Content-Type": "application/json",
+            "User-Agent": "The-Viral-Desk-App",
+          },
+          body: JSON.stringify({
+            ref: "main",
+            inputs: {
+              jobId,
+              prompt,
+              style,
+              aspect,
+              steps: String(steps),
+              seed: seed !== undefined ? String(seed) : "",
+              negativePrompt: negativePrompt || "",
+              isDirectPrompt: isDirectPrompt ? "true" : "false",
+              category,
+              userId,
+              appUrl,
+              cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
+              cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || "",
+              cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || "",
+            },
+          }),
+        });
+
+        if (ghRes.ok || ghRes.status === 204) {
+          return NextResponse.json({
+            success: true,
+            pending: true,
+            cloudMode: "github-actions",
+            jobId,
+            message: "Dispatched image generation to GitHub Actions native ML runner.",
+            engine: "github-actions",
+          });
+        } else {
+          const ghErr = await ghRes.text();
+          console.error("GitHub Actions dispatch error:", ghRes.status, ghErr);
+        }
+      }
+
+      if (isVercel) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "GitHub Actions runner is not configured (missing GITHUB_PAT) and Colab GPU Bridge is disconnected. Please add GITHUB_PAT to your environment secrets or provide a Google Colab GPU URL.",
+          },
+          { status: 503 }
+        );
+      }
     }
 
-    // 3. Direct CLI fallback using local PyTorch model on PC
+    // 3. Direct CLI fallback using local PyTorch model on PC (Local development)
     const tempOutputDir = os.tmpdir();
     const cleanName = prompt.slice(0, 24).replace(/[^a-zA-Z0-9]/g, "_").replace(/^_+|_+$/g, "") || "scene";
     const filename = isDirectPrompt
@@ -189,7 +267,6 @@ export async function POST(req: NextRequest) {
     const imageBuffer = fs.readFileSync(tempOutputPath);
     const finalImageUrl = await saveImageBuffer(imageBuffer, filename);
 
-    // Clean up temp file
     try {
       fs.unlinkSync(tempOutputPath);
     } catch {}
