@@ -603,8 +603,12 @@ export default function Home() {
         const hist = localStorage.getItem("image_gen_history");
         if (hist) {
           const parsed = JSON.parse(hist);
-          setImageGenHistory(parsed);
-          if (parsed.length > 0) setCurrentCustomImage(parsed[0]);
+          if (Array.isArray(parsed)) {
+            setImageGenHistory(parsed);
+            if (parsed.length > 0 && parsed[0] && typeof parsed[0] === "object" && parsed[0].imageUrl) {
+              setCurrentCustomImage(parsed[0]);
+            }
+          }
         }
       } catch {}
     }
@@ -4499,10 +4503,10 @@ export default function Home() {
                   {currentCustomImage && (
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <span style={{ fontSize: '10px', background: 'rgba(229,9,20,0.15)', color: '#ff3b45', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
-                        {currentCustomImage.style}
+                        {currentCustomImage.style || "Standard"}
                       </span>
                       <span style={{ fontSize: '10px', background: '#1f2937', color: '#9ca3af', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
-                        {currentCustomImage.aspect.split(" ")[0]}
+                        {(currentCustomImage.aspect || "9:16").split(" ")[0]}
                       </span>
                     </div>
                   )}
@@ -4590,7 +4594,7 @@ export default function Home() {
               </div>
 
               {/* History Gallery */}
-              {imageGenHistory.length > 0 && (
+              {Array.isArray(imageGenHistory) && imageGenHistory.length > 0 && (
                 <div style={{ background: '#111218', border: '1.5px solid #232635', borderRadius: '12px', padding: '20px', boxShadow: '0 8px 30px rgba(0,0,0,0.45)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                     <label style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -4609,15 +4613,16 @@ export default function Home() {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '8px' }}>
                     {imageGenHistory.map((item, idx) => {
-                      const isSelected = currentCustomImage?.imageUrl === item.imageUrl;
+                      if (!item || !item.imageUrl) return null;
+                      const isSelected = currentCustomImage?.imageUrl && currentCustomImage.imageUrl === item.imageUrl;
                       return (
                         <div
-                          key={idx}
+                          key={item.id || idx}
                           onClick={() => {
                             setCurrentCustomImage(item);
-                            setImageGenPrompt(item.prompt);
-                            setImageGenStyle(item.style);
-                            setImageGenAspect(item.aspect);
+                            if (item.prompt) setImageGenPrompt(item.prompt);
+                            if (item.style) setImageGenStyle(item.style);
+                            if (item.aspect) setImageGenAspect(item.aspect);
                           }}
                           style={{
                             position: 'relative',
@@ -4629,11 +4634,11 @@ export default function Home() {
                             background: '#0a0a0f',
                             boxShadow: isSelected ? '0 0 10px rgba(229,9,20,0.4)' : 'none',
                           }}
-                          title={item.prompt}
+                          title={item.prompt || "Generated image"}
                         >
                           <img
                             src={item.imageUrl}
-                            alt={item.prompt}
+                            alt={item.prompt || "Generated image"}
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                           />
                         </div>
