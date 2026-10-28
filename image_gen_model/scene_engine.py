@@ -75,6 +75,7 @@ ASPECT_RATIOS = {
 
 # Industry standard anti-distortion negative prompt prioritizing anatomical integrity & limb correctness
 COMPREHENSIVE_NEGATIVE_PROMPT = (
+    "two people, 2 characters, two ronin, 2 ronin, two warriors, 2 samurai, second warrior, second ronin, second person, person behind, character behind, towering warrior behind, giant figure behind, spirit avatar, stand, susanoo, shadow warrior, shadow figure, silhouette behind, glowing ghost, companion, duo, pair, two men, 2 men, "
     "deformed hands, poorly drawn hands, mutated hands, extra fingers, missing fingers, fused fingers, too many fingers, conjoined fingers, claw hands, mangled hands, deformed wrists, disembodied hands, floating hands, disconnected hands, malformed hands, webbed fingers, broken fingers, twisted fingers, overlapping fingers, amputated hands, "
     "anatomical dissimilarity, figure dissimilarity, mutated figure, deformed body, asymmetrical body, non-human anatomy, grotesque anatomy, disproportionate body, malformed torso, extra limbs, conjoined limbs, unnatural body shape, distorted figure, "
     "three arms, extra arms, multi-armed, third arm, arm behind head, three hands, extra hands, "
@@ -481,14 +482,17 @@ class StorySceneEngine:
         effective_negative = f"{base_negative}{style_neg}{user_neg}"
 
         has_scars = bool(re.search(r"\b(?:scars?|scarred|battle\s+scars?)\b", f"{prompt} {topic}", re.I))
-        if has_scars:
-            # Strip scar penalties from negative prompt so requested battle scars are rendered clearly
+        is_rough = bool(re.search(r"\b(?:ronin|samurai|rough|ruthless|weathered|battle-hardened|scarred|scars?)\b", f"{prompt} {topic}", re.I))
+        if has_scars or is_rough:
+            # Strip scar and roughness penalties from negative prompt so requested battle scars and rugged features are rendered clearly
             effective_negative = re.sub(
-                r"\b(?:scars?|scarred(?:\s+face)?|body\s+scars?)\b,?\s*",
+                r"\b(?:scars?|scarred(?:\s+face)?|body\s+scars?|rough\s+skin|weathered\s+face|aged\s+skin)\b,?\s*",
                 "",
                 effective_negative,
                 flags=re.IGNORECASE,
             )
+            # Add anti-pretty-boy tokens to negative prompt to enforce rugged, ruthless character appearance
+            effective_negative = f"pretty boy, bishounen, clean face, flawless smooth skin, porcelain skin, baby face, feminine, gentle smile, cheerful smile, child, {effective_negative}"
 
         raw_img = None
 

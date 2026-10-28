@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 const LOCAL_DAEMON_URL = "http://127.0.0.1:5055";
 
 const COMPREHENSIVE_NEGATIVE_PROMPT =
+  "two people, 2 characters, two ronin, 2 ronin, two warriors, 2 samurai, second warrior, second ronin, second person, person behind, character behind, towering warrior behind, giant figure behind, spirit avatar, stand, susanoo, shadow warrior, shadow figure, silhouette behind, glowing ghost, companion, duo, pair, two men, 2 men, " +
   "deformed hands, poorly drawn hands, mutated hands, extra fingers, missing fingers, fused fingers, too many fingers, conjoined fingers, claw hands, mangled hands, deformed wrists, disembodied hands, floating hands, disconnected hands, malformed hands, webbed fingers, broken fingers, twisted fingers, overlapping fingers, amputated hands, " +
   "anatomical dissimilarity, figure dissimilarity, mutated figure, deformed body, asymmetrical body, non-human anatomy, grotesque anatomy, disproportionate body, malformed torso, extra limbs, conjoined limbs, unnatural body shape, distorted figure, " +
   "three arms, extra arms, multi-armed, third arm, arm behind head, three hands, extra hands, " +
@@ -93,9 +94,11 @@ export async function POST(req: NextRequest) {
       ? HORROR_NEGATIVE_PROMPT
       : COMPREHENSIVE_NEGATIVE_PROMPT;
     const hasScars = /\b(?:scars?|scarred|battle\s+scars?)\b/i.test(prompt);
+    const isRough = /\b(?:ronin|samurai|rough|ruthless|weathered|battle-hardened|scarred|scars?)\b/i.test(prompt);
     let effectiveBaseNegative = baseNegative;
-    if (hasScars) {
-      effectiveBaseNegative = effectiveBaseNegative.replace(/\b(?:scars?|scarred(?:\s+face)?|body\s+scars?)\b,?\s*/gi, "");
+    if (hasScars || isRough) {
+      effectiveBaseNegative = effectiveBaseNegative.replace(/\b(?:scars?|scarred(?:\s+face)?|body\s+scars?|rough\s+skin|weathered\s+face|aged\s+skin)\b,?\s*/gi, "");
+      effectiveBaseNegative = `pretty boy, bishounen, clean face, flawless smooth skin, porcelain skin, baby face, feminine, gentle smile, cheerful smile, child, ${effectiveBaseNegative}`;
     }
     const negativePrompt = typeof body.negativePrompt === "string" && body.negativePrompt.trim()
       ? `${body.negativePrompt.trim()}, ${styleNegPrefix}${effectiveBaseNegative}`

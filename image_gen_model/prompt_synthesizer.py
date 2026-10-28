@@ -149,19 +149,19 @@ def clean_narration(text: str) -> str:
         flags=re.IGNORECASE,
     )
 
-    # Preserve requested battle scars as stylized anime scars while filtering medical trauma and blemishes
+    # Preserve requested battle scars as prominent scars while filtering medical trauma and blemishes
     has_scars = bool(re.search(r"\b(?:scars?|scarred|battle\s+scars?)\b", clean, re.IGNORECASE))
     if has_scars:
         clean = re.sub(
             r"\b(?:scars?\s+all\s+over(?:\s+(?:his|her|their|the))?\s+body|with\s+scars?|scars?|scarred)\b",
-            "stylized anime battle scars on body",
+            "prominent deep jagged battle scars",
             clean,
             flags=re.IGNORECASE,
         )
-        clean = re.sub(r"\b(?:blemish(?:es)?|acne|wrinkles?|no\s+scars?(?:\s+at\s+all)?)\b", "", clean, flags=re.IGNORECASE)
+        clean = re.sub(r"\b(?:blemish(?:es)?|acne|no\s+scars?(?:\s+at\s+all)?)\b", "", clean, flags=re.IGNORECASE)
     else:
         clean = re.sub(
-            r"\b(?:scars?\s+all\s+over(?:\s+(?:his|her|their|the))?\s+body|with\s+scars?|scars?|scarred|blemish(?:es)?|acne|wrinkles?|no\s+scars?(?:\s+at\s+all)?)\b",
+            r"\b(?:scars?\s+all\s+over(?:\s+(?:his|her|their|the))?\s+body|with\s+scars?|scars?|scarred|blemish(?:es)?|acne|no\s+scars?(?:\s+at\s+all)?)\b",
             "",
             clean,
             flags=re.IGNORECASE,
@@ -407,22 +407,25 @@ def synthesize_scene_prompt(
         staging = preset["char_framing"] if has_characters else preset["env_framing"]
 
     has_scars = bool(re.search(r"\b(?:scars?|scarred|battle\s+scars?)\b", f"{script_sentence} {topic}", re.IGNORECASE))
+    is_ronin = bool(re.search(r"\b(?:ronin|masterless|vagabond)\b", f"{script_sentence} {topic}", re.I))
+    is_eastern = bool(re.search(r"\b(?:ronin|samurai|ninja|katana|swordsman)\b", f"{script_sentence} {topic}", re.I))
+    is_rough = bool(re.search(r"\b(?:ronin|samurai|rough|ruthless|weathered|battle-hardened|berserker|warrior|veteran|fighter)\b", f"{script_sentence} {topic}", re.I))
 
     # 1. Extract user-specified environment/background directly, or infer contextually relevant fallback
     prep_match = re.search(
-        r"\b(?:standing\s+(?:in|on|at|inside)|in\s+front\s+of|inside|in\s+(?:a|an|the)|on\s+(?:a|an|the|top\s+of)|at\s+(?:a|an|the))\s+([a-zA-Z0-9\s\-]+?)(?:,|$|\.|\band\b|\bwith\b|\bholding\b|\bpoised\b)",
+        r"\b(?:standing\s+(?:in|on|at|inside)|in\s+front\s+of|inside|in\s+(?:a|an|the)|on\s+(?:a|an|the|top\s+of)|at\s+(?:a|an|the))\s+([a-zA-Z0-9\s\-]+?)(?:,|$|\.|\band\b|\bwith\b|\bholding\b|\bpoised\b|\bcovered\b)",
         f"{script_sentence} {topic}",
         re.IGNORECASE,
     )
     user_bg = None
     if prep_match:
         cand = prep_match.group(1).strip()
-        if cand and not re.search(r"\b(?:fighting\s+pose|pose|combat|stance|armor|clothes|robes|dress|suit|uniform|shoes|boots)\b", cand, re.I):
+        if cand and not re.search(r"\b(?:fighting\s+pose|pose|combat|stance|armor|clothes|robes|dress|suit|uniform|shoes|boots|scar|scars)\b", cand, re.I):
             user_bg = cand
 
     if not user_bg:
         direct_env = re.search(
-            r"\b(battlefield|battle\s*ground|warzone|war-torn|dojo|temple|shrine|castle|palace|fortress|dungeon|arena|cyberpunk\s*city|neon\s*street|city\s*street|alley|rooftop|forest|woods|bamboo\s*grove|mountain|snowy\s*peaks?|desert|ocean|sea|beach|waterfall|space|alien\s*planet|sky|clouds|throne\s*room|laboratory|library|tavern|cave)\b",
+            r"\b(battlefield|battle\s*field|battle\s*ground|warzone|war-torn|dojo|temple|shrine|castle|palace|fortress|dungeon|arena|cyberpunk\s*city|neon\s*street|city\s*street|alley|rooftop|forest|woods|bamboo\s*grove|mountain|snowy\s*peaks?|desert|ocean|sea|beach|waterfall|space|alien\s*planet|sky|clouds|throne\s*room|laboratory|library|tavern|cave)\b",
             f"{script_sentence} {topic}",
             re.IGNORECASE,
         )
@@ -430,13 +433,16 @@ def synthesize_scene_prompt(
             user_bg = direct_env.group(0).strip()
 
     if user_bg:
-        env_bg = f"set against {user_bg} background, atmospheric depth"
+        if re.search(r"\bbattle\s*(?:field|ground)\b", user_bg, re.I):
+            env_bg = "set against scorched earth battlefield terrain, battle debris, atmospheric smoke"
+        else:
+            env_bg = f"set against {user_bg} background, atmospheric depth"
     else:
         comb_lower = f"{script_sentence} {topic}".lower()
         if has_combat_action or any(w in comb_lower for w in ["ronin", "samurai", "katana", "ninja", "warrior", "sword"]):
-            env_bg = "set against epic battle ground background, atmospheric smoke and depth"
+            env_bg = "set against scorched earth battlefield terrain, battle debris, atmospheric smoke"
         elif any(w in comb_lower for w in ["space", "alien", "planet", "cyber", "sci-fi"]):
-            env_bg = "set against futuristic neon city background, atmospheric ambient depth"
+            env_bg = "set against futuristic neon city background, atmospheric depth"
         elif "horror" in comb_lower or is_horror:
             env_bg = "set against moody atmospheric ruins background, eerie mist"
         elif any(w in comb_lower for w in ["nature", "animal", "wilderness"]):
@@ -444,57 +450,120 @@ def synthesize_scene_prompt(
         else:
             env_bg = "set against detailed cinematic background, soft atmospheric depth"
 
-    is_eastern = bool(re.search(r"\b(?:ronin|samurai|ninja|katana|swordsman)\b", f"{script_sentence} {topic}", re.I))
-    if is_eastern:
-        clothing_tag = "wearing traditional dark Japanese samurai kimono robes, structured shoulder garments, wrapped obi belt"
+    if is_ronin:
+        clothing_tag = "wearing dark frayed ronin kimono, weathered samurai garments, wrapped obi sash"
+    elif is_eastern:
+        clothing_tag = "wearing traditional dark Japanese samurai kimono, structured garments, wrapped obi sash"
     else:
         clothing_tag = "wearing authentic structured warrior attire, fitted clothing"
 
     if is_anime:
-        char_tag = "1girl, beautiful anime heroine" if is_female else ("1boy, handsome anime warrior" if is_male else "1character, anime hero")
-        style_core = "Masterpiece 2D Japanese anime, clean crisp lineart, Ufotable key visual"
-        framing_part = f"solo, exactly one person, single {char_tag}, authentic human anatomy, perfectly proportioned figure, natural symmetrical shoulders, exactly two arms, no dissimilarities" if has_characters else preset["env_framing"]
-        if has_scars:
-            face_part = "sharp anime face, luminous amber eyes, clean jawline, iconic battle scar across cheek" if has_characters else ""
+        if is_female:
+            char_tag = "1girl, fierce battle-ready anime heroine" if is_rough else "1girl, beautiful anime heroine"
+        elif is_ronin:
+            char_tag = "1man, rugged battle-hardened ronin, ruthless masterless samurai, samurai topknot"
+        elif is_eastern:
+            char_tag = "1man, rugged Japanese samurai warrior, samurai topknot"
+        elif is_rough:
+            char_tag = "1man, rugged battle-hardened warrior, fierce ruthless expression"
+        elif is_male:
+            char_tag = "1boy, anime warrior"
         else:
-            face_part = "sharp anime face, luminous amber eyes, clean jawline, smooth skin" if has_characters else ""
+            char_tag = "1character, anime hero"
+
+        style_core = "Masterpiece 2D anime, clean crisp lineart, Ufotable visual"
+        framing_part = (
+            f"solo, strictly one person on screen, single {char_tag}, no second warrior, no spirit behind, authentic human anatomy, two arms only"
+            if has_characters
+            else preset["env_framing"]
+        )
+
+        if has_characters:
+            if is_ronin or is_rough:
+                if has_scars:
+                    face_part = "sharp weathered masculine face, ruthless fierce glare, prominent deep jagged battle scar across cheek, battle-scarred skin"
+                else:
+                    face_part = "sharp weathered masculine face, ruthless fierce glare, chiseled rugged jawline"
+            elif has_scars:
+                face_part = "sharp anime face, intense luminous eyes, prominent deep jagged battle scar across cheek, battle-scarred skin"
+            else:
+                face_part = "sharp anime face, luminous amber eyes, clean jawline, smooth skin"
+        else:
+            face_part = ""
 
         weapon_part = (
-            "one hand gripping the katana tsuka hilt firmly with five clearly defined fingers and knuckles, single sword only, natural authentic grip"
+            "one hand gripping katana tsuka hilt firmly with five defined fingers, single sword only"
             if has_weapon
             else (pose_guidance if has_characters else "")
+        )
+
+        clothing_tag = (
+            "wearing dark frayed ronin kimono, wrapped obi sash"
+            if is_ronin
+            else ("wearing traditional dark samurai kimono, wrapped obi sash" if is_eastern else clothing_tag)
         )
 
         prompt_parts = [
             style_core,
             framing_part,
             face_part,
-            clothing_tag,
             weapon_part,
+            clothing_tag,
             env_bg,
-            "dramatic cinematic lighting, volumetric bloom, rich saturated colors",
+            "dramatic cinematic lighting, rich saturated colors",
         ]
     elif is_realistic:
-        real_char_tag = "1woman, beautiful female warrior" if is_female else ("1man, handsome samurai warrior" if is_eastern else "1man, handsome male warrior")
-        style_core = "Masterpiece raw 35mm DSLR color photograph, award winning portrait photography, shot on Sony A7R V, 85mm f/1.4 GM lens"
-        real_framing_part = f"solo, exactly one person, single {real_char_tag}, authentic human anatomy, perfectly proportioned figure, natural symmetrical shoulders, exactly two arms, no dissimilarities" if has_characters else preset["env_framing"]
-        if has_scars:
-            real_face_part = "exquisite human face, authentic realistic eyes, clean jawline, iconic battle scar on cheek" if has_characters else ""
+        if is_female:
+            real_char_tag = "1woman, battle-ready female warrior" if is_rough else "1woman, beautiful female warrior"
+        elif is_ronin:
+            real_char_tag = "1man, authentic rugged Japanese ronin, ruthless masterless samurai, samurai topknot"
+        elif is_eastern:
+            real_char_tag = "1man, authentic rugged Japanese samurai warrior, samurai topknot"
+        elif is_rough:
+            real_char_tag = "1man, rugged battle-hardened male warrior, ruthless expression"
+        elif is_male:
+            real_char_tag = "1man, male warrior"
         else:
-            real_face_part = "exquisite human face, authentic realistic eyes, clean jawline, natural skin texture" if has_characters else ""
+            real_char_tag = "1person, warrior"
+
+        style_core = "Masterpiece 35mm DSLR photograph, award winning portrait photography, 85mm f/1.4 lens"
+        real_framing_part = (
+            f"solo, strictly one person in frame, single {real_char_tag}, no second warrior, no spirit behind, authentic human anatomy, two arms only"
+            if has_characters
+            else preset["env_framing"]
+        )
+
+        if has_characters:
+            if is_ronin or is_rough:
+                if has_scars:
+                    real_face_part = "weathered male face, intense ruthless expression, prominent deep jagged battle scar visible across cheek, battle-scarred skin texture"
+                else:
+                    real_face_part = "weathered male face, intense ruthless expression, rugged masculine features, natural skin texture"
+            elif has_scars:
+                real_face_part = "exquisite human face, authentic realistic eyes, prominent deep jagged battle scar across cheek, authentic skin texture"
+            else:
+                real_face_part = "exquisite human face, authentic realistic eyes, clean jawline, natural skin texture"
+        else:
+            real_face_part = ""
 
         real_weapon_part = (
-            "one hand gripping the katana tsuka hilt firmly with five clearly defined fingers and knuckles, single sword only, natural authentic grip"
+            "one hand gripping katana tsuka hilt firmly with five defined fingers, single sword only"
             if has_weapon
             else (pose_guidance if has_characters else "")
+        )
+
+        clothing_tag = (
+            "wearing dark frayed ronin kimono, wrapped obi sash"
+            if is_ronin
+            else ("wearing traditional dark samurai kimono, wrapped obi sash" if is_eastern else clothing_tag)
         )
 
         prompt_parts = [
             style_core,
             real_framing_part,
             real_face_part,
-            clothing_tag,
             real_weapon_part,
+            clothing_tag,
             env_bg,
             "natural golden hour lighting, cinematic rim light, authentic optical bokeh, 8k UHD",
         ]
@@ -549,12 +618,16 @@ def synthesize_scene_prompt(
                 seen_clauses.add(c_lower)
                 filtered_clauses.append(c_clean)
 
-    # Safely fit within 75 tokens without cutting words in half
+    # Safely fit within 95 words without cutting words in half, ensuring environment background is preserved
     fitted_clauses = []
     current_word_count = 0
     for clause in filtered_clauses:
         clause_words = len(clause.split())
-        if current_word_count + clause_words > 75 and fitted_clauses:
+        if current_word_count + clause_words > 95 and fitted_clauses:
+            if any(env_key in clause.lower() for env_key in ["against", "battlefield", "battle ground", "background", "terrain"]):
+                if current_word_count + clause_words <= 105:
+                    fitted_clauses.append(clause)
+                    current_word_count += clause_words
             break
         fitted_clauses.append(clause)
         current_word_count += clause_words

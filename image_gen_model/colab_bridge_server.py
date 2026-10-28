@@ -19,6 +19,7 @@ from flask_cors import CORS
 from PIL import Image
 
 COMPREHENSIVE_NEGATIVE_PROMPT = (
+    "two people, 2 characters, two ronin, 2 ronin, two warriors, 2 samurai, second warrior, second ronin, second person, person behind, character behind, towering warrior behind, giant figure behind, spirit avatar, stand, susanoo, shadow warrior, shadow figure, silhouette behind, glowing ghost, companion, duo, pair, two men, 2 men, "
     "deformed hands, poorly drawn hands, mutated hands, extra fingers, missing fingers, fused fingers, too many fingers, conjoined fingers, claw hands, mangled hands, deformed wrists, disembodied hands, floating hands, disconnected hands, malformed hands, webbed fingers, broken fingers, twisted fingers, overlapping fingers, amputated hands, "
     "anatomical dissimilarity, figure dissimilarity, mutated figure, deformed body, asymmetrical body, non-human anatomy, grotesque anatomy, disproportionate body, malformed torso, extra limbs, conjoined limbs, unnatural body shape, distorted figure, "
     "three arms, extra arms, multi-armed, third arm, arm behind head, three hands, extra hands, "
@@ -102,6 +103,17 @@ def start_bridge(pipe=None, port=5055):
             guidance = float(data.get("guidance", 7.5))
             seed = data.get("seed", None)
             negative_prompt = data.get("negative_prompt", "").strip() or COMPREHENSIVE_NEGATIVE_PROMPT
+
+            has_scars = bool(re.search(r"\b(?:scars?|scarred|battle\s+scars?)\b", prompt, re.I))
+            is_rough = bool(re.search(r"\b(?:ronin|samurai|rough|ruthless|weathered|battle-hardened|scarred|scars?)\b", prompt, re.I))
+            if has_scars or is_rough:
+                negative_prompt = re.sub(
+                    r"\b(?:scars?|scarred(?:\s+face)?|body\s+scars?|rough\s+skin|weathered\s+face|aged\s+skin)\b,?\s*",
+                    "",
+                    negative_prompt,
+                    flags=re.IGNORECASE,
+                )
+                negative_prompt = f"pretty boy, bishounen, clean face, flawless smooth skin, porcelain skin, baby face, feminine, gentle smile, cheerful smile, child, {negative_prompt}"
 
             # Optimal SDXL buckets preventing limb duplication and torso stretching
             if "9:16" in aspect:
