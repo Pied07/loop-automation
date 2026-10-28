@@ -75,9 +75,9 @@ ASPECT_RATIOS = {
 
 # Industry standard anti-distortion negative prompt prioritizing anatomical integrity & limb correctness
 COMPREHENSIVE_NEGATIVE_PROMPT = (
-    "two people, 2 characters, two ronin, 2 ronin, two warriors, 2 samurai, second warrior, second ronin, second person, person behind, character behind, towering warrior behind, giant figure behind, spirit avatar, stand, susanoo, shadow warrior, shadow figure, silhouette behind, glowing ghost, companion, duo, pair, two men, 2 men, multiple people, clone, duplicated character, stacked characters, stacked body, double torso, totem pole, second head, duplicate heads, vertical repetition, "
+    "extra arms, third arm, 3 arms, arm behind shoulder, arm behind head, extra hands, three hands, 3 hands, extra limbs, multiple swords, extra swords, two swords, 2 swords, three swords, 3 swords, multiple blades, extra weapons, floating swords, crossed swords, two people, 2 characters, two ronin, 2 ronin, second warrior, towering warrior, spirit avatar, stand, companion, duo, pair, clone, stacked characters, stacked body, totem pole, "
     "deformed hands, poorly drawn hands, mutated hands, extra fingers, missing fingers, fused fingers, too many fingers, conjoined fingers, claw hands, mangled hands, deformed wrists, disembodied hands, floating hands, disconnected hands, malformed hands, webbed fingers, broken fingers, twisted fingers, overlapping fingers, amputated hands, "
-    "anatomical dissimilarity, figure dissimilarity, mutated figure, deformed body, asymmetrical body, non-human anatomy, grotesque anatomy, disproportionate body, malformed torso, extra limbs, conjoined limbs, unnatural body shape, distorted figure, "
+    "anatomical dissimilarity, figure dissimilarity, mutated figure, deformed body, asymmetrical body, non-human anatomy, grotesque anatomy, disproportionate body, malformed torso, conjoined limbs, unnatural body shape, distorted figure, "
     "three arms, extra arms, multi-armed, third arm, arm behind head, three hands, extra hands, "
     "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, "
     "distorted torso, twisted body, elongated torso, bad anatomy, grotesque proportions, deformed body, unnatural posture, warped torso, deformed figure, non-human body, "

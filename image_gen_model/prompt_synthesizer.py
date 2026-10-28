@@ -473,7 +473,7 @@ def synthesize_scene_prompt(
 
         style_core = "Masterpiece 2D anime, clean crisp lineart, Ufotable visual"
         framing_part = (
-            f"solo, single character focus, centered lone {char_tag}, solo portrait framing, authentic human anatomy, two arms only"
+            f"solo, single character focus, centered lone {char_tag}, solo portrait framing, authentic human anatomy, exactly two arms, two hands only, single sword"
             if has_characters
             else preset["env_framing"]
         )
@@ -492,7 +492,7 @@ def synthesize_scene_prompt(
             face_part = ""
 
         weapon_part = (
-            "one hand gripping katana tsuka hilt firmly with five defined fingers, single sword only"
+            "single katana blade only, right hand holding the katana tsuka hilt, left arm resting at side, exactly two arms total, two hands only"
             if has_weapon
             else (pose_guidance if has_characters else "")
         )
@@ -528,7 +528,7 @@ def synthesize_scene_prompt(
 
         style_core = "Masterpiece 35mm DSLR photograph, award winning portrait photography, 85mm f/1.4 lens"
         real_framing_part = (
-            f"solo, single character focus, centered lone {real_char_tag}, solo portrait framing, authentic human anatomy, two arms only"
+            f"solo, single character focus, centered lone {real_char_tag}, solo portrait framing, authentic human anatomy, exactly two arms, two hands only, single sword"
             if has_characters
             else preset["env_framing"]
         )
@@ -547,7 +547,7 @@ def synthesize_scene_prompt(
             real_face_part = ""
 
         real_weapon_part = (
-            "one hand gripping katana tsuka hilt firmly with five defined fingers, single sword only"
+            "single katana blade only, right hand holding the katana tsuka hilt, left arm resting at side, exactly two arms total, two hands only"
             if has_weapon
             else (pose_guidance if has_characters else "")
         )
