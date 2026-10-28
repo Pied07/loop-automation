@@ -19,7 +19,7 @@ from flask_cors import CORS
 from PIL import Image
 
 COMPREHENSIVE_NEGATIVE_PROMPT = (
-    "extra arms, third arm, 3 arms, arm behind shoulder, arm behind head, extra hands, three hands, 3 hands, extra limbs, multiple swords, extra swords, two swords, 2 swords, multiple blades, extra weapons, "
+    "extra arms, third arm, 3 arms, arm behind shoulder, arm behind head, extra hands, three hands, 3 hands, extra limbs, multiple swords, extra swords, two swords, 2 swords, multiple blades, duplicate blade, double blade, split blade, twin swords, extra weapons, "
     "two people, 2 characters, background people, background characters, crowd, bystanders, group, second person, clone, "
     "blank background, plain background, white background, solid color background, empty background, border, frame, margin, parchment, scroll, "
     "deformed hands, poorly drawn hands, mutated hands, extra fingers, missing fingers, fused fingers, too many fingers, conjoined fingers, claw hands, mangled hands, deformed wrists, disembodied hands, floating hands, disconnected hands, malformed hands, webbed fingers, broken fingers, twisted fingers, overlapping fingers, amputated hands, "
