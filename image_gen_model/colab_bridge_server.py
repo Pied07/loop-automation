@@ -21,10 +21,11 @@ from PIL import Image
 COMPREHENSIVE_NEGATIVE_PROMPT = (
     "duplicate person, multiple people, two characters, stacked body, double torso, second body, conjoined, "
     "multiple heads, two heads, extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, "
+    "hazy hands, blurry hands, indistinct hands, hands hidden in sleeves, missing fingers, fused fingers, deformed hands, poorly drawn hands, "
+    "floating sword, disconnected sword, hazy sword, blurry blade, multiple blades, extra swords, double katana, translucent sword, dull blade, miniature sword, blunt blade, "
     "messy, chaotic, visual noise, grainy, noisy, haphazard, cluttered composition, debris, floating junk, distorted shapes, messy lines, "
-    "rough sketch, scribbles, jittery lines, jagged edges, broken sword, deformed weapon, miniature sword, blunt blade, multiple swords, "
+    "rough sketch, scribbles, jittery lines, jagged edges, "
     "solid aura, metallic blob, gold clutter, yellow blob, crushed metal, crumpled fabric, "
-    "deformed hands, poorly drawn hands, fused fingers, too many fingers, missing fingers, mutated hands, "
     "mutated limbs, malformed limbs, disconnected limbs, floating limbs, "
     "bad anatomy, grotesque proportions, malformed facial features, disfigured, "
     "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, "
@@ -119,12 +120,16 @@ def start_bridge(pipe=None, port=5055):
             except Exception:
                 full_prompt = f"{prompt}, {style}" if style else prompt
 
+            eff_negative = negative_prompt or COMPREHENSIVE_NEGATIVE_PROMPT
+            if re.search(r"\b(?:scars?|scarred|battle\s+scars?)\b", prompt, re.I):
+                eff_negative = re.sub(r"\b(?:scars?|scarred(?:\s+face)?|body\s+scars?)\b,?\s*", "", eff_negative, flags=re.I)
+
             gen = torch.Generator(device=device).manual_seed(seed) if seed is not None else None
             t0 = time.time()
             with torch.inference_mode():
                 result = pipe(
                     prompt=full_prompt,
-                    negative_prompt=negative_prompt,
+                    negative_prompt=eff_negative,
                     num_inference_steps=steps,
                     guidance_scale=guidance,
                     generator=gen,

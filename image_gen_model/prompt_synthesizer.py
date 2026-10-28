@@ -149,13 +149,23 @@ def clean_narration(text: str) -> str:
         flags=re.IGNORECASE,
     )
 
-    # Clean up scars, cuts, and blemish triggers that cause rough weathered skin
-    clean = re.sub(
-        r"\b(?:scars?\s+all\s+over(?:\s+(?:his|her|their|the))?\s+body|with\s+scars?|scars?|scarred|blemish(?:es)?|acne|wrinkles?|no\s+scars?(?:\s+at\s+all)?)\b",
-        "",
-        clean,
-        flags=re.IGNORECASE,
-    )
+    # Preserve requested battle scars as stylized anime scars while filtering medical trauma and blemishes
+    has_scars = bool(re.search(r"\b(?:scars?|scarred|battle\s+scars?)\b", clean, re.IGNORECASE))
+    if has_scars:
+        clean = re.sub(
+            r"\b(?:scars?\s+all\s+over(?:\s+(?:his|her|their|the))?\s+body|with\s+scars?|scars?|scarred)\b",
+            "stylized anime battle scars on body",
+            clean,
+            flags=re.IGNORECASE,
+        )
+        clean = re.sub(r"\b(?:blemish(?:es)?|acne|wrinkles?|no\s+scars?(?:\s+at\s+all)?)\b", "", clean, flags=re.IGNORECASE)
+    else:
+        clean = re.sub(
+            r"\b(?:scars?\s+all\s+over(?:\s+(?:his|her|their|the))?\s+body|with\s+scars?|scars?|scarred|blemish(?:es)?|acne|wrinkles?|no\s+scars?(?:\s+at\s+all)?)\b",
+            "",
+            clean,
+            flags=re.IGNORECASE,
+        )
 
     # Clean typos and awkward phrases
     clean = re.sub(r"\b(?:hair\s+tied\s+beding|hair\s+tied\s+behind)\b", "hair tied back", clean, flags=re.IGNORECASE)
@@ -394,12 +404,22 @@ def synthesize_scene_prompt(
     else:
         staging = preset["char_framing"] if has_characters else preset["env_framing"]
 
+    has_scars = bool(re.search(r"\b(?:scars?|scarred|battle\s+scars?)\b", f"{script_sentence} {topic}", re.IGNORECASE))
+
     if is_anime:
         char_tag = "1girl, beautiful anime heroine" if is_female else ("1boy, handsome anime warrior" if is_male else "1character, anime protagonist")
         style_core = "Masterpiece 2D Japanese anime, clean crisp lineart, Makoto Shinkai and Ufotable studio key visual"
-        framing_part = f"solo, {char_tag}, upper body portrait, dynamic three-quarter view" if has_characters else preset["env_framing"]
-        face_part = "exquisite anime face, sharp luminous amber eyes, clean jawline, flawless smooth skin" if has_characters else ""
-        weapon_part = "holding a single sharp glowing electric-blue katana diagonally, single sword only, perfect hands" if has_weapon else (pose_guidance if has_characters else "")
+        framing_part = f"solo, {char_tag}, close-up upper body portrait, dynamic three-quarter view" if has_characters else preset["env_framing"]
+        if has_scars:
+            face_part = "exquisite anime face, sharp luminous amber eyes, clean jawline, iconic stylized anime battle scar across cheek, battle-hardened warrior aesthetics" if has_characters else ""
+        else:
+            face_part = "exquisite anime face, sharp luminous amber eyes, clean jawline, flawless smooth skin" if has_characters else ""
+
+        weapon_part = (
+            "holding a single sharp glowing katana in foreground with both hands, clearly visible five fingers on each hand, detailed hilt and tsuba guard, razor-sharp steel blade diagonally across chest"
+            if has_weapon
+            else (pose_guidance if has_characters else "")
+        )
 
         prompt_parts = [
             style_core,
@@ -412,9 +432,17 @@ def synthesize_scene_prompt(
     elif is_realistic:
         real_char_tag = "1woman, beautiful female portrait" if is_female else ("1man, handsome male portrait" if is_male else "1person, authentic portrait")
         style_core = "Masterpiece raw 35mm DSLR color photograph, award winning portrait photography, shot on Sony A7R V, 85mm f/1.4 GM lens"
-        real_framing_part = f"solo, {real_char_tag}, upper body portrait, dynamic three-quarter view" if has_characters else preset["env_framing"]
-        real_face_part = "exquisite detailed human face, authentic realistic eyes with catchlights, natural skin texture with visible fine pores" if has_characters else ""
-        real_weapon_part = "holding a single sharp weapon with natural grip, exactly two arms, two hands only, five fingers per hand" if has_weapon else (pose_guidance if has_characters else "")
+        real_framing_part = f"solo, {real_char_tag}, close-up upper body portrait, dynamic three-quarter view" if has_characters else preset["env_framing"]
+        if has_scars:
+            real_face_part = "exquisite detailed human face, authentic realistic eyes with catchlights, prominent realistic battle scar on cheek, authentic weathered warrior skin" if has_characters else ""
+        else:
+            real_face_part = "exquisite detailed human face, authentic realistic eyes with catchlights, natural skin texture with visible fine pores" if has_characters else ""
+
+        real_weapon_part = (
+            "holding a single sharp weapon in foreground with natural two-handed grip, clearly visible five fingers per hand, authentic metal blade"
+            if has_weapon
+            else (pose_guidance if has_characters else "")
+        )
 
         prompt_parts = [
             style_core,

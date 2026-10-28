@@ -77,10 +77,11 @@ ASPECT_RATIOS = {
 COMPREHENSIVE_NEGATIVE_PROMPT = (
     "duplicate person, multiple people, two characters, stacked body, double torso, second body, conjoined, "
     "multiple heads, two heads, extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, "
+    "hazy hands, blurry hands, indistinct hands, hands hidden in sleeves, missing fingers, fused fingers, deformed hands, poorly drawn hands, "
+    "floating sword, disconnected sword, hazy sword, blurry blade, multiple blades, extra swords, double katana, translucent sword, dull blade, miniature sword, blunt blade, "
     "messy, chaotic, visual noise, grainy, noisy, haphazard, cluttered composition, debris, floating junk, distorted shapes, messy lines, "
-    "rough sketch, scribbles, jittery lines, jagged edges, broken sword, deformed weapon, miniature sword, blunt blade, multiple swords, "
+    "rough sketch, scribbles, jittery lines, jagged edges, "
     "solid aura, metallic blob, gold clutter, yellow blob, crushed metal, crumpled fabric, "
-    "deformed hands, poorly drawn hands, fused fingers, too many fingers, missing fingers, mutated hands, "
     "mutated limbs, malformed limbs, disconnected limbs, floating limbs, "
     "bad anatomy, grotesque proportions, malformed facial features, disfigured, "
     "multiple blades, extra weapons, "
@@ -371,15 +372,15 @@ class StorySceneEngine:
         is_turbo = "turbo" in getattr(self, "current_model_id", "").lower()
 
         if is_turbo:
-            # SD-Turbo optimal 512-based aspect ratios preventing limb repetition and torso duplication
-            inf_steps = 1
+            # SD-Turbo optimal 2-step denoising with 576x896 aspect ratio to sharply render fingers, swords, and scars
+            inf_steps = 2
             inf_guidance = 0.0
             if height > width:
-                inf_w, inf_h = 512, 768
+                inf_w, inf_h = 576, 896
             elif width > height:
-                inf_w, inf_h = 768, 512
+                inf_w, inf_h = 896, 576
             else:
-                inf_w, inf_h = 512, 512
+                inf_w, inf_h = 640, 640
         else:
             inf_steps = steps or 25
             inf_guidance = guidance_scale or 7.5
@@ -474,6 +475,16 @@ class StorySceneEngine:
         user_neg = f", {negative_prompt.strip()}" if negative_prompt and negative_prompt.strip() else ""
         style_neg = f", {style_negative_prefix.strip().rstrip(',')}" if style_negative_prefix.strip() else ""
         effective_negative = f"{base_negative}{style_neg}{user_neg}"
+
+        has_scars = bool(re.search(r"\b(?:scars?|scarred|battle\s+scars?)\b", f"{prompt} {topic}", re.I))
+        if has_scars:
+            # Strip scar penalties from negative prompt so requested battle scars are rendered clearly
+            effective_negative = re.sub(
+                r"\b(?:scars?|scarred(?:\s+face)?|body\s+scars?)\b,?\s*",
+                "",
+                effective_negative,
+                flags=re.IGNORECASE,
+            )
 
         raw_img = None
 
