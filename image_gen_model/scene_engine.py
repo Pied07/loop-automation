@@ -75,6 +75,7 @@ ASPECT_RATIOS = {
 
 # Industry standard anti-distortion negative prompt targeting horrifying faces, eye strabismus, anatomy mutations, and static portrait headshots
 COMPREHENSIVE_NEGATIVE_PROMPT = (
+    "dark void, empty black background, plain black background, solid black background, studio backdrop, indoor stage, stage lighting, spotlights, spotlight beams, disco lights, floating sparkles, yellow laser line, floating glitter, "
     "multiple hands, extra hands, four hands, four arms, three hands, three arms, duplicate hands, duplicate arms, multi-armed, mutated arms, mutated hands, sprouted arms, "
     "scars, scarred face, body scars, facial scars, cuts, wounds, lacerations, blemish, acne, rough skin, weathered face, wrinkles, aged skin, ugly face, "
     "standing straight, stiff pose, rigid posture, mannequin pose, t-pose, a-pose, static standing, boring pose, idle pose, straight upright posture, lifeless stance, neutral standing pose, standing upright, passport photo pose, symmetrical standing, "
@@ -439,14 +440,23 @@ class StorySceneEngine:
             or any(w in f"{prompt} {topic}".lower() for w in ["horror", "ghost", "haunt", "demon", "creepy", "spectral", "phantom", "asylum"])
         ) and category.lower() not in ["romance", "comedy", "food", "motivational", "music"]
 
-        is_anime = any(w in str(style_preset).lower() for w in ["anime", "manga", "ghibli", "comic"])
-        anime_negative_prefix = (
-            "photorealistic, photograph, 35mm photograph, realism, real life, realistic skin texture, pores, live action film, real human photo, "
-            if is_anime else ""
-        )
+        is_anime = any(w in str(style_preset).lower() for w in ["anime", "manga", "ghibli", "comic", "cartoon"])
+        is_realistic = any(w in str(style_preset).lower() for w in ["real", "photo", "cinematic film"])
+
+        if is_anime:
+            style_negative_prefix = (
+                "photorealistic, photograph, 35mm photograph, realism, real life, realistic skin texture, pores, live action film, real human photo, 3d render, cgi, "
+            )
+        elif is_realistic:
+            style_negative_prefix = (
+                "anime, manga, cartoon, 3d render, cgi, digital illustration, digital painting, drawing, vector art, graphic novel, artificial, videogame, unreal engine, octane render, airbrushed, "
+            )
+        else:
+            style_negative_prefix = ""
+
         base_negative = HORROR_NEGATIVE_PROMPT if is_horror else COMPREHENSIVE_NEGATIVE_PROMPT
         effective_negative = (
-            f"{anime_negative_prefix}{negative_prompt}" if negative_prompt else f"{anime_negative_prefix}{base_negative}"
+            f"{style_negative_prefix}{negative_prompt}" if negative_prompt else f"{style_negative_prefix}{base_negative}"
         )
 
         raw_img = None

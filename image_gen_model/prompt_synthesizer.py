@@ -45,11 +45,11 @@ UNIFIED_STYLE_PRESETS: Dict[str, Dict[str, str]] = {
         "env_framing": "wide establishing shot, atmospheric depth, rich environmental storytelling",
     },
     "Realism": {
-        "prefix": "cinematic 35mm film still, photorealistic",
-        "lighting": "dramatic natural rim lighting, volumetric atmospheric depth",
-        "suffix": "photorealistic 8k UHD, masterpiece, award-winning cinematography",
-        "char_framing": "cinematic medium angle shot, natural posture, cinematic staging",
-        "env_framing": "wide establishing shot, breathtaking perspective, rich realistic textures",
+        "prefix": "authentic raw 35mm color photograph, true photorealism, shot on Canon EOS R5 DSLR, 85mm lens f/1.4",
+        "lighting": "natural golden hour sunlight, soft natural bokeh, realistic atmospheric illumination",
+        "suffix": "award-winning National Geographic portrait photography, realistic skin pores, lifelike human features, authentic physical reality, 8k",
+        "char_framing": "cinematic on-location portrait photograph, natural authentic posture, shallow depth of field",
+        "env_framing": "breathtaking on-location outdoor landscape photography, natural lighting, high dynamic range",
     },
     "Epic Fantasy": {
         "prefix": "epic fantasy digital concept art, masterpiece",
@@ -80,11 +80,11 @@ UNIFIED_STYLE_PRESETS: Dict[str, Dict[str, str]] = {
         "env_framing": "authentic ancient architecture, monumental stone ruins, sweeping vista",
     },
     "Anime / Manga": {
-        "prefix": "cinematic anime manga art style, detailed Japanese anime illustration, crisp clean line art",
-        "lighting": "dramatic cinematic anime lighting, intense glowing highlights, volumetric contrast",
-        "suffix": "masterpiece anime artwork, trending on Pixiv, dynamic anime aesthetic, highly detailed 8k",
-        "char_framing": "dynamic anime action stance, expressive battle-ready pose, dramatic cinematic perspective",
-        "env_framing": "breathtaking anime environment, vivid colors, detailed scenic background",
+        "prefix": "authentic 2D Japanese anime visual artwork, Ufotable and Makoto Shinkai aesthetic, crisp clean hand-drawn line art",
+        "lighting": "vibrant anime lighting, rich cel-shaded shadows, radiant anime highlights",
+        "suffix": "masterpiece anime artwork, trending on Pixiv, stunning 2D anime illustration, crisp clean contours, 8k",
+        "char_framing": "dynamic 2D anime battle stance, sharp anime character design, dramatic anime action framing",
+        "env_framing": "breathtaking painted anime scenery, lush scenic landscape under vibrant painterly sky",
     },
     "Anime / Storybook": {
         "prefix": "Studio Ghibli inspired anime scenery, gorgeous hand-painted art",
@@ -300,6 +300,35 @@ def synthesize_scene_prompt(
     weapon_guidance = "holding a single weapon in hand, single weapon only, authentic natural grip" if has_weapon else ""
 
     is_anime = any(w in (style_preset or "").lower() for w in ["anime", "manga", "ghibli", "comic", "cartoon"])
+    is_realistic = any(w in (style_preset or "").lower() for w in ["real", "photo", "cinematic film"])
+
+    # Detect if user prompt already specified an environmental background
+    ENVIRONMENT_PATTERNS = [
+        r"\b(?:forest|woods|bamboo|mountains?|hills?|river|lake|ocean|sea|beach|waterfall|field|meadow|desert|canyon|valley)\b",
+        r"\b(?:temple|shrine|castle|palace|courtyard|ruins|fortress|village|town|city|street|alley|rooftop|bridge|gate|pagoda)\b",
+        r"\b(?:room|hall|interior|bedroom|chamber|library|dungeon|corridor|cave|garden|balcony|tavern)\b",
+        r"\b(?:battlefield|warzone|arena|clouds?|sky|outdoors?|landscape|cliffs?)\b",
+    ]
+    has_environment = any(re.search(pat, f"{visual_core} {script_sentence}", re.IGNORECASE) for pat in ENVIRONMENT_PATTERNS)
+
+    if not has_environment:
+        is_eastern_warrior = bool(re.search(r"\b(?:ronin|samurai|ninja|katana|warrior|swordsman|blade|martial\s*arts)\b", f"{visual_core} {script_sentence}", re.IGNORECASE))
+        if is_eastern_warrior:
+            if is_anime:
+                env_setting = "in an ancient Japanese mountain temple courtyard with falling pink sakura cherry blossoms, stone pathway, misty bamboo groves under a painterly anime sky"
+            elif is_realistic:
+                env_setting = "outdoors on location in a lush Japanese bamboo forest in Arashiyama, ancient mossy stone lanterns, misty mountains, natural outdoor sunlight"
+            else:
+                env_setting = "outdoors in a lush misty ancient temple grove with stone lanterns and mountain backdrop"
+        else:
+            if is_anime:
+                env_setting = "in a breathtaking vibrant anime landscape, blooming wildflowers, lush green hills, fluffy clouds under a clear blue anime sky"
+            elif is_realistic:
+                env_setting = "outdoors in an authentic scenic mountain vista, natural golden hour sunlight, lush green nature and atmospheric depth"
+            else:
+                env_setting = "in a detailed natural outdoor environment with atmospheric scenic background"
+    else:
+        env_setting = ""
 
     if is_anime:
         human_enhancement = (
@@ -309,11 +338,18 @@ def synthesize_scene_prompt(
             + pose_guidance
             + (f", {weapon_guidance}" if weapon_guidance else "")
         ) if has_characters else ""
-    else:
+    elif is_realistic:
         human_enhancement = (
             "handsome attractive male, clean chiseled jawline, captivating detailed eyes, "
             "smooth clear flawless skin, blemish-free, no scars, authentic human torso anatomy, natural body proportions, "
             "exactly two arms, two hands only, well-proportioned limbs and hands, "
+            + pose_guidance
+            + (f", {weapon_guidance}" if weapon_guidance else "")
+        ) if has_characters else ""
+    else:
+        human_enhancement = (
+            "handsome attractive figure, clean symmetrical face, clear eyes, "
+            "smooth blemish-free skin, no scars, authentic human anatomy, exactly two arms, two hands only, "
             + pose_guidance
             + (f", {weapon_guidance}" if weapon_guidance else "")
         ) if has_characters else ""
@@ -337,9 +373,10 @@ def synthesize_scene_prompt(
         staging = preset["char_framing"] if has_characters else preset["env_framing"]
 
     if is_anime:
-        anime_lighting = "dramatic anime lighting, glowing aura highlights, vibrant saturated colors"
+        anime_lighting = "vibrant anime lighting, rich cel-shaded shadows, radiant energy aura"
         prompt_parts = [
-            f"Masterpiece Japanese anime illustration of {visual_core}",
+            f"Authentic 2D Japanese anime visual of {visual_core}",
+            env_setting,
             preset["prefix"],
             human_enhancement,
             staging,
@@ -347,10 +384,23 @@ def synthesize_scene_prompt(
             anime_lighting,
             preset["suffix"],
         ]
+    elif is_realistic:
+        realistic_lighting = "natural golden hour sunlight, soft optical bokeh, authentic atmospheric daylight"
+        prompt_parts = [
+            f"Authentic raw 35mm color photograph of {visual_core}",
+            env_setting,
+            preset["prefix"],
+            human_enhancement,
+            staging,
+            framing_tag,
+            realistic_lighting,
+            preset["suffix"],
+        ]
     elif is_horror:
         horror_lighting = "chilling moonlight piercing cold shadows, volumetric supernatural mist, eerie amber glow"
         prompt_parts = [
             f"Cinematic atmospheric scene of {visual_core}",
+            env_setting,
             human_enhancement,
             preset["prefix"],
             staging,
@@ -362,6 +412,7 @@ def synthesize_scene_prompt(
         romance_lighting = "warm golden hour lighting, soft sunset bokeh, intimate natural amber glow"
         prompt_parts = [
             f"Cinematic romantic scene of {visual_core}",
+            env_setting,
             human_enhancement,
             preset["prefix"],
             staging,
@@ -372,6 +423,7 @@ def synthesize_scene_prompt(
     else:
         prompt_parts = [
             f"Cinematic scene of {visual_core}",
+            env_setting,
             human_enhancement,
             preset["prefix"],
             staging,
@@ -382,9 +434,9 @@ def synthesize_scene_prompt(
 
     full_prompt = ", ".join(p for p in prompt_parts if p)
 
-    # Cap to optimal 65 tokens for text encoder
+    # Cap to optimal 85 tokens for text encoder
     tokens = full_prompt.split()
-    if len(tokens) > 65:
-        full_prompt = " ".join(tokens[:65])
+    if len(tokens) > 85:
+        full_prompt = " ".join(tokens[:85])
 
     return full_prompt

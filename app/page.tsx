@@ -4499,8 +4499,8 @@ export default function Home() {
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '10px' }}>
                   {[
-                    { id: "Anime / Manga", icon: "🎨", name: "Anime / Manga", character: "Anime Character", image: "/assets/styles/anime.jpg", desc: "Studio Ghibli and Makoto Shinkai anime aesthetic" },
-                    { id: "Realistic / Photorealism", icon: "📸", name: "Realistic", character: "Photoreal Human", image: "/assets/styles/realism.jpg", desc: "35mm lens, photorealistic 8k skin and eye detail" },
+                    { id: "Anime / Manga", icon: "🎨", name: "Anime / Manga", character: "Anime Character", image: "/assets/styles/anime.jpg", desc: "Authentic 2D Japanese anime cel-shading, Ufotable & Makoto Shinkai" },
+                    { id: "Realistic / Photorealism", icon: "📸", name: "Realistic", character: "Photoreal Human", image: "/assets/styles/realism.jpg", desc: "Real 35mm DSLR raw photography, authentic on-location environment" },
                     { id: "Cinematic Film", icon: "🎬", name: "Cinematic Film", character: "Cinematic Actor", image: "/assets/styles/cinematic.jpg", desc: "Dramatic chiaroscuro rim lighting and anamorphic feel" },
                     { id: "3D Animation / Pixar", icon: "✨", name: "3D Animation", character: "Pixar 3D Person", image: "/assets/styles/disney3d.jpg", desc: "Pixar Disney CGI 3D Octane render subsurface glow" },
                     { id: "Sci-Fi Cyberpunk", icon: "⚡", name: "Cyberpunk", character: "Cyber Warrior", image: "/assets/styles/mecha.jpg", desc: "Neon reflections, cyber gear and futuristic haze" },
