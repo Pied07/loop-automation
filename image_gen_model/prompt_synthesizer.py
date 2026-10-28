@@ -258,9 +258,13 @@ def synthesize_scene_prompt(
     # Check whether the scene describes human characters or inanimate objects/environments
     has_characters = any(re.search(pat, visual_core, re.IGNORECASE) for pat in CHARACTER_PATTERNS) or any(re.search(pat, script_sentence, re.IGNORECASE) for pat in CHARACTER_PATTERNS)
 
+    has_weapon = bool(re.search(r"\b(?:sword|blade|dagger|spear|axe|shield|bow|weapon|gun|pistol|rifle|saber|katana)\b", f"{visual_core} {script_sentence}", re.IGNORECASE))
+    weapon_guidance = "holding a single weapon in hand, single sword only, authentic natural grip" if has_weapon else ""
+
     human_enhancement = (
         "detailed beautiful symmetrical face, clear expressive eyes with detailed pupils, "
-        "realistic skin texture, anatomically correct body and natural limbs, well-proportioned hands"
+        "realistic skin texture, authentic human torso anatomy, natural body proportions, well-proportioned limbs and hands"
+        + (f", {weapon_guidance}" if weapon_guidance else "")
     ) if has_characters else ""
 
     is_horror = (not is_direct) and (

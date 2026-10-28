@@ -75,6 +75,9 @@ ASPECT_RATIOS = {
 
 # Industry standard anti-distortion negative prompt targeting horrifying faces, eye strabismus, anatomy mutations, and static portrait headshots
 COMPREHENSIVE_NEGATIVE_PROMPT = (
+    "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, "
+    "elongated torso, long torso, stretched body, unnaturally tall torso, stacked torso, double torso, accordion torso, repeating armor, ribbed armor distortion, repeating patterns, "
+    "extra arms, multiple arms, extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, "
     "horrifying face, grotesque face, scary distorted face, deformed face, disfigured face, twisted face, "
     "hollow eyes, sunken eye sockets, dark eye sockets, black eye sockets, deformed pupils, missing eyes, blind eyes, mismatched eyes, "
     "crossed eyes, strabismus, wall-eyed, cockeyed, misaligned eyes, lazy eye, asymmetrical eyes, crooked pupils, dilated pupils, "
@@ -83,10 +86,9 @@ COMPREHENSIVE_NEGATIVE_PROMPT = (
     "spinal deformity, broken neck, mutilated neck, twisted spine, physical deformity, "
     "collaged face, pasted face, cut-and-paste face, mismatched face, photo collage, cutout head, frankenstein face, "
     "extra eyes, multi eyes, mutated eyes, duplicate eyes, fused eyes, "
-    "extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, extra fingers, missing fingers, "
-    "fused fingers, too many fingers, deformed hands, poorly drawn hands, poorly drawn face, mutation, deformed, "
+    "extra fingers, missing fingers, fused fingers, too many fingers, deformed hands, poorly drawn hands, poorly drawn face, mutation, deformed, "
     "elongated arms, rubbery arms, melted skin, mutated fingers, fused limbs, deformed body, unnatural posture, "
-    "blurry, bad proportions, gross proportions, unnatural body, plastic skin, multiple heads, multiple people, "
+    "blurry, bad proportions, gross proportions, unnatural body, plastic skin, multiple heads, multiple people, duplicate person, "
     "blank background, solid color background, plain background, studio backdrop, cropped head, "
     "text, watermark, signature, username, error, "
     "low quality, worst quality, normal quality, jpeg artifacts, overexposed, underexposed, bad lighting"
@@ -94,6 +96,8 @@ COMPREHENSIVE_NEGATIVE_PROMPT = (
 
 # Dedicated Horror negative prompt: prevents cheerful smiles and technical artifacts while ALLOWING scary/ghostly faces
 HORROR_NEGATIVE_PROMPT = (
+    "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, "
+    "elongated torso, long torso, stretched body, stacked torso, accordion torso, ribbed armor distortion, "
     "happy smile, cheerful face, laughing, friendly smile, sunny day, bright cheerful lighting, pastel colors, "
     "cartoon, 3d cute pixar, anime, childish, "
     "collaged face, pasted face, cut-and-paste face, mismatched photo, cutout head, frankenstein collage, "
@@ -350,14 +354,14 @@ class StorySceneEngine:
         gen = torch.Generator(device=self.pipe.device).manual_seed(seed) if seed is not None else None
         is_turbo = "turbo" in getattr(self, "current_model_id", "").lower()
         inf_steps = max(2, min(steps or 4, 6)) if is_turbo else (steps or 15)
-        inf_guidance = guidance_scale if (guidance_scale is not None and guidance_scale > 0) else (1.5 if is_turbo else 7.0)
+        inf_guidance = guidance_scale if (guidance_scale is not None and guidance_scale > 0) else (1.6 if is_turbo else 7.0)
 
         if is_turbo:
-            # Native SD 512 dimensions avoiding anatomy distortion
+            # Optimal SD 512 dimensions avoiding receptive-field vertical tiling and torso duplication
             if height > width:
-                inf_w, inf_h = 512, 896
+                inf_w, inf_h = 416, 736
             elif width > height:
-                inf_w, inf_h = 896, 512
+                inf_w, inf_h = 736, 416
             else:
                 inf_w, inf_h = 512, 512
         else:
@@ -454,8 +458,8 @@ class StorySceneEngine:
                 model_name = getattr(self, "current_model_id", "local diffusion")
                 print(f"[SCENE ENGINE] 🎯 Synthesizing with Local Diffusion Pipeline ({model_name})...")
                 is_turbo = "turbo" in str(model_name).lower()
-                inf_steps = steps if steps is not None else (1 if is_turbo else 15)
-                inf_guidance = guidance_scale if guidance_scale is not None else (0.0 if is_turbo else 7.0)
+                inf_steps = steps if steps is not None else (2 if is_turbo else 15)
+                inf_guidance = guidance_scale if guidance_scale is not None else (1.6 if is_turbo else 7.0)
                 raw_img = self.generate_local_image(
                     prompt=rich_prompt,
                     width=w,

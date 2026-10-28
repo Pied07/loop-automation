@@ -14,17 +14,19 @@ export const dynamic = "force-dynamic";
 const LOCAL_DAEMON_URL = "http://127.0.0.1:5055";
 
 const COMPREHENSIVE_NEGATIVE_PROMPT =
+  "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, " +
+  "elongated torso, long torso, stretched body, unnaturally tall torso, stacked torso, double torso, accordion torso, " +
+  "repeating armor, ribbed armor distortion, repeating patterns, segmented body, " +
+  "extra arms, multiple arms, extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, " +
   "horrifying face, grotesque face, scary distorted face, deformed face, disfigured face, twisted face, " +
+  "hollow eyes, sunken eye sockets, dark eye sockets, black eyes, deformed pupils, missing eyes, blind eyes, mismatched eyes, " +
   "crossed eyes, strabismus, wall-eyed, cockeyed, misaligned eyes, lazy eye, asymmetrical eyes, crooked pupils, dilated pupils, " +
   "deformed eyes, missing pupils, unnatural iris, crooked mouth, twisted jaw, deformed teeth, melted face, claymation face, " +
   "zombie face, plastic dummy, uncanny valley, ugly proportions, malformed facial structure, bad anatomy, " +
   "spinal deformity, broken neck, mutilated neck, twisted spine, physical deformity, " +
-  "collaged face, pasted face, cut-and-paste face, mismatched face, photo collage, cutout head, frankenstein face, " +
-  "extra eyes, multi eyes, mutated eyes, duplicate eyes, fused eyes, " +
-  "extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, extra fingers, missing fingers, " +
-  "fused fingers, too many fingers, deformed hands, poorly drawn hands, poorly drawn face, mutation, deformed, " +
-  "blurry, bad proportions, gross proportions, unnatural body, plastic skin, multiple heads, " +
-  "close-up, headshot, portrait, passport photo, mugshot, ID photo, centered face, static pose, " +
+  "extra fingers, missing fingers, fused fingers, too many fingers, deformed hands, poorly drawn hands, poorly drawn face, mutation, deformed, " +
+  "elongated arms, rubbery arms, melted skin, mutated fingers, fused limbs, deformed body, unnatural posture, " +
+  "blurry, bad proportions, gross proportions, unnatural body, plastic skin, multiple heads, multiple people, duplicate person, " +
   "blank background, solid color background, plain background, studio backdrop, cropped head, " +
   "text, watermark, signature, username, error, " +
   "low quality, worst quality, normal quality, jpeg artifacts, overexposed, underexposed, bad lighting";
