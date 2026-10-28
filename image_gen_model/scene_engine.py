@@ -76,6 +76,7 @@ ASPECT_RATIOS = {
 # Industry standard anti-distortion negative prompt targeting horrifying faces, eye strabismus, anatomy mutations, and static portrait headshots
 COMPREHENSIVE_NEGATIVE_PROMPT = (
     "horrifying face, grotesque face, scary distorted face, deformed face, disfigured face, twisted face, "
+    "hollow eyes, sunken eye sockets, dark eye sockets, black eye sockets, deformed pupils, missing eyes, blind eyes, mismatched eyes, "
     "crossed eyes, strabismus, wall-eyed, cockeyed, misaligned eyes, lazy eye, asymmetrical eyes, crooked pupils, dilated pupils, "
     "deformed eyes, missing pupils, unnatural iris, crooked mouth, twisted jaw, deformed teeth, melted face, claymation face, "
     "zombie face, plastic dummy, uncanny valley, ugly proportions, malformed facial structure, bad anatomy, "
@@ -84,8 +85,8 @@ COMPREHENSIVE_NEGATIVE_PROMPT = (
     "extra eyes, multi eyes, mutated eyes, duplicate eyes, fused eyes, "
     "extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, extra fingers, missing fingers, "
     "fused fingers, too many fingers, deformed hands, poorly drawn hands, poorly drawn face, mutation, deformed, "
-    "blurry, bad proportions, gross proportions, unnatural body, plastic skin, multiple heads, "
-    "close-up, headshot, portrait, passport photo, mugshot, ID photo, centered face, static pose, "
+    "elongated arms, rubbery arms, melted skin, mutated fingers, fused limbs, deformed body, unnatural posture, "
+    "blurry, bad proportions, gross proportions, unnatural body, plastic skin, multiple heads, multiple people, "
     "blank background, solid color background, plain background, studio backdrop, cropped head, "
     "text, watermark, signature, username, error, "
     "low quality, worst quality, normal quality, jpeg artifacts, overexposed, underexposed, bad lighting"
@@ -348,22 +349,22 @@ class StorySceneEngine:
         import torch
         gen = torch.Generator(device=self.pipe.device).manual_seed(seed) if seed is not None else None
         is_turbo = "turbo" in getattr(self, "current_model_id", "").lower()
-        inf_steps = 1 if is_turbo else steps
-        inf_guidance = 0.0 if is_turbo else guidance_scale
+        inf_steps = max(2, min(steps or 4, 6)) if is_turbo else (steps or 15)
+        inf_guidance = guidance_scale if (guidance_scale is not None and guidance_scale > 0) else (1.5 if is_turbo else 7.0)
 
         if is_turbo:
-            # Native aspect ratios without destructive 2.6x center-zooming
+            # Native SD 512 dimensions avoiding anatomy distortion
             if height > width:
-                inf_w, inf_h = 448, 768
+                inf_w, inf_h = 512, 896
             elif width > height:
-                inf_w, inf_h = 768, 448
+                inf_w, inf_h = 896, 512
             else:
                 inf_w, inf_h = 512, 512
         else:
             inf_w = (width // 8) * 8
             inf_h = (height // 8) * 8
 
-        eff_neg = (negative_prompt or COMPREHENSIVE_NEGATIVE_PROMPT) if inf_guidance > 0.0 else None
+        eff_neg = negative_prompt or COMPREHENSIVE_NEGATIVE_PROMPT
 
         try:
             with torch.inference_mode():
@@ -375,7 +376,7 @@ class StorySceneEngine:
                     "width": inf_w,
                     "generator": gen,
                 }
-                if eff_neg is not None:
+                if eff_neg is not None and inf_guidance > 0.0:
                     pipe_kwargs["negative_prompt"] = eff_neg
 
                 result = self.pipe(**pipe_kwargs)

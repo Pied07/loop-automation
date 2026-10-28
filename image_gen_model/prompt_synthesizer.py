@@ -32,6 +32,7 @@ CHARACTER_PATTERNS = [
     r"\b(?:man|woman|boy|girl|person|people|explorer|explorers|detective|scientist|astronaut|warrior|soldier|guard|knight|wanderer|operator|pilot|captain|figure|silhouette|traveler|stranger)\b",
     r"\b(?:sarah|marcus|lucas|talia|finnian|kira|mark|alex|john|david|emma|elena|arthur|victor|clara)\b",
     r"\b(?:he|she|they|him|her|them)\s+(?:walked|stepped|looked|gazed|ran|turned|whispered|froze|reached|stood|held|sat|saw|watched|crawled|pressed|backed)\b",
+    r"\b(?:nude|naked|model|female|male|lady|guy|body|face|portrait|character|hero|protagonist|goddess|beauty)\b",
 ]
 
 # Comprehensive cinematic and visual style definitions
@@ -255,7 +256,12 @@ def synthesize_scene_prompt(
     preset = find_style_preset(style_preset)
 
     # Check whether the scene describes human characters or inanimate objects/environments
-    has_characters = any(re.search(pat, visual_core, re.IGNORECASE) for pat in CHARACTER_PATTERNS)
+    has_characters = any(re.search(pat, visual_core, re.IGNORECASE) for pat in CHARACTER_PATTERNS) or any(re.search(pat, script_sentence, re.IGNORECASE) for pat in CHARACTER_PATTERNS)
+
+    human_enhancement = (
+        "detailed beautiful symmetrical face, clear expressive eyes with detailed pupils, "
+        "realistic skin texture, anatomically correct body and natural limbs, well-proportioned hands"
+    ) if has_characters else ""
 
     is_horror = (not is_direct) and (
         (genre == "Horror" or "horror" in category.lower())
@@ -276,6 +282,7 @@ def synthesize_scene_prompt(
         horror_lighting = "chilling moonlight piercing cold shadows, volumetric supernatural mist, eerie amber glow"
         prompt_parts = [
             f"Cinematic atmospheric scene of {visual_core}",
+            human_enhancement,
             preset["prefix"],
             staging,
             framing_tag,
@@ -286,6 +293,7 @@ def synthesize_scene_prompt(
         romance_lighting = "warm golden hour lighting, soft sunset bokeh, intimate natural amber glow"
         prompt_parts = [
             f"Cinematic romantic scene of {visual_core}",
+            human_enhancement,
             preset["prefix"],
             staging,
             framing_tag,
@@ -295,6 +303,7 @@ def synthesize_scene_prompt(
     else:
         prompt_parts = [
             f"Cinematic scene of {visual_core}",
+            human_enhancement,
             preset["prefix"],
             staging,
             framing_tag,
