@@ -75,10 +75,13 @@ ASPECT_RATIOS = {
 
 # Industry standard anti-distortion negative prompt prioritizing anatomical integrity & limb correctness
 COMPREHENSIVE_NEGATIVE_PROMPT = (
+    "three arms, extra arms, multi-armed, third arm, arm behind head, three hands, extra hands, "
+    "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, "
+    "distorted torso, twisted body, elongated torso, bad anatomy, grotesque proportions, deformed body, unnatural posture, warped torso, deformed figure, non-human body, "
     "duplicate person, multiple people, two characters, three characters, 3 people, multiple clones, clone duplication, totem pole, stacked characters, stacked body, double torso, second body, conjoined, "
-    "multiple heads, two heads, three heads, stacked heads, vertical repetition, extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, "
+    "multiple heads, two heads, three heads, stacked heads, vertical repetition, extra limbs, extra legs, duplicate hands, duplicate arms, "
     "hazy hands, blurry hands, indistinct hands, hands hidden in sleeves, missing fingers, fused fingers, deformed hands, poorly drawn hands, "
-    "floating sword, disconnected sword, hazy sword, blurry blade, multiple blades, extra swords, double katana, translucent sword, dull blade, miniature sword, blunt blade, "
+    "floating sword, disconnected sword, hazy sword, blurry blade, double katana, translucent sword, dull blade, miniature sword, blunt blade, "
     "messy, chaotic, visual noise, grainy, noisy, haphazard, cluttered composition, debris, floating junk, distorted shapes, messy lines, "
     "rough sketch, scribbles, jittery lines, jagged edges, "
     "solid aura, metallic blob, gold clutter, yellow blob, crushed metal, crumpled fabric, "
@@ -372,9 +375,9 @@ class StorySceneEngine:
         is_turbo = "turbo" in getattr(self, "current_model_id", "").lower()
 
         if is_turbo:
-            # SD-Turbo optimal 2-step denoising with 576x896 aspect ratio to sharply render fingers, swords, and scars
-            inf_steps = 2
-            inf_guidance = 0.0
+            # SD-Turbo optimal 3-step denoising with 1.8 guidance to enforce negative prompt against extra limbs
+            inf_steps = 3
+            inf_guidance = 1.8
             if height > width:
                 inf_w, inf_h = 576, 896
             elif width > height:
@@ -399,7 +402,7 @@ class StorySceneEngine:
                     "width": inf_w,
                     "generator": gen,
                 }
-                if not is_turbo and eff_neg is not None and inf_guidance > 0.0:
+                if eff_neg is not None and inf_guidance > 0.0:
                     pipe_kwargs["negative_prompt"] = eff_neg
 
                 result = self.pipe(**pipe_kwargs)

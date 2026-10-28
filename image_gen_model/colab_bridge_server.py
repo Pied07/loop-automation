@@ -19,10 +19,13 @@ from flask_cors import CORS
 from PIL import Image
 
 COMPREHENSIVE_NEGATIVE_PROMPT = (
+    "three arms, extra arms, multi-armed, third arm, arm behind head, three hands, extra hands, "
+    "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, "
+    "distorted torso, twisted body, elongated torso, bad anatomy, grotesque proportions, deformed body, unnatural posture, warped torso, deformed figure, non-human body, "
     "duplicate person, multiple people, two characters, three characters, 3 people, multiple clones, clone duplication, totem pole, stacked characters, stacked body, double torso, second body, conjoined, "
-    "multiple heads, two heads, three heads, stacked heads, vertical repetition, extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, "
+    "multiple heads, two heads, three heads, stacked heads, vertical repetition, extra limbs, extra legs, duplicate hands, duplicate arms, "
     "hazy hands, blurry hands, indistinct hands, hands hidden in sleeves, missing fingers, fused fingers, deformed hands, poorly drawn hands, "
-    "floating sword, disconnected sword, hazy sword, blurry blade, multiple blades, extra swords, double katana, translucent sword, dull blade, miniature sword, blunt blade, "
+    "floating sword, disconnected sword, hazy sword, blurry blade, double katana, translucent sword, dull blade, miniature sword, blunt blade, "
     "messy, chaotic, visual noise, grainy, noisy, haphazard, cluttered composition, debris, floating junk, distorted shapes, messy lines, "
     "rough sketch, scribbles, jittery lines, jagged edges, "
     "solid aura, metallic blob, gold clutter, yellow blob, crushed metal, crumpled fabric, "

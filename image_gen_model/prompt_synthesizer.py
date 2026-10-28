@@ -167,18 +167,20 @@ def clean_narration(text: str) -> str:
             flags=re.IGNORECASE,
         )
 
-    # Clean typos and awkward phrases
-    clean = re.sub(r"\b(?:hair\s+tied\s+beding|hair\s+tied\s+behind)\b", "hair tied back", clean, flags=re.IGNORECASE)
+    # Clean typos, hair, and topknot phrases
+    clean = re.sub(r"\b(?:hair\s+tied\s+(?:bak|behind|back)\s+topknot|hair\s+tied\s+(?:bak|behind|back)|topknot|samurai\s+topknot)\b", "hair styled in traditional samurai topknot", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"\b(?:hair\s+tied\s+beding)\b", "hair styled in traditional samurai topknot", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\b(?:and\s+)+and\b", "and", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\b(?:and\s+and\s+)+", "and ", clean, flags=re.IGNORECASE)
 
-    # Convert aura/radiating energy to subtle atmospheric lighting instead of solid physical clutter
+    # Convert aura/radiating energy in all colors and forms to clean atmospheric backlighting
     def _aura_sub(m):
-        color = (m.group(1) or "golden").strip()
-        return f"soft ethereal {color} backlight glow, subtle luminous floating embers"
+        c_m = re.search(r"\b(white|golden|gold|bright|fiery|blue|purple|dark|red|shining|radiant|glowing)\b", m.group(0), re.IGNORECASE)
+        color = c_m.group(1).lower() if c_m else "golden"
+        return f"soft ethereal {color} backlight glow"
 
     clean = re.sub(
-        r"\b(?:and\s+)?(?:a\s+)?(golden|bright|fiery|blue|purple|dark|shining|radiant|glowing)?\s*(?:aura|energy|flames?|light)\s*radiating(?:\s+(?:from|around)(?:\s+(?:his|her|their|the))?\s+body)?\b",
+        r"\b(?:and\s+)?(?:a\s+)?(?:white|golden|gold|bright|fiery|blue|purple|dark|red|shining|radiant|glowing)?\s*(?:aura|energy|flames?|light|power)\s*(?:radiating|emanating|flowing)?(?:\s+(?:from|around)(?:\s+(?:him|her|them|his\s+body|her\s+body|the\s+body))?)?(?:\s+in\s+form\s+of\s+energy)?\b",
         _aura_sub,
         clean,
         flags=re.IGNORECASE,
@@ -445,14 +447,14 @@ def synthesize_scene_prompt(
     if is_anime:
         char_tag = "1girl, beautiful anime heroine" if is_female else ("1boy, handsome anime warrior" if is_male else "1character, anime hero")
         style_core = "Masterpiece 2D Japanese anime, clean crisp lineart, Ufotable key visual"
-        framing_part = f"solo, exactly one person, single {char_tag}, centered upper body portrait, no other characters" if has_characters else preset["env_framing"]
+        framing_part = f"solo, exactly one person, single {char_tag}, authentic human anatomy, exactly two arms, two hands only, natural human torso, no extra limbs" if has_characters else preset["env_framing"]
         if has_scars:
             face_part = "sharp anime face, luminous amber eyes, clean jawline, iconic battle scar across cheek" if has_characters else ""
         else:
             face_part = "sharp anime face, luminous amber eyes, clean jawline, smooth skin" if has_characters else ""
 
         weapon_part = (
-            "holding a single sharp glowing katana in foreground with both hands, detailed hilt, razor-sharp steel blade"
+            "holding a single katana firmly with both hands, single blade only, no extra swords, authentic two-handed grip on the hilt"
             if has_weapon
             else (pose_guidance if has_characters else "")
         )
@@ -468,14 +470,14 @@ def synthesize_scene_prompt(
     elif is_realistic:
         real_char_tag = "1woman, beautiful female portrait" if is_female else ("1man, handsome male warrior" if is_male else "1person, authentic portrait")
         style_core = "Masterpiece raw 35mm DSLR color photograph, award winning portrait, shot on Sony A7R V"
-        real_framing_part = f"solo, exactly one person, single {real_char_tag}, centered upper body portrait, no other characters" if has_characters else preset["env_framing"]
+        real_framing_part = f"solo, exactly one person, single {real_char_tag}, authentic human anatomy, exactly two arms, two hands only, natural human torso, no extra limbs" if has_characters else preset["env_framing"]
         if has_scars:
             real_face_part = "exquisite human face, authentic realistic eyes, clean jawline, iconic battle scar on cheek" if has_characters else ""
         else:
             real_face_part = "exquisite human face, authentic realistic eyes, clean jawline, natural skin texture" if has_characters else ""
 
         real_weapon_part = (
-            "holding a single sharp weapon in foreground with both hands, detailed metal blade"
+            "holding a single weapon firmly with both hands, single blade only, no extra weapons, natural grip"
             if has_weapon
             else (pose_guidance if has_characters else "")
         )
