@@ -4358,24 +4358,35 @@ export default function Home() {
 
               {/* Image Type / Style Selection Card */}
               <div style={{ background: '#111218', border: '1.5px solid #232635', borderRadius: '12px', padding: '20px', boxShadow: '0 8px 30px rgba(0,0,0,0.45)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Image Type / Style
-                  </label>
-                  <span style={{ fontSize: '11px', color: '#ff3b45', fontWeight: 600 }}>{imageGenStyle}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>Image Type / Style</span>
+                      <span style={{ fontSize: '10px', background: 'rgba(255,59,69,0.15)', color: '#ff3b45', border: '1px solid rgba(255,59,69,0.3)', padding: '2px 6px', borderRadius: '4px', textTransform: 'none', fontWeight: 600 }}>
+                        👤 With Character Samples
+                      </span>
+                    </label>
+                    <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block', marginTop: '2px' }}>
+                      High-fidelity person samples demonstrating each art style rendered by your ML model
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '12px', color: '#ff3b45', fontWeight: 700, background: 'rgba(255,59,69,0.1)', padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(255,59,69,0.25)' }}>
+                    Active: {imageGenStyle}
+                  </span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '8px' }}>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '10px' }}>
                   {[
-                    { id: "Anime / Manga", icon: "🎨", name: "Anime / Manga", desc: "Studio Ghibli & anime aesthetic" },
-                    { id: "Realistic / Photorealism", icon: "📸", name: "Realistic", desc: "35mm photorealistic 8k detail" },
-                    { id: "Cinematic Film", icon: "🎬", name: "Cinematic Film", desc: "Dramatic chiaroscuro lighting" },
-                    { id: "3D Animation / Pixar", icon: "✨", name: "3D Animation", desc: "Pixar Disney CGI Octane render" },
-                    { id: "Sci-Fi Cyberpunk", icon: "⚡", name: "Cyberpunk", desc: "Neon reflections & rainy haze" },
-                    { id: "Epic Fantasy", icon: "🏰", name: "Epic Fantasy", desc: "Ancient majesty & god rays" },
-                    { id: "Dark Fantasy / Horror", icon: "🌑", name: "Dark Fantasy", desc: "Gothic mood & ominous shadows" },
-                    { id: "Comic Book / Graphic Novel", icon: "💥", name: "Comic Book", desc: "Bold ink contours & pop-art" },
-                    { id: "Photorealistic Nature", icon: "🌿", name: "Nature Wildlife", desc: "National Geographic realism" },
-                    { id: "Raw Prompt Only", icon: "📝", name: "Raw Prompt Only", desc: "Direct model prompt only" },
+                    { id: "Anime / Manga", icon: "🎨", name: "Anime / Manga", character: "Anime Character", image: "/assets/styles/anime.jpg", desc: "Studio Ghibli and Makoto Shinkai anime aesthetic" },
+                    { id: "Realistic / Photorealism", icon: "📸", name: "Realistic", character: "Photoreal Human", image: "/assets/styles/realism.jpg", desc: "35mm lens, photorealistic 8k skin and eye detail" },
+                    { id: "Cinematic Film", icon: "🎬", name: "Cinematic Film", character: "Cinematic Actor", image: "/assets/styles/cinematic.jpg", desc: "Dramatic chiaroscuro rim lighting and anamorphic feel" },
+                    { id: "3D Animation / Pixar", icon: "✨", name: "3D Animation", character: "Pixar 3D Person", image: "/assets/styles/disney3d.jpg", desc: "Pixar Disney CGI 3D Octane render subsurface glow" },
+                    { id: "Sci-Fi Cyberpunk", icon: "⚡", name: "Cyberpunk", character: "Cyber Warrior", image: "/assets/styles/mecha.jpg", desc: "Neon reflections, cyber gear and futuristic haze" },
+                    { id: "Epic Fantasy", icon: "🏰", name: "Epic Fantasy", character: "Fantasy Hero", image: "/assets/styles/fantasy.jpg", desc: "Mystical atmosphere, ancient majesty and god rays" },
+                    { id: "Dark Fantasy / Horror", icon: "🌑", name: "Dark Fantasy", character: "Armored Knight", image: "/assets/styles/darkfantasy.jpg", desc: "Gothic mood, armored knight and ominous mist" },
+                    { id: "Comic Book / Graphic Novel", icon: "💥", name: "Comic Book", character: "Comic Superhero", image: "/assets/styles/retrocomic.jpg", desc: "Bold ink contours, pop-art halftone dots and cover art" },
+                    { id: "Photorealistic Nature", icon: "🌿", name: "Nature Wildlife", character: "Outdoor Explorer", image: "/assets/styles/nature.jpg", desc: "National Geographic rugged adventurer in wilderness" },
+                    { id: "Raw Prompt Only", icon: "📝", name: "Raw Prompt Only", character: "Direct Model Output", image: "/assets/styles/raw.jpg", desc: "Unstyled pure prompt interpretation by ML diffusion" },
                   ].map((st) => {
                     const isSelected = imageGenStyle === st.id;
                     return (
@@ -4384,42 +4395,139 @@ export default function Home() {
                         type="button"
                         onClick={() => setImageGenStyle(st.id)}
                         style={{
-                          background: isSelected ? 'rgba(229, 9, 20, 0.14)' : '#161822',
+                          background: isSelected ? 'rgba(229, 9, 20, 0.16)' : '#161822',
                           border: isSelected ? '1.5px solid #ff3b45' : '1px solid #282c3f',
-                          borderRadius: '8px',
-                          padding: '10px 12px',
+                          borderRadius: '10px',
+                          overflow: 'hidden',
                           display: 'flex',
                           flexDirection: 'column',
-                          alignItems: 'flex-start',
                           textAlign: 'left',
                           cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                          boxShadow: isSelected ? '0 0 12px rgba(229,9,20,0.3)' : 'none',
+                          transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
+                          boxShadow: isSelected ? '0 0 16px rgba(229,9,20,0.35)' : 'none',
+                          transform: isSelected ? 'translateY(-1px)' : 'none',
+                          padding: 0,
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%', marginBottom: '4px' }}>
-                          <span style={{ fontSize: '16px' }}>{st.icon}</span>
-                          <span style={{ fontSize: '12px', fontWeight: 700, color: isSelected ? '#ff3b45' : '#ffffff', flex: 1 }}>{st.name}</span>
-                          {isSelected && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ff3b45' }} />}
+                        {/* Sample Person Image Thumbnail */}
+                        <div style={{ position: 'relative', width: '100%', height: '88px', background: '#0d0e14', overflow: 'hidden' }}>
+                          <img
+                            src={st.image}
+                            alt={st.name}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              transition: 'transform 0.3s ease',
+                              filter: isSelected ? 'brightness(1.05) contrast(1.05)' : 'brightness(0.92)',
+                            }}
+                          />
+                          {/* Bottom gradient overlay for readability */}
+                          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(17,18,24,0.85) 0%, rgba(17,18,24,0.1) 60%, transparent 100%)' }} />
+
+                          {/* Person Sample Badge */}
+                          <div style={{ position: 'absolute', bottom: '6px', left: '6px', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', padding: '1px 5px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <span style={{ fontSize: '9px' }}>👤</span>
+                            <span style={{ fontSize: '9px', fontWeight: 600, color: '#f1f5f9' }}>{st.character}</span>
+                          </div>
+
+                          {/* Selected Checkmark Badge */}
+                          {isSelected && (
+                            <div style={{ position: 'absolute', top: '6px', right: '6px', background: '#ff3b45', color: '#ffffff', borderRadius: '4px', padding: '2px 6px', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px', boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>
+                              ✓ Active
+                            </div>
+                          )}
                         </div>
-                        <span style={{ fontSize: '10px', color: '#94a3b8', lineHeight: 1.2 }}>{st.desc}</span>
+
+                        {/* Style Details */}
+                        <div style={{ padding: '8px 10px 10px 10px', width: '100%' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '3px' }}>
+                            <span style={{ fontSize: '13px' }}>{st.icon}</span>
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: isSelected ? '#ff3b45' : '#ffffff', flex: 1 }}>{st.name}</span>
+                          </div>
+                          <span style={{ fontSize: '10px', color: '#94a3b8', lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                            {st.desc}
+                          </span>
+                        </div>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Aspect Ratio Card */}
+              {/* Aspect Ratio & Scale Card with Visual Person Framing */}
               <div style={{ background: '#111218', border: '1.5px solid #232635', borderRadius: '12px', padding: '20px', boxShadow: '0 8px 30px rgba(0,0,0,0.45)' }}>
-                <label style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '12px' }}>
-                  Aspect Ratio
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>Aspect Ratio & Scale</span>
+                      <span style={{ fontSize: '10px', background: 'rgba(56,189,248,0.15)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.3)', padding: '2px 6px', borderRadius: '4px', textTransform: 'none', fontWeight: 600 }}>
+                        📐 Scale & Person Framing
+                      </span>
+                    </label>
+                    <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block', marginTop: '2px' }}>
+                      Live scale proportions showing how a person is framed in each dimension
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 700, background: 'rgba(56,189,248,0.1)', padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.25)' }}>
+                    {imageGenAspect}
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '10px' }}>
                   {[
-                    { id: "9:16 (Shorts / Reels)", label: "9:16 Vertical", res: "768 × 1344", badge: "Shorts / Reels" },
-                    { id: "16:9 (YouTube Standard)", label: "16:9 Landscape", res: "1344 × 768", badge: "YouTube Standard" },
-                    { id: "1:1 (Square)", label: "1:1 Square", res: "1024 × 1024", badge: "Instagram Feed" },
-                    { id: "4:3 (Classic)", label: "4:3 Classic", res: "1024 × 768", badge: "Classic Framing" },
+                    {
+                      id: "9:16 (Shorts / Reels)",
+                      label: "9:16 Vertical",
+                      res: "768 × 1344",
+                      ratio: "9:16",
+                      badge: "Shorts / Reels",
+                      framing: "Full Body (Head to Toe)",
+                      frameW: 32,
+                      frameH: 58,
+                      personH: 46,
+                      scaleTag: "Mobile Vertical",
+                      scaleRel: "0.57 : 1 (Tall)",
+                    },
+                    {
+                      id: "16:9 (YouTube Standard)",
+                      label: "16:9 Landscape",
+                      res: "1344 × 768",
+                      ratio: "16:9",
+                      badge: "YouTube Standard",
+                      framing: "Widescreen Cinematic",
+                      frameW: 64,
+                      frameH: 36,
+                      personH: 26,
+                      scaleTag: "Widescreen Display",
+                      scaleRel: "1.75 : 1 (Wide)",
+                    },
+                    {
+                      id: "1:1 (Square)",
+                      label: "1:1 Square",
+                      res: "1024 × 1024",
+                      ratio: "1:1",
+                      badge: "Instagram Feed",
+                      framing: "Medium Shot (Waist Up)",
+                      frameW: 46,
+                      frameH: 46,
+                      personH: 34,
+                      scaleTag: "Square Social Feed",
+                      scaleRel: "1.00 : 1 (Equal)",
+                    },
+                    {
+                      id: "4:3 (Classic)",
+                      label: "4:3 Classic",
+                      res: "1024 × 768",
+                      ratio: "4:3",
+                      badge: "Classic Framing",
+                      framing: "Classic Standard Portrait",
+                      frameW: 56,
+                      frameH: 42,
+                      personH: 30,
+                      scaleTag: "Photo Framing",
+                      scaleRel: "1.33 : 1 (Photo)",
+                    },
                   ].map((asp) => {
                     const isSelected = imageGenAspect === asp.id;
                     return (
@@ -4428,27 +4536,133 @@ export default function Home() {
                         type="button"
                         onClick={() => setImageGenAspect(asp.id)}
                         style={{
-                          background: isSelected ? 'rgba(229, 9, 20, 0.14)' : '#161822',
+                          background: isSelected ? 'rgba(229, 9, 20, 0.16)' : '#161822',
                           border: isSelected ? '1.5px solid #ff3b45' : '1px solid #282c3f',
-                          borderRadius: '8px',
-                          padding: '10px 12px',
+                          borderRadius: '10px',
+                          padding: '12px',
                           display: 'flex',
                           flexDirection: 'column',
                           textAlign: 'left',
                           cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                          boxShadow: isSelected ? '0 0 12px rgba(229,9,20,0.3)' : 'none',
+                          transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
+                          boxShadow: isSelected ? '0 0 16px rgba(229,9,20,0.35)' : 'none',
+                          transform: isSelected ? 'translateY(-1px)' : 'none',
                         }}
                       >
-                        <span style={{ fontSize: '12px', fontWeight: 700, color: isSelected ? '#ff3b45' : '#ffffff' }}>{asp.label}</span>
-                        <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>{asp.res}</span>
-                        <span style={{ fontSize: '9px', color: '#64748b', marginTop: '4px' }}>{asp.badge}</span>
+                        {/* Scale & Person Framing Visualizer Box */}
+                        <div style={{
+                          height: '74px',
+                          width: '100%',
+                          background: 'rgba(0,0,0,0.4)',
+                          borderRadius: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                          border: '1px solid rgba(255,255,255,0.05)',
+                          marginBottom: '10px',
+                        }}>
+                          {/* Scaled Proportional Frame Box */}
+                          <div style={{
+                            width: `${asp.frameW}px`,
+                            height: `${asp.frameH}px`,
+                            border: isSelected ? '2px solid #ff3b45' : '1.5px dashed rgba(148,163,184,0.4)',
+                            borderRadius: '3px',
+                            background: isSelected ? 'rgba(255,59,69,0.1)' : 'rgba(255,255,255,0.03)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            position: 'relative',
+                            boxShadow: isSelected ? '0 0 10px rgba(255,59,69,0.4)' : 'none',
+                            transition: 'all 0.2s ease',
+                          }}>
+                            {/* Proportional Person Silhouette Inside Frame */}
+                            <svg viewBox="0 0 24 40" height={asp.personH} width={asp.personH * 0.6} fill={isSelected ? '#ff3b45' : '#94a3b8'} style={{ display: 'block' }}>
+                              <circle cx="12" cy="6" r="4" />
+                              <path d="M6 14 C6 12 8 11.5 12 11.5 C16 11.5 18 12 18 14 L17.5 24 C17.5 25 16.5 25.5 15.5 25.5 L15 37 C15 38.5 14 39 13 39 C12 39 11.5 38 11.5 37 L11 27 L10.5 37 C10.5 38 10 39 9 39 C8 39 7 38.5 7 37 L6.5 25.5 C5.5 25.5 4.5 25 4.5 24 Z" />
+                            </svg>
+                          </div>
+
+                          {/* Aspect Ratio Badge overlay */}
+                          <span style={{
+                            position: 'absolute',
+                            top: '4px',
+                            right: '6px',
+                            fontSize: '9px',
+                            fontWeight: 700,
+                            color: isSelected ? '#ff3b45' : '#64748b',
+                            background: 'rgba(0,0,0,0.6)',
+                            padding: '1px 5px',
+                            borderRadius: '3px',
+                          }}>
+                            {asp.ratio}
+                          </span>
+                        </div>
+
+                        {/* Title & Dimension */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: isSelected ? '#ff3b45' : '#ffffff' }}>{asp.label}</span>
+                          {isSelected && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ff3b45' }} />}
+                        </div>
+
+                        {/* Resolution & Scale Info */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#e2e8f0', letterSpacing: '0.02em' }}>{asp.res}</span>
+                          <span style={{ fontSize: '9px', color: '#64748b' }}>px</span>
+                        </div>
+
+                        {/* Person Framing Descriptor */}
+                        <div style={{ fontSize: '10px', color: isSelected ? '#ff858d' : '#94a3b8', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <span>👤</span>
+                          <span style={{ fontWeight: 500 }}>{asp.framing}</span>
+                        </div>
+
+                        {/* Platform Badge */}
+                        <span style={{
+                          fontSize: '9px',
+                          color: isSelected ? '#ff3b45' : '#64748b',
+                          background: isSelected ? 'rgba(255,59,69,0.12)' : 'rgba(255,255,255,0.03)',
+                          border: isSelected ? '1px solid rgba(255,59,69,0.25)' : '1px solid rgba(255,255,255,0.06)',
+                          borderRadius: '4px',
+                          padding: '2px 6px',
+                          marginTop: '6px',
+                          display: 'inline-block',
+                          width: 'fit-content',
+                        }}>
+                          {asp.badge}
+                        </span>
                       </button>
                     );
                   })}
                 </div>
-              </div>
 
+                {/* Framing Scale Reference Bar */}
+                <div style={{
+                  marginTop: '14px',
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid #1e2230',
+                  borderRadius: '8px',
+                  padding: '10px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '10px',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '15px' }}>📐</span>
+                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                      Selected Output: <strong style={{ color: '#ffffff' }}>{(imageGenAspect.split(' ')[0] || '9:16')}</strong> ({imageGenAspect.includes('16:9') ? '1344 × 768 px' : imageGenAspect.includes('1:1') ? '1024 × 1024 px' : imageGenAspect.includes('4:3') ? '1024 × 768 px' : '768 × 1344 px'})
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b' }}>Framing Mode:</span>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#38bdf8', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.25)', borderRadius: '4px', padding: '2px 8px' }}>
+                      {imageGenAspect.includes('16:9') ? 'Widescreen Landscape Cinematic' : imageGenAspect.includes('1:1') ? 'Square Feed Medium Shot' : imageGenAspect.includes('4:3') ? 'Classic Standard View' : 'Vertical Full-Body (Head to Toe)'}
+                    </span>
+                  </div>
+                </div>
+              </div>
               {/* Advanced Settings Toggle */}
               <div style={{ background: '#111218', border: '1px solid #232635', borderRadius: '12px', padding: '16px' }}>
                 <button
