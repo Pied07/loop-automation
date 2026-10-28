@@ -49,8 +49,8 @@ def main():
         choices=list(ASPECT_RATIOS.keys()),
         help="Aspect ratio (e.g. 9:16 for YouTube Shorts, 16:9 for YouTube Standard)",
     )
-    parser.add_argument("--steps", type=int, default=4, help="Denoising steps (4 optimal for DPMSolver)")
-    parser.add_argument("--guidance", type=float, default=6.0, help="Guidance scale")
+    parser.add_argument("--steps", type=int, default=20, help="Denoising steps (20-25 optimal for high quality)")
+    parser.add_argument("--guidance", type=float, default=7.5, help="Guidance scale")
     parser.add_argument("--lora", type=str, default=None, help="Path to trained LoRA .safetensors")
     parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
     parser.add_argument("--output", type=str, default=None, help="Explicit file path to save output image")

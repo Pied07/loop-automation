@@ -65,53 +65,50 @@ STYLE_PRESETS = {
     "Raw Prompt Only": "",
 }
 
-# Aspect ratio presets
+# Aspect ratio presets tuned to native diffusion buckets to eliminate duplicate limbs & torsos
 ASPECT_RATIOS = {
-    "9:16 (Shorts / Reels)": (768, 1344),
-    "16:9 (YouTube Standard)": (1344, 768),
+    "9:16 (Shorts / Reels)": (832, 1216),
+    "16:9 (YouTube Standard)": (1216, 832),
     "1:1 (Square)": (1024, 1024),
-    "4:3 (Classic)": (1024, 768),
+    "4:3 (Classic)": (1152, 896),
 }
 
-# Industry standard anti-distortion negative prompt targeting horrifying faces, eye strabismus, anatomy mutations, and static portrait headshots
+# Industry standard anti-distortion negative prompt prioritizing anatomical integrity & limb correctness
 COMPREHENSIVE_NEGATIVE_PROMPT = (
-    "dull colors, washed out, desaturated, muted colors, drab lighting, flat shading, 2d vector, clip art, low contrast, gray background, plain slate background, monochrome, "
-    "retro comic, vintage comic, western comic, comic book panel, ink hatching, crosshatching, heavy linework, flat coloring, posterized, sketch, line drawing, "
-    "distant character, tiny person, miniature character, zoomed out wide shot, full body far away, walking down path, long shot, "
-    "neon pink, oversaturated pink, bright pink flowers, cherry blossom overload, cartoonish garden, children book illustration, 8-bit, pixel art, "
-    "dark void, empty black background, plain black background, solid black background, studio backdrop, indoor stage, stage lighting, spotlights, spotlight beams, disco lights, floating sparkles, yellow laser line, floating glitter, "
-    "multiple hands, extra hands, four hands, four arms, three hands, three arms, duplicate hands, duplicate arms, multi-armed, mutated arms, mutated hands, sprouted arms, "
-    "scars, scarred face, body scars, facial scars, cuts, wounds, lacerations, blemish, acne, rough skin, weathered face, wrinkles, aged skin, ugly face, "
-    "standing straight, stiff pose, rigid posture, mannequin pose, t-pose, a-pose, static standing, boring pose, idle pose, straight upright posture, lifeless stance, neutral standing pose, standing upright, passport photo pose, symmetrical standing, "
+    "extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, "
+    "deformed hands, poorly drawn hands, fused fingers, too many fingers, missing fingers, mutated hands, "
+    "mutated limbs, malformed limbs, disconnected limbs, floating limbs, duplicate person, multiple heads, multiple people, "
+    "bad anatomy, grotesque proportions, malformed facial features, disfigured, "
     "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, "
     "elongated torso, long torso, stretched body, unnaturally tall torso, stacked torso, double torso, accordion torso, repeating armor, ribbed armor distortion, repeating patterns, "
-    "extra arms, multiple arms, extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, "
     "horrifying face, grotesque face, scary distorted face, deformed face, disfigured face, twisted face, "
     "hollow eyes, sunken eye sockets, dark eye sockets, black eye sockets, deformed pupils, missing eyes, blind eyes, mismatched eyes, "
     "crossed eyes, strabismus, wall-eyed, cockeyed, misaligned eyes, lazy eye, asymmetrical eyes, crooked pupils, dilated pupils, "
     "deformed eyes, missing pupils, unnatural iris, crooked mouth, twisted jaw, deformed teeth, melted face, claymation face, "
-    "zombie face, plastic dummy, uncanny valley, ugly proportions, malformed facial structure, bad anatomy, "
+    "zombie face, plastic dummy, uncanny valley, malformed facial structure, "
     "spinal deformity, broken neck, mutilated neck, twisted spine, physical deformity, "
     "collaged face, pasted face, cut-and-paste face, mismatched face, photo collage, cutout head, frankenstein face, "
     "extra eyes, multi eyes, mutated eyes, duplicate eyes, fused eyes, "
-    "extra fingers, missing fingers, fused fingers, too many fingers, deformed hands, poorly drawn hands, poorly drawn face, mutation, deformed, "
     "elongated arms, rubbery arms, melted skin, mutated fingers, fused limbs, deformed body, unnatural posture, "
-    "blurry, bad proportions, gross proportions, unnatural body, plastic skin, multiple heads, multiple people, duplicate person, "
+    "blurry, unnatural body, plastic skin, "
+    "dull colors, washed out, desaturated, muted colors, drab lighting, flat shading, 2d vector, clip art, low contrast, gray background, plain slate background, monochrome, "
+    "retro comic, vintage comic, western comic, comic book panel, ink hatching, crosshatching, heavy linework, flat coloring, posterized, sketch, line drawing, "
     "blank background, solid color background, plain background, studio backdrop, cropped head, "
     "text, watermark, signature, username, error, "
     "low quality, worst quality, normal quality, jpeg artifacts, overexposed, underexposed, bad lighting"
 )
 
-# Dedicated Horror negative prompt: prevents cheerful smiles and technical artifacts while ALLOWING scary/ghostly faces
+# Dedicated Horror negative prompt prioritizing anatomical integrity while allowing spooky atmosphere
 HORROR_NEGATIVE_PROMPT = (
-    "standing straight, stiff pose, rigid posture, mannequin pose, t-pose, a-pose, static standing, straight upright posture, "
+    "extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, "
+    "deformed hands, poorly drawn hands, fused fingers, too many fingers, missing fingers, mutated hands, "
+    "mutated limbs, malformed limbs, disconnected limbs, floating limbs, duplicate person, multiple heads, multiple people, "
+    "bad anatomy, grotesque proportions, malformed facial features, "
     "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, "
     "elongated torso, long torso, stretched body, stacked torso, accordion torso, ribbed armor distortion, "
     "happy smile, cheerful face, laughing, friendly smile, sunny day, bright cheerful lighting, pastel colors, "
     "cartoon, 3d cute pixar, anime, childish, "
     "collaged face, pasted face, cut-and-paste face, mismatched photo, cutout head, frankenstein collage, "
-    "extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, extra fingers, missing fingers, "
-    "fused fingers, too many fingers, deformed hands, poorly drawn hands, "
     "blurry, bad proportions, gross proportions, plastic skin, "
     "close-up passport photo, mugshot, centered headshot, solid color background, "
     "text, watermark, signature, username, error, low quality, worst quality, normal quality, jpeg artifacts"
@@ -251,10 +248,12 @@ class StorySceneEngine:
                 turbo_model = "stabilityai/sd-turbo"
                 print(f"[SCENE ENGINE] ⚡ Initializing Fast Diffusion on CPU ({turbo_model}, {torch.get_num_threads()} threads)...")
                 t0 = time.time()
+                from diffusers import EulerAncestralDiscreteScheduler
                 self.pipe = AutoPipelineForText2Image.from_pretrained(
                     turbo_model,
                     torch_dtype=torch.float32,
                 )
+                self.pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(self.pipe.scheduler.config)
                 self.pipe.to("cpu")
                 self.current_model_id = turbo_model
                 if self.active_lora and os.path.exists(self.active_lora):
@@ -283,13 +282,13 @@ class StorySceneEngine:
         self,
         prompt: str,
         bridge_url: str,
-        width: int = 768,
-        height: int = 1344,
-        steps: int = 20,
-        guidance: float = 7.0,
+        width: int = 832,
+        height: int = 1216,
+        steps: int = 25,
+        guidance: float = 7.5,
         seed: Optional[int] = None,
         negative_prompt: Optional[str] = None,
-        timeout: int = 60,
+        timeout: int = 90,
     ) -> Optional[Image.Image]:
         """
         Synthesizes photorealistic scene image via Live Google Colab GPU Bridge or local daemon.
@@ -303,7 +302,7 @@ class StorySceneEngine:
             "aspect": "9:16 (Shorts / Reels)" if height > width else "16:9 (YouTube Standard)",
             "width": width,
             "height": height,
-            "steps": steps,
+            "steps": max(20, steps),
             "guidance": guidance,
             "seed": seed,
         }).encode("utf-8")
@@ -347,10 +346,10 @@ class StorySceneEngine:
     def generate_local_image(
         self,
         prompt: str,
-        width: int = 512,
-        height: int = 896,
-        steps: int = 15,
-        guidance_scale: float = 7.0,
+        width: int = 832,
+        height: int = 1216,
+        steps: int = 25,
+        guidance_scale: float = 7.5,
         seed: Optional[int] = None,
         negative_prompt: Optional[str] = None,
     ) -> Optional[Image.Image]:
@@ -362,18 +361,20 @@ class StorySceneEngine:
         import torch
         gen = torch.Generator(device=self.pipe.device).manual_seed(seed) if seed is not None else None
         is_turbo = "turbo" in getattr(self, "current_model_id", "").lower()
-        inf_steps = max(2, min(steps or 4, 6)) if is_turbo else (steps or 15)
-        inf_guidance = guidance_scale if (guidance_scale is not None and guidance_scale > 0) else (1.6 if is_turbo else 7.0)
 
         if is_turbo:
-            # Optimal SD 512 dimensions avoiding receptive-field vertical tiling and torso duplication
+            # SD-Turbo optimal 512-based aspect ratios preventing limb repetition and torso duplication
+            inf_steps = 1
+            inf_guidance = 0.0
             if height > width:
-                inf_w, inf_h = 416, 736
+                inf_w, inf_h = 512, 768
             elif width > height:
-                inf_w, inf_h = 736, 416
+                inf_w, inf_h = 768, 512
             else:
                 inf_w, inf_h = 512, 512
         else:
+            inf_steps = steps or 25
+            inf_guidance = guidance_scale or 7.5
             inf_w = (width // 8) * 8
             inf_h = (height // 8) * 8
 
@@ -389,7 +390,7 @@ class StorySceneEngine:
                     "width": inf_w,
                     "generator": gen,
                 }
-                if eff_neg is not None and inf_guidance > 0.0:
+                if not is_turbo and eff_neg is not None and inf_guidance > 0.0:
                     pipe_kwargs["negative_prompt"] = eff_neg
 
                 result = self.pipe(**pipe_kwargs)
@@ -487,8 +488,8 @@ class StorySceneEngine:
                 model_name = getattr(self, "current_model_id", "local diffusion")
                 print(f"[SCENE ENGINE] 🎯 Synthesizing with Local Diffusion Pipeline ({model_name})...")
                 is_turbo = "turbo" in str(model_name).lower()
-                inf_steps = steps if steps is not None else (2 if is_turbo else 15)
-                inf_guidance = guidance_scale if guidance_scale is not None else (1.6 if is_turbo else 7.0)
+                inf_steps = 1 if is_turbo else (steps or 25)
+                inf_guidance = 0.0 if is_turbo else (guidance_scale or 7.5)
                 raw_img = self.generate_local_image(
                     prompt=rich_prompt,
                     width=w,

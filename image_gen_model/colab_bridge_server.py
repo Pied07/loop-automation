@@ -19,12 +19,16 @@ from flask_cors import CORS
 from PIL import Image
 
 COMPREHENSIVE_NEGATIVE_PROMPT = (
+    "extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, "
+    "deformed hands, poorly drawn hands, fused fingers, too many fingers, missing fingers, mutated hands, "
+    "mutated limbs, malformed limbs, disconnected limbs, floating limbs, duplicate person, multiple heads, multiple people, "
+    "bad anatomy, grotesque proportions, malformed facial features, disfigured, "
+    "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, "
+    "elongated torso, long torso, stretched body, unnaturally tall torso, stacked torso, double torso, accordion torso, repeating armor, ribbed armor distortion, repeating patterns, "
     "collaged face, pasted face, cut-and-paste face, mismatched face, photo collage, cutout head, frankenstein face, "
     "extra eyes, multi eyes, mutated eyes, duplicate eyes, crossed eyes, fused eyes, deformed iris, deformed pupils, "
     "asymmetrical face, deformed face, bad face anatomy, distorted facial features, cloned face, morbid, mutilated, "
-    "extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, extra fingers, missing fingers, "
-    "fused fingers, too many fingers, deformed hands, poorly drawn hands, poorly drawn face, mutation, deformed, "
-    "blurry, bad proportions, gross proportions, unnatural body, plastic skin, deformed jaw, multiple heads, uncanny valley, "
+    "blurry, bad proportions, gross proportions, unnatural body, plastic skin, deformed jaw, uncanny valley, "
     "close-up, headshot, portrait, passport photo, mugshot, ID photo, centered face, static pose, "
     "blank background, solid color background, plain background, studio backdrop, cropped head, "
     "text, watermark, signature, username, error, "
@@ -82,15 +86,32 @@ def start_bridge(pipe=None, port=5055):
                 return jsonify({"error": "Prompt is required"}), 400
 
             aspect = data.get("aspect", "9:16 (Shorts / Reels)")
-            style = data.get("style", "cinematic film still, 35mm photography, dramatic atmospheric lighting, natural depth of field, 8k")
-            steps = int(data.get("steps", 20))
-            guidance = float(data.get("guidance", 7.0))
+            style = data.get("style", "Realistic / Photorealism")
+            steps = max(20, int(data.get("steps", 25)))
+            guidance = float(data.get("guidance", 7.5))
             seed = data.get("seed", None)
             negative_prompt = data.get("negative_prompt", "").strip() or COMPREHENSIVE_NEGATIVE_PROMPT
 
-            width = int(data.get("width", 768 if "9:16" in aspect else (1344 if "16:9" in aspect else 1024)))
-            height = int(data.get("height", 1344 if "9:16" in aspect else (768 if "16:9" in aspect else 1024)))
-            full_prompt = f"{prompt}, {style}" if style else prompt
+            # Optimal SDXL buckets preventing limb duplication and torso stretching
+            if "9:16" in aspect:
+                width, height = 832, 1216
+            elif "16:9" in aspect:
+                width, height = 1216, 832
+            elif "4:3" in aspect:
+                width, height = 1152, 896
+            else:
+                width, height = 1024, 1024
+
+            try:
+                from prompt_synthesizer import synthesize_scene_prompt
+                full_prompt = synthesize_scene_prompt(
+                    script_sentence=prompt,
+                    category="Custom",
+                    style_preset=style,
+                    aspect_ratio="9:16" if height > width else "16:9",
+                )
+            except Exception:
+                full_prompt = f"{prompt}, {style}" if style else prompt
 
             gen = torch.Generator(device=device).manual_seed(seed) if seed is not None else None
             t0 = time.time()
@@ -101,8 +122,8 @@ def start_bridge(pipe=None, port=5055):
                     num_inference_steps=steps,
                     guidance_scale=guidance,
                     generator=gen,
-                    height=(height // 8) * 8,
-                    width=(width // 8) * 8,
+                    height=height,
+                    width=width,
                 )
                 img = result.images[0]
 

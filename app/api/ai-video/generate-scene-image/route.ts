@@ -14,40 +14,38 @@ export const dynamic = "force-dynamic";
 const LOCAL_DAEMON_URL = "http://127.0.0.1:5055";
 
 const COMPREHENSIVE_NEGATIVE_PROMPT =
-  "dull colors, washed out, desaturated, muted colors, drab lighting, flat shading, 2d vector, clip art, low contrast, gray background, plain slate background, monochrome, " +
-  "retro comic, vintage comic, western comic, comic book panel, ink hatching, crosshatching, heavy linework, flat coloring, posterized, sketch, line drawing, " +
-  "distant character, tiny person, miniature character, zoomed out wide shot, full body far away, walking down path, long shot, " +
-  "neon pink, oversaturated pink, bright pink flowers, cherry blossom overload, cartoonish garden, children book illustration, 8-bit, pixel art, " +
-  "dark void, empty black background, plain black background, solid black background, studio backdrop, indoor stage, stage lighting, spotlights, spotlight beams, disco lights, floating sparkles, yellow laser line, floating glitter, " +
-  "multiple hands, extra hands, four hands, four arms, three hands, three arms, duplicate hands, duplicate arms, multi-armed, mutated arms, mutated hands, sprouted arms, " +
-  "scars, scarred face, body scars, facial scars, cuts, wounds, lacerations, blemish, acne, rough skin, weathered face, wrinkles, aged skin, ugly face, " +
-  "standing straight, stiff pose, rigid posture, mannequin pose, t-pose, a-pose, static standing, boring pose, idle pose, straight upright posture, lifeless stance, neutral standing pose, standing upright, passport photo pose, symmetrical standing, " +
+  "extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, " +
+  "deformed hands, poorly drawn hands, fused fingers, too many fingers, missing fingers, mutated hands, " +
+  "mutated limbs, malformed limbs, disconnected limbs, floating limbs, duplicate person, multiple heads, multiple people, " +
+  "bad anatomy, grotesque proportions, malformed facial features, disfigured, " +
   "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, " +
-  "elongated torso, long torso, stretched body, unnaturally tall torso, stacked torso, double torso, accordion torso, " +
-  "repeating armor, ribbed armor distortion, repeating patterns, segmented body, " +
-  "extra arms, multiple arms, extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, " +
+  "elongated torso, long torso, stretched body, unnaturally tall torso, stacked torso, double torso, accordion torso, repeating armor, ribbed armor distortion, repeating patterns, " +
   "horrifying face, grotesque face, scary distorted face, deformed face, disfigured face, twisted face, " +
   "hollow eyes, sunken eye sockets, dark eye sockets, black eyes, deformed pupils, missing eyes, blind eyes, mismatched eyes, " +
   "crossed eyes, strabismus, wall-eyed, cockeyed, misaligned eyes, lazy eye, asymmetrical eyes, crooked pupils, dilated pupils, " +
   "deformed eyes, missing pupils, unnatural iris, crooked mouth, twisted jaw, deformed teeth, melted face, claymation face, " +
-  "zombie face, plastic dummy, uncanny valley, ugly proportions, malformed facial structure, bad anatomy, " +
+  "zombie face, plastic dummy, uncanny valley, ugly proportions, malformed facial structure, " +
   "spinal deformity, broken neck, mutilated neck, twisted spine, physical deformity, " +
-  "extra fingers, missing fingers, fused fingers, too many fingers, deformed hands, poorly drawn hands, poorly drawn face, mutation, deformed, " +
+  "collaged face, pasted face, cut-and-paste face, mismatched face, photo collage, cutout head, frankenstein face, " +
+  "extra eyes, multi eyes, mutated eyes, duplicate eyes, fused eyes, " +
   "elongated arms, rubbery arms, melted skin, mutated fingers, fused limbs, deformed body, unnatural posture, " +
-  "blurry, bad proportions, gross proportions, unnatural body, plastic skin, multiple heads, multiple people, duplicate person, " +
+  "blurry, bad proportions, gross proportions, unnatural body, plastic skin, " +
+  "dull colors, washed out, desaturated, muted colors, drab lighting, flat shading, 2d vector, clip art, low contrast, gray background, plain slate background, monochrome, " +
+  "retro comic, vintage comic, western comic, comic book panel, ink hatching, crosshatching, heavy linework, flat coloring, posterized, sketch, line drawing, " +
   "blank background, solid color background, plain background, studio backdrop, cropped head, " +
   "text, watermark, signature, username, error, " +
   "low quality, worst quality, normal quality, jpeg artifacts, overexposed, underexposed, bad lighting";
 
 const HORROR_NEGATIVE_PROMPT =
-  "standing straight, stiff pose, rigid posture, mannequin pose, t-pose, a-pose, static standing, straight upright posture, " +
+  "extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, " +
+  "deformed hands, poorly drawn hands, fused fingers, too many fingers, missing fingers, mutated hands, " +
+  "mutated limbs, malformed limbs, disconnected limbs, floating limbs, duplicate person, multiple heads, multiple people, " +
+  "bad anatomy, grotesque proportions, malformed facial features, " +
   "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, " +
   "elongated torso, long torso, stretched body, stacked torso, accordion torso, ribbed armor distortion, " +
   "happy smile, cheerful face, laughing, friendly smile, sunny day, bright cheerful lighting, pastel colors, " +
   "cartoon, 3d cute pixar, anime, childish, " +
   "collaged face, pasted face, cut-and-paste face, mismatched photo, cutout head, frankenstein collage, " +
-  "extra limbs, missing limbs, malformed limbs, floating limbs, disconnected limbs, extra fingers, missing fingers, " +
-  "fused fingers, too many fingers, deformed hands, poorly drawn hands, " +
   "blurry, bad proportions, gross proportions, plastic skin, " +
   "close-up passport photo, mugshot, centered headshot, solid color background, " +
   "text, watermark, signature, username, error, low quality, worst quality, normal quality, jpeg artifacts";
@@ -64,7 +62,7 @@ export async function POST(req: NextRequest) {
     const category = typeof body.category === "string" ? body.category : (isDirectPrompt ? "Custom" : "General");
     const style = typeof body.style === "string" ? body.style : "Cinematic Film";
     const aspect = typeof body.aspect === "string" ? body.aspect : "9:16 (Shorts / Reels)";
-    const steps = typeof body.steps === "number" ? Math.max(1, Math.min(20, body.steps)) : 4;
+    const steps = typeof body.steps === "number" ? Math.max(1, Math.min(30, body.steps)) : 20;
     const seed = typeof body.seed === "number" ? body.seed : undefined;
     const sceneIndex = typeof body.sceneIndex === "number" ? body.sceneIndex : 0;
     const partNumber = typeof body.partNumber === "number" ? body.partNumber : 1;
@@ -74,7 +72,7 @@ export async function POST(req: NextRequest) {
     const isAnime = /anime|manga|ghibli|comic|cartoon/i.test(style);
     const isRealistic = /real|photo|cinematic film/i.test(style);
     const styleNegPrefix = isAnime
-      ? "dull colors, washed out, desaturated, muted colors, drab lighting, flat shading, 2d vector, clip art, low contrast, gray background, flat colors, posterized, retro comic, vintage comic, western comic, american comic, comic book panel, ink hatching, crosshatching, heavy linework, woodblock print, ukiyo-e, sketch, line drawing, scribbles, doodle, low quality anime, photorealistic, photograph, 35mm photograph, realism, real life, realistic skin texture, skin pores, live action film still, real human photo, 3d render, cgi, "
+      ? "photorealistic, photograph, 35mm photograph, realism, real life, realistic skin texture, skin pores, live action film still, real human photo, 3d render, cgi, low quality anime, poorly drawn anime, "
       : (isRealistic
         ? "anime, manga, cartoon, 3d render, cgi, digital illustration, digital painting, drawing, vector art, graphic novel, artificial, videogame, unreal engine, octane render, airbrushed, "
         : "");
@@ -82,7 +80,7 @@ export async function POST(req: NextRequest) {
       ? HORROR_NEGATIVE_PROMPT
       : COMPREHENSIVE_NEGATIVE_PROMPT;
     const negativePrompt = typeof body.negativePrompt === "string" && body.negativePrompt.trim()
-      ? `${styleNegPrefix}${body.negativePrompt.trim()}`
+      ? `${body.negativePrompt.trim()}, ${styleNegPrefix}${baseNegative}`
       : `${styleNegPrefix}${baseNegative}`;
 
     const isVercel = process.env.VERCEL === "1" || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
@@ -116,7 +114,7 @@ export async function POST(req: NextRequest) {
             prompt,
             style,
             aspect,
-            steps,
+            steps: Math.max(20, steps),
             seed,
             negative_prompt: negativePrompt,
           }),

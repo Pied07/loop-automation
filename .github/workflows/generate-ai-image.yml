@@ -24,7 +24,7 @@ on:
       steps:
         description: 'Diffusion denoising steps'
         required: false
-        default: '4'
+        default: '20'
         type: string
       seed:
         description: 'Optional random seed'

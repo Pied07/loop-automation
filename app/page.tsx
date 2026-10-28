@@ -586,7 +586,7 @@ export default function Home() {
   const [imageGenPrompt, setImageGenPrompt] = useState<string>("A serene anime shrine in the misty mountains surrounded by blooming cherry blossoms at sunrise");
   const [imageGenStyle, setImageGenStyle] = useState<string>("Anime / Manga");
   const [imageGenAspect, setImageGenAspect] = useState<string>("9:16 (Shorts / Reels)");
-  const [imageGenSteps, setImageGenSteps] = useState<number>(4);
+  const [imageGenSteps, setImageGenSteps] = useState<number>(20);
   const [imageGenSeed, setImageGenSeed] = useState<string>("");
   const [imageGenNegative, setImageGenNegative] = useState<string>("");
   const [isGeneratingCustomImage, setIsGeneratingCustomImage] = useState<boolean>(false);
@@ -2082,7 +2082,7 @@ export default function Home() {
           prompt: imageGenPrompt.trim(),
           style: imageGenStyle,
           aspect: imageGenAspect,
-          steps: imageGenSteps || 4,
+          steps: imageGenSteps || 20,
           seed: imageGenSeed ? parseInt(imageGenSeed, 10) : undefined,
           negativePrompt: imageGenNegative.trim() || undefined,
           isDirectPrompt: true,
@@ -4818,9 +4818,9 @@ export default function Home() {
                         <input
                           type="number"
                           min={1}
-                          max={20}
+                          max={35}
                           value={imageGenSteps}
-                          onChange={(e) => setImageGenSteps(Math.max(1, Math.min(20, parseInt(e.target.value) || 4)))}
+                          onChange={(e) => setImageGenSteps(Math.max(1, Math.min(35, parseInt(e.target.value) || 20)))}
                           style={{ width: '100%', background: '#0a0a0f', border: '1px solid #2a2e3f', borderRadius: '6px', padding: '6px 10px', color: '#f8fafc', fontSize: '12px', boxSizing: 'border-box' }}
                         />
                       </div>
