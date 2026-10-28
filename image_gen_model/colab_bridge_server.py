@@ -105,16 +105,26 @@ def start_bridge(pipe=None, port=5055):
             seed = data.get("seed", None)
             negative_prompt = data.get("negative_prompt", "").strip() or COMPREHENSIVE_NEGATIVE_PROMPT
 
+            is_anime_style = any(w in str(style).lower() for w in ["anime", "manga", "ghibli", "comic", "cartoon"])
             has_scars = bool(re.search(r"\b(?:scars?|scarred|battle\s+scars?)\b", prompt, re.I))
             is_rough = bool(re.search(r"\b(?:ronin|samurai|rough|ruthless|weathered|battle-hardened|scarred|scars?)\b", prompt, re.I))
             if has_scars or is_rough:
-                negative_prompt = re.sub(
-                    r"\b(?:scars?|scarred(?:\s+face)?|body\s+scars?|rough\s+skin|weathered\s+face|aged\s+skin)\b,?\s*",
-                    "",
-                    negative_prompt,
-                    flags=re.IGNORECASE,
-                )
-                negative_prompt = f"pretty boy, bishounen, clean face, flawless smooth skin, porcelain skin, baby face, feminine, gentle smile, cheerful smile, child, {negative_prompt}"
+                if not is_anime_style:
+                    negative_prompt = re.sub(
+                        r"\b(?:scars?|scarred(?:\s+face)?|body\s+scars?|rough\s+skin|weathered\s+face|aged\s+skin)\b,?\s*",
+                        "",
+                        negative_prompt,
+                        flags=re.IGNORECASE,
+                    )
+                    negative_prompt = f"pretty boy, bishounen, clean face, flawless smooth skin, porcelain skin, baby face, feminine, gentle smile, cheerful smile, child, {negative_prompt}"
+                else:
+                    negative_prompt = re.sub(
+                        r"\b(?:scars?|scarred(?:\s+face)?|body\s+scars?)\b,?\s*",
+                        "",
+                        negative_prompt,
+                        flags=re.IGNORECASE,
+                    )
+                    negative_prompt = f"comic book, western comic, comic panel, ink hatching, crosshatching, heavy black outlines, rough sketch, dirty skin, gritty texture, feminine, gentle smile, cheerful smile, child, {negative_prompt}"
 
             # Optimal SDXL buckets preventing limb duplication and torso stretching
             if "9:16" in aspect:

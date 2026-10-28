@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
     const isAnime = /anime|manga|ghibli|comic|cartoon/i.test(style);
     const isRealistic = /real|photo|cinematic film/i.test(style);
     const styleNegPrefix = isAnime
-      ? "matte, dull colors, flat shading, washed out, drab lighting, low contrast, photorealistic, photograph, 35mm photograph, realism, real life, realistic skin texture, skin pores, live action film still, real human photo, 3d render, cgi, low quality anime, poorly drawn anime, "
+      ? "comic book, western comic, comic panel, retro comic, ink hatching, crosshatching, heavy black outlines, thick linework, woodblock print, ukiyo-e, rough sketch, scribbles, jittery lines, messy lines, dirty skin, gritty texture, dark circles, wrinkled skin, textured skin, rough skin, realistic skin pores, photorealism, photograph, 35mm photograph, realism, real life, 3d render, cgi, "
       : (isRealistic
         ? "anime, manga, cartoon, 3d render, cgi, digital illustration, digital painting, drawing, vector art, graphic novel, artificial, videogame, unreal engine, octane render, airbrushed, "
         : "");
@@ -98,8 +98,13 @@ export async function POST(req: NextRequest) {
     const isRough = /\b(?:ronin|samurai|rough|ruthless|weathered|battle-hardened|scarred|scars?)\b/i.test(prompt);
     let effectiveBaseNegative = baseNegative;
     if (hasScars || isRough) {
-      effectiveBaseNegative = effectiveBaseNegative.replace(/\b(?:scars?|scarred(?:\s+face)?|body\s+scars?|rough\s+skin|weathered\s+face|aged\s+skin)\b,?\s*/gi, "");
-      effectiveBaseNegative = `pretty boy, bishounen, clean face, flawless smooth skin, porcelain skin, baby face, feminine, gentle smile, cheerful smile, child, ${effectiveBaseNegative}`;
+      if (!isAnime) {
+        effectiveBaseNegative = effectiveBaseNegative.replace(/\b(?:scars?|scarred(?:\s+face)?|body\s+scars?|rough\s+skin|weathered\s+face|aged\s+skin)\b,?\s*/gi, "");
+        effectiveBaseNegative = `pretty boy, bishounen, clean face, flawless smooth skin, porcelain skin, baby face, feminine, gentle smile, cheerful smile, child, ${effectiveBaseNegative}`;
+      } else {
+        effectiveBaseNegative = effectiveBaseNegative.replace(/\b(?:scars?|scarred(?:\s+face)?|body\s+scars?)\b,?\s*/gi, "");
+        effectiveBaseNegative = `comic book, western comic, comic panel, ink hatching, crosshatching, heavy black outlines, rough sketch, dirty skin, gritty texture, feminine, gentle smile, cheerful smile, child, ${effectiveBaseNegative}`;
+      }
     }
     const negativePrompt = typeof body.negativePrompt === "string" && body.negativePrompt.trim()
       ? `${body.negativePrompt.trim()}, ${styleNegPrefix}${effectiveBaseNegative}`

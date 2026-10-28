@@ -465,10 +465,7 @@ class StorySceneEngine:
 
         if is_anime:
             style_negative_prefix = (
-                "retro comic, vintage comic, western comic, comic book panel, ink hatching, crosshatching, heavy linework, woodblock print, ukiyo-e, sketch, line drawing, scribbles, doodle, low quality anime, "
-                "ugly face, deformed face, bad eyes, small eyes, scars, rough skin, weathered face, wrinkles, "
-                "photorealistic, photograph, 35mm photograph, realism, real life, realistic skin texture, pores, live action film, real human photo, 3d render, cgi, "
-                "dull colors, washed out, desaturated, muted colors, drab lighting, flat shading, 2d vector, clip art, low contrast, gray background, flat colors, posterized, "
+                "comic book, western comic, comic panel, retro comic, ink hatching, crosshatching, heavy black outlines, thick linework, woodblock print, ukiyo-e, rough sketch, scribbles, jittery lines, messy lines, dirty skin, gritty texture, dark circles, wrinkled skin, textured skin, rough skin, realistic skin pores, photorealism, photograph, 35mm photograph, realism, real life, 3d render, cgi, "
             )
         elif is_realistic:
             style_negative_prefix = (
@@ -479,21 +476,30 @@ class StorySceneEngine:
 
         base_negative = HORROR_NEGATIVE_PROMPT if is_horror else COMPREHENSIVE_NEGATIVE_PROMPT
         user_neg = f", {negative_prompt.strip()}" if negative_prompt and negative_prompt.strip() else ""
-        style_neg = f", {style_negative_prefix.strip().rstrip(',')}" if style_negative_prefix.strip() else ""
-        effective_negative = f"{base_negative}{style_neg}{user_neg}"
+        style_neg = f"{style_negative_prefix.strip().rstrip(',')}, " if style_negative_prefix.strip() else ""
+        effective_negative = f"{style_neg}{base_negative}{user_neg}"
 
         has_scars = bool(re.search(r"\b(?:scars?|scarred|battle\s+scars?)\b", f"{prompt} {topic}", re.I))
         is_rough = bool(re.search(r"\b(?:ronin|samurai|rough|ruthless|weathered|battle-hardened|scarred|scars?)\b", f"{prompt} {topic}", re.I))
         if has_scars or is_rough:
-            # Strip scar and roughness penalties from negative prompt so requested battle scars and rugged features are rendered clearly
-            effective_negative = re.sub(
-                r"\b(?:scars?|scarred(?:\s+face)?|body\s+scars?|rough\s+skin|weathered\s+face|aged\s+skin)\b,?\s*",
-                "",
-                effective_negative,
-                flags=re.IGNORECASE,
-            )
-            # Add anti-pretty-boy tokens to negative prompt to enforce rugged, ruthless character appearance
-            effective_negative = f"pretty boy, bishounen, clean face, flawless smooth skin, porcelain skin, baby face, feminine, gentle smile, cheerful smile, child, {effective_negative}"
+            if not is_anime:
+                # Strip scar and roughness penalties from negative prompt for realistic styling
+                effective_negative = re.sub(
+                    r"\b(?:scars?|scarred(?:\s+face)?|body\s+scars?|rough\s+skin|weathered\s+face|aged\s+skin)\b,?\s*",
+                    "",
+                    effective_negative,
+                    flags=re.IGNORECASE,
+                )
+                effective_negative = f"pretty boy, bishounen, clean face, flawless smooth skin, porcelain skin, baby face, feminine, gentle smile, cheerful smile, child, {effective_negative}"
+            else:
+                # For anime, NEVER ban clean face or smooth skin! Keep anime smooth cel-shading and sleek lineart
+                effective_negative = re.sub(
+                    r"\b(?:scars?|scarred(?:\s+face)?|body\s+scars?)\b,?\s*",
+                    "",
+                    effective_negative,
+                    flags=re.IGNORECASE,
+                )
+                effective_negative = f"feminine, gentle smile, cheerful smile, child, {effective_negative}"
 
         raw_img = None
 

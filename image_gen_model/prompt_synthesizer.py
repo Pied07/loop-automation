@@ -80,11 +80,11 @@ UNIFIED_STYLE_PRESETS: Dict[str, Dict[str, str]] = {
         "env_framing": "authentic ancient architecture, monumental stone ruins, sweeping vista",
     },
     "Anime / Manga": {
-        "prefix": "masterpiece authentic vibrant 2D Japanese anime visual art, glossy luminous Ufotable key visual, Makoto Shinkai style",
-        "lighting": "radiant luminous bloom, glossy ambient highlights, vibrant rich saturated colors, high contrast reflections",
-        "suffix": "trending on Pixiv, glossy anime art, expressive luminous anime eyes, clean polished digital anime illustration, 8k anime wallpaper",
-        "char_framing": "cinematic anime full body shot, entire figure head to toe in frame, complete body visible, prominent hero focus, dynamic anime composition",
-        "env_framing": "atmospheric anime scenery, beautifully painted background scenery, soft depth of field blur",
+        "prefix": "masterpiece high definition 2D Japanese anime digital key visual, Ufotable style, clean delicate lineart",
+        "lighting": "radiant cinematic rim lighting, warm golden ambient glow, luminous energy bloom, 8k anime wallpaper",
+        "suffix": "trending on Pixiv, clean delicate anime lineart, expressive luminous anime eyes, polished digital anime illustration, 8k anime wallpaper",
+        "char_framing": "cinematic high definition anime shot, clear visible stance, prominent hero focus, dynamic anime composition",
+        "env_framing": "traditional Japanese wooden pavilion, hanging warm lanterns, soft bokeh blur",
     },
     "Anime / Storybook": {
         "prefix": "Studio Ghibli inspired anime scenery, gorgeous hand-painted art",
@@ -440,7 +440,10 @@ def synthesize_scene_prompt(
     else:
         comb_lower = f"{script_sentence} {topic}".lower()
         if has_combat_action or any(w in comb_lower for w in ["ronin", "samurai", "katana", "ninja", "warrior", "sword"]):
-            env_bg = "set against scorched earth battlefield, atmospheric smoke"
+            if is_anime:
+                env_bg = "traditional Japanese wooden pavilion, hanging warm lanterns, soft bokeh"
+            else:
+                env_bg = "set against scorched earth battlefield, atmospheric smoke"
         elif any(w in comb_lower for w in ["space", "alien", "planet", "cyber", "sci-fi"]):
             env_bg = "set against futuristic neon city background, atmospheric depth"
         elif "horror" in comb_lower or is_horror:
@@ -458,53 +461,66 @@ def synthesize_scene_prompt(
         clothing_tag = "wearing authentic warrior attire"
 
     if is_anime:
+        has_aura_match = re.search(
+            r"\b((?:white|blue|golden|gold|red|purple|green|dark|flaming|fiery|electric|energy|radiant|glowing)\s+(?:aura|energy|flames?|fire|glow|light|sparks?|power)(?:\s+(?:radiating|bursting|emanating))?)\b",
+            f"{script_sentence} {topic}",
+            re.IGNORECASE,
+        )
+        if has_aura_match:
+            clean_aura = re.sub(r"\b(?:radiating|bursting|emanating)\b", "", has_aura_match.group(1), flags=re.IGNORECASE).strip()
+            energy_clause = f"radiating {clean_aura} in form of energy, glowing sparks"
+        elif "aura" in f"{script_sentence} {topic}".lower():
+            energy_clause = "radiating white energy aura, glowing sparks"
+        else:
+            energy_clause = ""
+
+        has_topknot = bool(re.search(r"\b(?:topknot|tied\s+ba[ck]+(?:\s+in)?\s+topknot|hair\s+tied\s+ba[ck]+)\b", f"{script_sentence} {topic}", re.IGNORECASE))
+        hair_tag = "topknot" if has_topknot else "silky hair"
+
         if is_female:
-            char_tag = "1girl, fierce anime heroine" if is_rough else "1girl, beautiful anime heroine"
+            char_tag = "1girl in ornate dark kimono, anime warrior"
         elif is_ronin:
-            char_tag = "1man, rugged ruthless ronin samurai, topknot"
+            char_tag = "1man in ornate dark kimono, anime ronin"
         elif is_eastern:
-            char_tag = "1man, rugged Japanese samurai warrior, topknot"
+            char_tag = "1man in ornate dark kimono, anime samurai"
         elif is_rough:
-            char_tag = "1man, rugged warrior, fierce expression"
+            char_tag = "1man in ornate dark kimono, battle-ready anime warrior"
         elif is_male:
-            char_tag = "1boy, anime warrior"
+            char_tag = "1boy in ornate kimono, anime warrior"
         else:
             char_tag = "1character, anime hero"
 
-        style_core = "Masterpiece vibrant glossy 2D anime, luminous Ufotable visual"
+        style_core = "Masterpiece high definition 2D anime key visual, Ufotable style, clean lineart"
         framing_part = (
-            f"solo full body shot, entire figure head to toe in frame, lone {char_tag}, single sword, two arms only"
+            f"solo, centered {char_tag}, two arms only"
             if has_characters
             else preset["env_framing"]
         )
 
         if has_characters:
-            if is_ronin or is_rough:
-                if has_scars:
-                    face_part = "sharp anime face, piercing eyes, prominent battle scar on cheek"
-                else:
-                    face_part = "sharp anime face, piercing eyes, intense glare"
-            elif has_scars:
-                face_part = "sharp anime face, expressive eyes, prominent battle scar on cheek"
+            if has_scars:
+                face_part = f"sharp anime face, luminous eyes, smooth skin, sleek cheek scar, {hair_tag}"
             else:
-                face_part = "sharp anime face, expressive eyes, clean defined jawline"
+                face_part = f"sharp anime face, luminous eyes, smooth skin, clean jawline, {hair_tag}"
         else:
             face_part = ""
 
-        weapon_part = (
-            "holding straight Japanese steel katana blade, sharp metal edge"
-            if has_weapon
-            else (pose_guidance if has_characters else "")
-        )
+        if has_weapon:
+            if energy_clause:
+                weapon_part = f"holding Japanese steel katana with {energy_clause}"
+            else:
+                weapon_part = "holding Japanese steel katana, sharp luminous blade edge, detailed tsuba guard"
+        else:
+            weapon_part = energy_clause if energy_clause else (pose_guidance if has_characters else "")
 
-        lighting_part = "radiant luminous bloom, glossy highlights, rich saturated colors"
+        lighting_part = "radiant rim lighting, golden ambient glow, 8k anime wallpaper"
 
         prompt_parts = [
             style_core,
             framing_part,
+            weapon_part,
             env_bg,
             face_part,
-            weapon_part,
             lighting_part,
         ]
     elif is_realistic:
