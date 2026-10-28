@@ -141,9 +141,17 @@ def clean_narration(text: str) -> str:
         flags=re.IGNORECASE,
     )
 
-    # Aggressively filter physical trauma and injury triggers that cause mutilated/distorted face renders
+    # Aggressively filter physical trauma and injury triggers that cause mutilated/distorted face renders or weathered skin
     clean = re.sub(
         r"\b(?:spinal mobility|highway crash|car crash|crash|paralysis|paralyzed|wheelchair|crutches|rehabilitation|hospital|amputation|injured|injury|deformity|deformed|broken|surgery|disease|sick|illness|twisted|severed|bleeding|wound)\b",
+        "",
+        clean,
+        flags=re.IGNORECASE,
+    )
+
+    # Clean up scars, cuts, and blemish triggers that cause rough weathered skin
+    clean = re.sub(
+        r"\b(?:scars?\s+all\s+over(?:\s+(?:his|her|their|the))?\s+body|with\s+scars?|scars?|scarred|blemish(?:es)?|acne|wrinkles?|no\s+scars?(?:\s+at\s+all)?)\b",
         "",
         clean,
         flags=re.IGNORECASE,
@@ -291,12 +299,24 @@ def synthesize_scene_prompt(
 
     weapon_guidance = "holding a single weapon in hand, single weapon only, authentic natural grip" if has_weapon else ""
 
-    human_enhancement = (
-        "detailed beautiful symmetrical face, clear expressive eyes with detailed pupils, "
-        "realistic skin texture, authentic human torso anatomy, natural body proportions, well-proportioned limbs and hands, "
-        + pose_guidance
-        + (f", {weapon_guidance}" if weapon_guidance else "")
-    ) if has_characters else ""
+    is_anime = any(w in (style_preset or "").lower() for w in ["anime", "manga", "ghibli", "comic", "cartoon"])
+
+    if is_anime:
+        human_enhancement = (
+            "handsome attractive anime male protagonist, gorgeous anime face, sharp clean jawline, large expressive anime eyes, "
+            "smooth flawless blemish-free skin, no scars, perfectly drawn anime hair, "
+            "authentic human anatomy, exactly two arms, two hands only, well-drawn anime hands, "
+            + pose_guidance
+            + (f", {weapon_guidance}" if weapon_guidance else "")
+        ) if has_characters else ""
+    else:
+        human_enhancement = (
+            "handsome attractive male, clean chiseled jawline, captivating detailed eyes, "
+            "smooth clear flawless skin, blemish-free, no scars, authentic human torso anatomy, natural body proportions, "
+            "exactly two arms, two hands only, well-proportioned limbs and hands, "
+            + pose_guidance
+            + (f", {weapon_guidance}" if weapon_guidance else "")
+        ) if has_characters else ""
 
     is_horror = (not is_direct) and (
         (genre == "Horror" or "horror" in category.lower())
@@ -316,7 +336,18 @@ def synthesize_scene_prompt(
     else:
         staging = preset["char_framing"] if has_characters else preset["env_framing"]
 
-    if is_horror:
+    if is_anime:
+        anime_lighting = "dramatic anime lighting, glowing aura highlights, vibrant saturated colors"
+        prompt_parts = [
+            f"Masterpiece Japanese anime illustration of {visual_core}",
+            preset["prefix"],
+            human_enhancement,
+            staging,
+            framing_tag,
+            anime_lighting,
+            preset["suffix"],
+        ]
+    elif is_horror:
         horror_lighting = "chilling moonlight piercing cold shadows, volumetric supernatural mist, eerie amber glow"
         prompt_parts = [
             f"Cinematic atmospheric scene of {visual_core}",

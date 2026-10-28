@@ -14,6 +14,8 @@ export const dynamic = "force-dynamic";
 const LOCAL_DAEMON_URL = "http://127.0.0.1:5055";
 
 const COMPREHENSIVE_NEGATIVE_PROMPT =
+  "multiple hands, extra hands, four hands, four arms, three hands, three arms, duplicate hands, duplicate arms, multi-armed, mutated arms, mutated hands, sprouted arms, " +
+  "scars, scarred face, body scars, facial scars, cuts, wounds, lacerations, blemish, acne, rough skin, weathered face, wrinkles, aged skin, ugly face, " +
   "standing straight, stiff pose, rigid posture, mannequin pose, t-pose, a-pose, static standing, boring pose, idle pose, straight upright posture, lifeless stance, neutral standing pose, standing upright, passport photo pose, symmetrical standing, " +
   "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, " +
   "elongated torso, long torso, stretched body, unnaturally tall torso, stacked torso, double torso, accordion torso, " +
@@ -64,9 +66,16 @@ export async function POST(req: NextRequest) {
     const userId = typeof body.userId === "string" ? body.userId.trim() : "creator";
     const colabGpuUrl = typeof body.colabGpuUrl === "string" ? body.colabGpuUrl.trim() : "";
     const forceCloud = Boolean(body.forceCloud);
+    const isAnime = /anime|manga|ghibli|comic/i.test(style);
+    const animeNegPrefix = isAnime
+      ? "photorealistic, photograph, 35mm photograph, realism, real life, realistic skin texture, skin pores, live action film still, real human photo, "
+      : "";
+    const baseNegative = /horror|ghost|haunt|creepy|demon|spectral|phantom/i.test(`${prompt} ${style}`)
+      ? HORROR_NEGATIVE_PROMPT
+      : COMPREHENSIVE_NEGATIVE_PROMPT;
     const negativePrompt = typeof body.negativePrompt === "string" && body.negativePrompt.trim()
-      ? body.negativePrompt.trim()
-      : (/horror|ghost|haunt|creepy|demon|spectral|phantom/i.test(`${prompt} ${style}`) ? HORROR_NEGATIVE_PROMPT : COMPREHENSIVE_NEGATIVE_PROMPT);
+      ? `${animeNegPrefix}${body.negativePrompt.trim()}`
+      : `${animeNegPrefix}${baseNegative}`;
 
     const isVercel = process.env.VERCEL === "1" || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
 

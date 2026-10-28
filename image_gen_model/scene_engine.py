@@ -75,6 +75,8 @@ ASPECT_RATIOS = {
 
 # Industry standard anti-distortion negative prompt targeting horrifying faces, eye strabismus, anatomy mutations, and static portrait headshots
 COMPREHENSIVE_NEGATIVE_PROMPT = (
+    "multiple hands, extra hands, four hands, four arms, three hands, three arms, duplicate hands, duplicate arms, multi-armed, mutated arms, mutated hands, sprouted arms, "
+    "scars, scarred face, body scars, facial scars, cuts, wounds, lacerations, blemish, acne, rough skin, weathered face, wrinkles, aged skin, ugly face, "
     "standing straight, stiff pose, rigid posture, mannequin pose, t-pose, a-pose, static standing, boring pose, idle pose, straight upright posture, lifeless stance, neutral standing pose, standing upright, passport photo pose, symmetrical standing, "
     "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, "
     "elongated torso, long torso, stretched body, unnaturally tall torso, stacked torso, double torso, accordion torso, repeating armor, ribbed armor distortion, repeating patterns, "
@@ -436,7 +438,16 @@ class StorySceneEngine:
             category.lower() == "horror"
             or any(w in f"{prompt} {topic}".lower() for w in ["horror", "ghost", "haunt", "demon", "creepy", "spectral", "phantom", "asylum"])
         ) and category.lower() not in ["romance", "comedy", "food", "motivational", "music"]
-        effective_negative = negative_prompt or (HORROR_NEGATIVE_PROMPT if is_horror else COMPREHENSIVE_NEGATIVE_PROMPT)
+
+        is_anime = any(w in str(style_preset).lower() for w in ["anime", "manga", "ghibli", "comic"])
+        anime_negative_prefix = (
+            "photorealistic, photograph, 35mm photograph, realism, real life, realistic skin texture, pores, live action film, real human photo, "
+            if is_anime else ""
+        )
+        base_negative = HORROR_NEGATIVE_PROMPT if is_horror else COMPREHENSIVE_NEGATIVE_PROMPT
+        effective_negative = (
+            f"{anime_negative_prefix}{negative_prompt}" if negative_prompt else f"{anime_negative_prefix}{base_negative}"
+        )
 
         raw_img = None
 
