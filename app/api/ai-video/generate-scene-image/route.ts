@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "path";
+import os from "os";
 import fs from "fs";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { saveImageBuffer } from "@/app/image-storage";
 
 const execAsync = promisify(exec);
 
@@ -58,100 +60,108 @@ export async function POST(req: NextRequest) {
       ? body.negativePrompt.trim()
       : (/horror|ghost|haunt|creepy|demon|spectral|phantom/i.test(`${prompt} ${style}`) ? HORROR_NEGATIVE_PROMPT : COMPREHENSIVE_NEGATIVE_PROMPT);
 
+    const isVercel = process.env.VERCEL === "1" || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
+
     // 1. Try Live Colab GPU Bridge or warm local daemon service
     let activeBridgeUrl = colabGpuUrl;
-    if (!activeBridgeUrl) {
+    if (!activeBridgeUrl && !isVercel) {
       const colabFile = path.join(process.cwd(), "image_gen_model", "colab_url.txt");
       if (fs.existsSync(colabFile)) {
         try {
           activeBridgeUrl = fs.readFileSync(colabFile, "utf-8").trim();
         } catch {}
       }
+      if (!activeBridgeUrl) {
+        activeBridgeUrl = LOCAL_DAEMON_URL;
+      }
     }
-    if (!activeBridgeUrl) {
-      activeBridgeUrl = LOCAL_DAEMON_URL;
-    }
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 1 min timeout for GPU inference
+    if (activeBridgeUrl) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 1 min timeout for GPU inference
 
-      const daemonRes = await fetch(`${activeBridgeUrl.replace(/\/$/, "")}/generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Bypass-Tunnel-Reminder": "true",
-        },
-        body: JSON.stringify({
-          prompt,
-          style,
-          aspect,
-          steps,
-          seed,
-          negative_prompt: negativePrompt,
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
+        const daemonRes = await fetch(`${activeBridgeUrl.replace(/\/$/, "")}/generate`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Bypass-Tunnel-Reminder": "true",
+          },
+          body: JSON.stringify({
+            prompt,
+            style,
+            aspect,
+            steps,
+            seed,
+            negative_prompt: negativePrompt,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
 
-      if (daemonRes.ok) {
-        const publicScenesDir = path.join(process.cwd(), "public", "generated_scenes");
-        if (!fs.existsSync(publicScenesDir)) {
-          fs.mkdirSync(publicScenesDir, { recursive: true });
-        }
-        const cleanName = prompt.slice(0, 24).replace(/[^a-zA-Z0-9]/g, "_").replace(/^_+|_+$/g, "") || "scene";
-        const filename = isDirectPrompt
-          ? `gen_${cleanName}_${Date.now()}.png`
-          : `scene_p${partNumber}_s${sceneIndex}_${cleanName}_${Date.now()}.png`;
-        const outputPath = path.join(publicScenesDir, filename);
+        if (daemonRes.ok) {
+          const contentType = daemonRes.headers.get("content-type") || "";
+          if (contentType.includes("application/json")) {
+            const daemonData = await daemonRes.json();
+            if (daemonData.success && daemonData.imageUrl) {
+              return NextResponse.json({
+                success: true,
+                imageUrl: daemonData.imageUrl,
+                prompt,
+                style,
+                aspect,
+                sceneIndex,
+                partNumber,
+                engine: "gpu-bridge",
+                elapsed: daemonData.elapsed,
+              });
+            }
+          } else {
+            // Direct image bytes returned by Colab Flask bridge
+            const imageBuffer = Buffer.from(await daemonRes.arrayBuffer());
+            const cleanName = prompt.slice(0, 24).replace(/[^a-zA-Z0-9]/g, "_").replace(/^_+|_+$/g, "") || "scene";
+            const filename = isDirectPrompt
+              ? `gen_${cleanName}_${Date.now()}.png`
+              : `scene_p${partNumber}_s${sceneIndex}_${cleanName}_${Date.now()}.png`;
 
-        const contentType = daemonRes.headers.get("content-type") || "";
-        if (contentType.includes("application/json")) {
-          const daemonData = await daemonRes.json();
-          if (daemonData.success && daemonData.imageUrl) {
+            const imageUrl = await saveImageBuffer(imageBuffer, filename);
             return NextResponse.json({
               success: true,
-              imageUrl: daemonData.imageUrl,
+              imageUrl,
               prompt,
               style,
               aspect,
               sceneIndex,
               partNumber,
-              engine: "gpu-bridge",
-              elapsed: daemonData.elapsed,
+              engine: "colab-gpu-bridge",
             });
           }
-        } else {
-          // Direct image bytes returned by Colab Flask bridge
-          const imageBuffer = Buffer.from(await daemonRes.arrayBuffer());
-          fs.writeFileSync(outputPath, imageBuffer);
-          return NextResponse.json({
-            success: true,
-            imageUrl: `/generated_scenes/${filename}`,
-            prompt,
-            style,
-            aspect,
-            sceneIndex,
-            partNumber,
-            engine: "colab-gpu-bridge",
-          });
         }
+      } catch (bridgeErr: any) {
+        console.warn("GPU Bridge call error:", bridgeErr?.message || bridgeErr);
+        // Fall through to local CLI inference if on local PC
       }
-    } catch {
-      // Bridge not reachable; fall through to local CLI inference
     }
 
-    // 2. Direct CLI fallback using local PyTorch model on PC
-    const publicScenesDir = path.join(process.cwd(), "public", "generated_scenes");
-    if (!fs.existsSync(publicScenesDir)) {
-      fs.mkdirSync(publicScenesDir, { recursive: true });
+    // 2. Handling Vercel Serverless environment where local PyTorch GPU is unavailable
+    if (isVercel) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Colab GPU Bridge is not connected. To generate images with your native ML model from the live website, please paste your Google Colab URL (e.g. from Cloudflare Tunnel or ngrok) into the 'Colab GPU Bridge URL' input, or run the app locally on your PC via 'npm run dev'.",
+        },
+        { status: 503 }
+      );
     }
 
+    // 3. Direct CLI fallback using local PyTorch model on PC
+    const tempOutputDir = os.tmpdir();
     const cleanName = prompt.slice(0, 24).replace(/[^a-zA-Z0-9]/g, "_").replace(/^_+|_+$/g, "") || "scene";
     const filename = isDirectPrompt
       ? `gen_${cleanName}_${Date.now()}.png`
       : `scene_p${partNumber}_s${sceneIndex}_${cleanName}_${Date.now()}.png`;
-    const outputPath = path.join(publicScenesDir, filename);
+    const tempOutputPath = path.join(tempOutputDir, filename);
 
     const scriptPath = path.join(process.cwd(), "image_gen_model", "local_inference.py");
     const pyExe = process.platform === "win32" ? "py" : "python3";
@@ -161,7 +171,7 @@ export async function POST(req: NextRequest) {
     const escapedAspect = aspect.replace(/"/g, '\\"');
     const escapedNegativePrompt = negativePrompt.replace(/"/g, '\\"');
 
-    const cmd = `"${pyExe}" "${scriptPath}" --prompt "${escapedPrompt}" --style "${escapedStyle}" --aspect "${escapedAspect}" --steps ${steps} --category "${category}" --output "${outputPath}" --negative-prompt "${escapedNegativePrompt}" --json ${seed !== undefined ? `--seed ${seed}` : ""}${colabGpuUrl ? ` --colab-url "${colabGpuUrl}"` : ""}`;
+    const cmd = `"${pyExe}" "${scriptPath}" --prompt "${escapedPrompt}" --style "${escapedStyle}" --aspect "${escapedAspect}" --steps ${steps} --category "${category}" --output "${tempOutputPath}" --negative-prompt "${escapedNegativePrompt}" --json ${seed !== undefined ? `--seed ${seed}` : ""}${colabGpuUrl ? ` --colab-url "${colabGpuUrl}"` : ""}`;
 
     const { stdout, stderr } = await execAsync(cmd, {
       maxBuffer: 10 * 1024 * 1024,
@@ -172,15 +182,21 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    if (!fs.existsSync(outputPath)) {
+    if (!fs.existsSync(tempOutputPath)) {
       throw new Error(`Inference finished but image not found on disk: ${stderr || stdout}`);
     }
 
-    const publicUrl = `/generated_scenes/${filename}`;
+    const imageBuffer = fs.readFileSync(tempOutputPath);
+    const finalImageUrl = await saveImageBuffer(imageBuffer, filename);
+
+    // Clean up temp file
+    try {
+      fs.unlinkSync(tempOutputPath);
+    } catch {}
 
     return NextResponse.json({
       success: true,
-      imageUrl: publicUrl,
+      imageUrl: finalImageUrl,
       prompt,
       style,
       aspect,

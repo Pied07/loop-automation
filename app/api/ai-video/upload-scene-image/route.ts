@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import path from "path";
-import fs from "fs";
+import { saveImageBuffer } from "@/app/image-storage";
 
 export const dynamic = "force-dynamic";
 
@@ -21,22 +20,14 @@ export async function POST(req: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const publicDir = path.join(process.cwd(), "public", "generated_scenes");
-    if (!fs.existsSync(publicDir)) {
-      fs.mkdirSync(publicDir, { recursive: true });
-    }
-
     const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
     const filename = `uploaded_scene_${Date.now()}_${safeName}`;
-    const filePath = path.join(publicDir, filename);
 
-    fs.writeFileSync(filePath, buffer);
-
-    const publicUrl = `/generated_scenes/${filename}`;
+    const imageUrl = await saveImageBuffer(buffer, filename);
 
     return NextResponse.json({
       success: true,
-      imageUrl: publicUrl,
+      imageUrl,
       sceneIndex: Number(sceneIndex) || 0,
     });
   } catch (err: any) {
