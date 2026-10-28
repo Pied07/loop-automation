@@ -444,17 +444,23 @@ def synthesize_scene_prompt(
         else:
             env_bg = "set against detailed cinematic background, soft atmospheric depth"
 
+    is_eastern = bool(re.search(r"\b(?:ronin|samurai|ninja|katana|swordsman)\b", f"{script_sentence} {topic}", re.I))
+    if is_eastern:
+        clothing_tag = "wearing traditional dark Japanese samurai kimono robes, structured shoulder garments, wrapped obi belt"
+    else:
+        clothing_tag = "wearing authentic structured warrior attire, fitted clothing"
+
     if is_anime:
         char_tag = "1girl, beautiful anime heroine" if is_female else ("1boy, handsome anime warrior" if is_male else "1character, anime hero")
         style_core = "Masterpiece 2D Japanese anime, clean crisp lineart, Ufotable key visual"
-        framing_part = f"solo, exactly one person, single {char_tag}, authentic human anatomy, exactly two arms, two hands only, natural human torso, no extra limbs" if has_characters else preset["env_framing"]
+        framing_part = f"solo, exactly one person, single {char_tag}, head and shoulders portrait, chest-up framing, centered composition, single human body" if has_characters else preset["env_framing"]
         if has_scars:
             face_part = "sharp anime face, luminous amber eyes, clean jawline, iconic battle scar across cheek" if has_characters else ""
         else:
             face_part = "sharp anime face, luminous amber eyes, clean jawline, smooth skin" if has_characters else ""
 
         weapon_part = (
-            "holding a single katana firmly with both hands, single blade only, no extra swords, authentic two-handed grip on the hilt"
+            "holding a single katana firmly with both hands, single blade only, authentic grip"
             if has_weapon
             else (pose_guidance if has_characters else "")
         )
@@ -463,21 +469,22 @@ def synthesize_scene_prompt(
             style_core,
             framing_part,
             face_part,
+            clothing_tag,
             weapon_part,
             env_bg,
             "dramatic cinematic lighting, volumetric bloom, rich saturated colors",
         ]
     elif is_realistic:
-        real_char_tag = "1woman, beautiful female portrait" if is_female else ("1man, handsome male warrior" if is_male else "1person, authentic portrait")
-        style_core = "Masterpiece raw 35mm DSLR color photograph, award winning portrait, shot on Sony A7R V"
-        real_framing_part = f"solo, exactly one person, single {real_char_tag}, authentic human anatomy, exactly two arms, two hands only, natural human torso, no extra limbs" if has_characters else preset["env_framing"]
+        real_char_tag = "1woman, beautiful female warrior" if is_female else ("1man, handsome samurai warrior" if is_eastern else "1man, handsome male warrior")
+        style_core = "Masterpiece raw 35mm DSLR color photograph, award winning portrait photography, shot on Sony A7R V, 85mm f/1.4 GM lens"
+        real_framing_part = f"solo, exactly one person, single {real_char_tag}, head and shoulders portrait, chest-up framing, centered composition, single human body" if has_characters else preset["env_framing"]
         if has_scars:
             real_face_part = "exquisite human face, authentic realistic eyes, clean jawline, iconic battle scar on cheek" if has_characters else ""
         else:
             real_face_part = "exquisite human face, authentic realistic eyes, clean jawline, natural skin texture" if has_characters else ""
 
         real_weapon_part = (
-            "holding a single weapon firmly with both hands, single blade only, no extra weapons, natural grip"
+            "holding a single katana firmly with both hands, single blade only, authentic grip"
             if has_weapon
             else (pose_guidance if has_characters else "")
         )
@@ -486,6 +493,7 @@ def synthesize_scene_prompt(
             style_core,
             real_framing_part,
             real_face_part,
+            clothing_tag,
             real_weapon_part,
             env_bg,
             "natural golden hour lighting, cinematic rim light, authentic optical bokeh, 8k UHD",

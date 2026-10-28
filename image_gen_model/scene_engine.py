@@ -375,15 +375,15 @@ class StorySceneEngine:
         is_turbo = "turbo" in getattr(self, "current_model_id", "").lower()
 
         if is_turbo:
-            # SD-Turbo optimal 3-step denoising with 1.8 guidance to enforce negative prompt against extra limbs
-            inf_steps = 3
-            inf_guidance = 1.8
+            # SD-Turbo optimal 1-step inference at 512x768 to prevent receptive-field double-torso tiling
+            inf_steps = 1
+            inf_guidance = 0.0
             if height > width:
-                inf_w, inf_h = 576, 896
+                inf_w, inf_h = 512, 768
             elif width > height:
-                inf_w, inf_h = 896, 576
+                inf_w, inf_h = 768, 512
             else:
-                inf_w, inf_h = 640, 640
+                inf_w, inf_h = 512, 512
         else:
             inf_steps = steps or 25
             inf_guidance = guidance_scale or 7.5
