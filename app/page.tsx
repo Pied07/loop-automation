@@ -86,7 +86,7 @@ const formats = [
   { name: "Others", icon: WandSparkles, tone: "gold", detail: "Custom story tag & theme" },
 ];
 
-type Screen = "home" | "studio" | "library" | "settings";
+type Screen = "home" | "studio" | "library" | "image-gen" | "settings";
 
 function isGarbageRecord(video: VideoRecord): boolean {
   if (!video) return true;
@@ -582,10 +582,31 @@ export default function Home() {
   const [isGeneratingAllScenes, setIsGeneratingAllScenes] = useState<boolean>(false);
   const [colabGpuUrl, setColabGpuUrl] = useState<string>("");
 
+  // Image Generator Screen State
+  const [imageGenPrompt, setImageGenPrompt] = useState<string>("A serene anime shrine in the misty mountains surrounded by blooming cherry blossoms at sunrise");
+  const [imageGenStyle, setImageGenStyle] = useState<string>("Anime / Manga");
+  const [imageGenAspect, setImageGenAspect] = useState<string>("9:16 (Shorts / Reels)");
+  const [imageGenSteps, setImageGenSteps] = useState<number>(4);
+  const [imageGenSeed, setImageGenSeed] = useState<string>("");
+  const [imageGenNegative, setImageGenNegative] = useState<string>("");
+  const [isGeneratingCustomImage, setIsGeneratingCustomImage] = useState<boolean>(false);
+  const [imageGenError, setImageGenError] = useState<string>("");
+  const [currentCustomImage, setCurrentCustomImage] = useState<any>(null);
+  const [imageGenHistory, setImageGenHistory] = useState<any[]>([]);
+  const [showAdvancedImageGen, setShowAdvancedImageGen] = useState<boolean>(false);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("colab_gpu_bridge_url");
       if (saved) setColabGpuUrl(saved);
+      try {
+        const hist = localStorage.getItem("image_gen_history");
+        if (hist) {
+          const parsed = JSON.parse(hist);
+          setImageGenHistory(parsed);
+          if (parsed.length > 0) setCurrentCustomImage(parsed[0]);
+        }
+      } catch {}
     }
   }, []);
 
@@ -2259,6 +2280,7 @@ export default function Home() {
       <nav className="side-nav" aria-label="Workspace">
         <button className={screen === "studio" ? "nav-item active" : "nav-item"} onClick={() => { setScreen("studio"); setMobileNav(false); }}><Scissors size={17} /> Create viral clips</button>
         <button className={screen === "library" ? "nav-item active" : "nav-item"} onClick={() => { setScreen("library"); setMobileNav(false); }}><FolderOpen size={17} /> My videos <span className="nav-count">{videos.length}</span></button>
+        <button className={screen === "image-gen" ? "nav-item active" : "nav-item"} onClick={() => { setScreen("image-gen"); setMobileNav(false); }}><WandSparkles size={17} /> Image generator</button>
         <button className={screen === "settings" ? "nav-item active" : "nav-item"} onClick={() => { setScreen("settings"); setMobileNav(false); }}><Settings2 size={17} /> Settings</button>
       </nav>
       <div className="sidebar-bottom">
@@ -2268,7 +2290,7 @@ export default function Home() {
     </aside>
     {mobileNav && <button className="nav-scrim" aria-label="Close navigation" onClick={() => setMobileNav(false)} />}
     <main className="main-panel">
-      <header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Toggle menu"><Menu size={20} /></button><div className="breadcrumb"><span>Workspace</span><span className="crumb-divider">/</span><strong>{screen === "studio" ? "Create viral clips" : screen === "library" ? "My clips" : "Settings"}</strong></div><div className="topbar-actions"><a href="/privacy" style={{ color: "#94a3b8", textDecoration: "none", fontSize: "11px" }}>Privacy</a><a href="/terms" style={{ color: "#94a3b8", textDecoration: "none", fontSize: "11px" }}>Terms</a><span className={`connection-pill ${firebaseConfigured ? "connected" : "preview"}`}><span />{firebaseConfigured ? "Firebase connected" : "Preview mode"}</span><button className="help-button" onClick={() => notify("Connect Firebase and platform accounts to enable production workflows.")}><CircleHelp size={16} /><span>Help</span></button></div></header>
+      <header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Toggle menu"><Menu size={20} /></button><div className="breadcrumb"><span>Workspace</span><span className="crumb-divider">/</span><strong>{screen === "studio" ? "Create viral clips" : screen === "library" ? "My clips" : screen === "image-gen" ? "Image generator" : "Settings"}</strong></div><div className="topbar-actions"><a href="/privacy" style={{ color: "#94a3b8", textDecoration: "none", fontSize: "11px" }}>Privacy</a><a href="/terms" style={{ color: "#94a3b8", textDecoration: "none", fontSize: "11px" }}>Terms</a><span className={`connection-pill ${firebaseConfigured ? "connected" : "preview"}`}><span />{firebaseConfigured ? "Firebase connected" : "Preview mode"}</span><button className="help-button" onClick={() => notify("Connect Firebase and platform accounts to enable production workflows.")}><CircleHelp size={16} /><span>Help</span></button></div></header>
       {screen === "studio" && <section className="studio-content">
         <div className="page-heading">
           <div>
@@ -4183,6 +4205,448 @@ export default function Home() {
     </div>
   )}
   </> : <div className="empty-library"><div className="empty-art"><span /><span /><span /><Clapperboard size={27} /></div><h2>{query || filter !== "All videos" ? "No matching clips" : "No clips published yet."}</h2><p>{query || filter !== "All videos" ? "Try another search or category." : "Published viral clips will appear here with YouTube, Facebook, and Instagram links."}</p>{!query && filter === "All videos" && <button className="primary-button" onClick={() => setScreen("studio")}><TrendingUp size={16} /> Create your first viral clip</button>}</div>}</section>}
+      {screen === "image-gen" && (
+        <section className="image-gen-content" style={{ maxWidth: '1400px', margin: '0 auto', paddingBottom: '60px' }}>
+          <div className="page-heading">
+            <div>
+              <div className="eyebrow"><span className="eyebrow-dot" /> NATIVE ML DIFFUSION STUDIO</div>
+              <h1>Generate images with <em>your ML model.</em></h1>
+              <p>Create high-definition visuals from any prompt using your local PyTorch ML diffusion model with LoRA weights, custom styles, and instant downloads.</p>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', color: colabGpuUrl ? '#10b981' : '#f59e0b', background: colabGpuUrl ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', padding: '6px 12px', borderRadius: '8px', border: `1px solid ${colabGpuUrl ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}`, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: colabGpuUrl ? '#10b981' : '#f59e0b' }} />
+                {colabGpuUrl ? 'Tesla T4 GPU Connected (2s)' : 'Local ML Pipeline Active'}
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px', alignItems: 'start' }}>
+            {/* LEFT COLUMN: Controls */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Prompt Card */}
+              <div style={{ background: '#111218', border: '1.5px solid #232635', borderRadius: '12px', padding: '20px', boxShadow: '0 8px 30px rgba(0,0,0,0.45)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Prompt Description
+                  </label>
+                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>{imageGenPrompt.length} chars</span>
+                </div>
+                <textarea
+                  value={imageGenPrompt}
+                  onChange={(e) => setImageGenPrompt(e.target.value)}
+                  placeholder="Describe what you want to see... e.g. A solitary samurai standing under blooming cherry blossoms in the rain at twilight"
+                  rows={4}
+                  style={{
+                    width: '100%',
+                    background: '#0a0a0f',
+                    border: '1px solid #2a2e3f',
+                    borderRadius: '8px',
+                    padding: '12px',
+                    color: '#f8fafc',
+                    fontSize: '13px',
+                    lineHeight: '1.5',
+                    resize: 'vertical',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                
+                {/* Prompt suggestion pills */}
+                <div style={{ marginTop: '12px' }}>
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '6px', fontWeight: 600 }}>Quick Prompt Ideas:</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {[
+                      { label: "🌸 Anime Sakura", prompt: "A serene anime shrine in the misty mountains surrounded by blooming cherry blossoms at sunrise, vibrant colors, Studio Ghibli aesthetic" },
+                      { label: "📸 Realistic Golden Hour", prompt: "Hyperrealistic portrait of an explorer overlooking a golden hour misty canyon, 35mm photography, natural rim lighting, 8k" },
+                      { label: "🏙️ Cyberpunk Alley", prompt: "A cyberpunk detective in a neon-lit rainy Tokyo alley, glowing blue and purple reflections on wet asphalt, Blade Runner vibe" },
+                      { label: "✨ 3D Cute Robot", prompt: "A charming friendly little brass robot sitting on a grassy hill with flowers, Pixar Disney 3D style, soft warm lighting, Octane render" },
+                      { label: "🐉 Fantasy Dragon", prompt: "A majestic obsidian dragon coiled atop an ancient crumbling stone fortress on a stormy cliffside, volumetric mist, epic fantasy" },
+                      { label: "🌑 Dark Gothic Castle", prompt: "An ominous gothic castle perched on jagged sea rocks under a blood moon, rolling sea fog, dark dramatic shadows" },
+                    ].map((item, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => { setImageGenPrompt(item.prompt); }}
+                        style={{
+                          background: '#1b1d29',
+                          border: '1px solid #2d3148',
+                          borderRadius: '6px',
+                          color: '#cbd5e1',
+                          fontSize: '11px',
+                          padding: '4px 8px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#ff3b45')}
+                        onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#2d3148')}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Image Type / Style Selection Card */}
+              <div style={{ background: '#111218', border: '1.5px solid #232635', borderRadius: '12px', padding: '20px', boxShadow: '0 8px 30px rgba(0,0,0,0.45)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Image Type / Style
+                  </label>
+                  <span style={{ fontSize: '11px', color: '#ff3b45', fontWeight: 600 }}>{imageGenStyle}</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '8px' }}>
+                  {[
+                    { id: "Anime / Manga", icon: "🎨", name: "Anime / Manga", desc: "Studio Ghibli & anime aesthetic" },
+                    { id: "Realistic / Photorealism", icon: "📸", name: "Realistic", desc: "35mm photorealistic 8k detail" },
+                    { id: "Cinematic Film", icon: "🎬", name: "Cinematic Film", desc: "Dramatic chiaroscuro lighting" },
+                    { id: "3D Animation / Pixar", icon: "✨", name: "3D Animation", desc: "Pixar Disney CGI Octane render" },
+                    { id: "Sci-Fi Cyberpunk", icon: "⚡", name: "Cyberpunk", desc: "Neon reflections & rainy haze" },
+                    { id: "Epic Fantasy", icon: "🏰", name: "Epic Fantasy", desc: "Ancient majesty & god rays" },
+                    { id: "Dark Fantasy / Horror", icon: "🌑", name: "Dark Fantasy", desc: "Gothic mood & ominous shadows" },
+                    { id: "Comic Book / Graphic Novel", icon: "💥", name: "Comic Book", desc: "Bold ink contours & pop-art" },
+                    { id: "Photorealistic Nature", icon: "🌿", name: "Nature Wildlife", desc: "National Geographic realism" },
+                    { id: "Raw Prompt Only", icon: "📝", name: "Raw Prompt Only", desc: "Direct model prompt only" },
+                  ].map((st) => {
+                    const isSelected = imageGenStyle === st.id;
+                    return (
+                      <button
+                        key={st.id}
+                        type="button"
+                        onClick={() => setImageGenStyle(st.id)}
+                        style={{
+                          background: isSelected ? 'rgba(229, 9, 20, 0.14)' : '#161822',
+                          border: isSelected ? '1.5px solid #ff3b45' : '1px solid #282c3f',
+                          borderRadius: '8px',
+                          padding: '10px 12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'flex-start',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          boxShadow: isSelected ? '0 0 12px rgba(229,9,20,0.3)' : 'none',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '16px' }}>{st.icon}</span>
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: isSelected ? '#ff3b45' : '#ffffff', flex: 1 }}>{st.name}</span>
+                          {isSelected && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ff3b45' }} />}
+                        </div>
+                        <span style={{ fontSize: '10px', color: '#94a3b8', lineHeight: 1.2 }}>{st.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Aspect Ratio Card */}
+              <div style={{ background: '#111218', border: '1.5px solid #232635', borderRadius: '12px', padding: '20px', boxShadow: '0 8px 30px rgba(0,0,0,0.45)' }}>
+                <label style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '12px' }}>
+                  Aspect Ratio
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }}>
+                  {[
+                    { id: "9:16 (Shorts / Reels)", label: "9:16 Vertical", res: "768 × 1344", badge: "Shorts / Reels" },
+                    { id: "16:9 (YouTube Standard)", label: "16:9 Landscape", res: "1344 × 768", badge: "YouTube Standard" },
+                    { id: "1:1 (Square)", label: "1:1 Square", res: "1024 × 1024", badge: "Instagram Feed" },
+                    { id: "4:3 (Classic)", label: "4:3 Classic", res: "1024 × 768", badge: "Classic Framing" },
+                  ].map((asp) => {
+                    const isSelected = imageGenAspect === asp.id;
+                    return (
+                      <button
+                        key={asp.id}
+                        type="button"
+                        onClick={() => setImageGenAspect(asp.id)}
+                        style={{
+                          background: isSelected ? 'rgba(229, 9, 20, 0.14)' : '#161822',
+                          border: isSelected ? '1.5px solid #ff3b45' : '1px solid #282c3f',
+                          borderRadius: '8px',
+                          padding: '10px 12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          boxShadow: isSelected ? '0 0 12px rgba(229,9,20,0.3)' : 'none',
+                        }}
+                      >
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: isSelected ? '#ff3b45' : '#ffffff' }}>{asp.label}</span>
+                        <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>{asp.res}</span>
+                        <span style={{ fontSize: '9px', color: '#64748b', marginTop: '4px' }}>{asp.badge}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Advanced Settings Toggle */}
+              <div style={{ background: '#111218', border: '1px solid #232635', borderRadius: '12px', padding: '16px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedImageGen(!showAdvancedImageGen)}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#cbd5e1',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Settings2 size={14} /> Advanced Tuning (Steps, Seed, Negative Prompt)
+                  </span>
+                  <ChevronDown size={14} style={{ transform: showAdvancedImageGen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                </button>
+
+                {showAdvancedImageGen && (
+                  <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid #232635', paddingTop: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label style={{ fontSize: '11px', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Denoising Steps</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={20}
+                          value={imageGenSteps}
+                          onChange={(e) => setImageGenSteps(Math.max(1, Math.min(20, parseInt(e.target.value) || 4)))}
+                          style={{ width: '100%', background: '#0a0a0f', border: '1px solid #2a2e3f', borderRadius: '6px', padding: '6px 10px', color: '#f8fafc', fontSize: '12px', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Seed (Optional)</label>
+                        <input
+                          type="text"
+                          placeholder="Random"
+                          value={imageGenSeed}
+                          onChange={(e) => setImageGenSeed(e.target.value.replace(/[^0-9]/g, ""))}
+                          style={{ width: '100%', background: '#0a0a0f', border: '1px solid #2a2e3f', borderRadius: '6px', padding: '6px 10px', color: '#f8fafc', fontSize: '12px', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Custom Negative Prompt (Anti-distortion)</label>
+                      <input
+                        type="text"
+                        placeholder="Default blockers applied (horrifying face, deformed hands, blurry...)"
+                        value={imageGenNegative}
+                        onChange={(e) => setImageGenNegative(e.target.value)}
+                        style={{ width: '100%', background: '#0a0a0f', border: '1px solid #2a2e3f', borderRadius: '6px', padding: '6px 10px', color: '#f8fafc', fontSize: '12px', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Generate Button */}
+              {imageGenError && (
+                <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '10px 14px', color: '#ef4444', fontSize: '12px' }}>
+                  ⚠️ {imageGenError}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleGenerateCustomImage}
+                disabled={isGeneratingCustomImage}
+                style={{
+                  width: '100%',
+                  background: isGeneratingCustomImage ? '#374151' : 'linear-gradient(135deg, #e50914, #ff3b45)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '14px 20px',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  cursor: isGeneratingCustomImage ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  boxShadow: isGeneratingCustomImage ? 'none' : '0 4px 20px rgba(229,9,20,0.5)',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {isGeneratingCustomImage ? (
+                  <>
+                    <RefreshCw size={18} className="spin" />
+                    <span>Synthesizing with ML Model... (Diffusion inference)</span>
+                  </>
+                ) : (
+                  <>
+                    <WandSparkles size={18} />
+                    <span>Generate Image with ML Model</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* RIGHT COLUMN: Output Display & History */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Main Result Card */}
+              <div style={{ background: '#111218', border: '1.5px solid #232635', borderRadius: '12px', padding: '20px', boxShadow: '0 8px 30px rgba(0,0,0,0.45)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Generated Output
+                  </label>
+                  {currentCustomImage && (
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <span style={{ fontSize: '10px', background: 'rgba(229,9,20,0.15)', color: '#ff3b45', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                        {currentCustomImage.style}
+                      </span>
+                      <span style={{ fontSize: '10px', background: '#1f2937', color: '#9ca3af', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                        {currentCustomImage.aspect.split(" ")[0]}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {isGeneratingCustomImage ? (
+                  <div style={{ minHeight: '380px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#0a0a0f', borderRadius: '10px', border: '1px dashed #2a2e3f', padding: '30px', textAlign: 'center' }}>
+                    <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(229,9,20,0.1)', display: 'grid', placeItems: 'center', color: '#ff3b45', marginBottom: '16px' }}>
+                      <RefreshCw size={28} className="spin" />
+                    </div>
+                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#f8fafc', marginBottom: '6px' }}>Running PyTorch ML Diffusion Model</div>
+                    <div style={{ fontSize: '12px', color: '#94a3b8', maxWidth: '320px' }}>
+                      {colabGpuUrl ? "Synthesizing image on Colab Tesla T4 GPU in 2-3 seconds..." : "Synthesizing image on local diffusion pipeline..."}
+                    </div>
+                  </div>
+                ) : currentCustomImage ? (
+                  <div>
+                    <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', background: '#0a0a0f', border: '1px solid #2a2e3f', display: 'flex', justifyContent: 'center', alignItems: 'center', maxHeight: '520px' }}>
+                      <img
+                        src={currentCustomImage.imageUrl}
+                        alt={currentCustomImage.prompt}
+                        style={{ width: '100%', height: 'auto', maxHeight: '520px', objectFit: 'contain', display: 'block' }}
+                      />
+                    </div>
+                    <div style={{ marginTop: '12px', padding: '10px', background: '#0d0e14', borderRadius: '8px', border: '1px solid #1f2333' }}>
+                      <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '4px', fontWeight: 600 }}>Prompt:</div>
+                      <div style={{ fontSize: '12px', color: '#e2e8f0', lineHeight: 1.4 }}>{currentCustomImage.prompt}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
+                      <a
+                        href={currentCustomImage.imageUrl}
+                        download={`ai_image_${Date.now()}.png`}
+                        style={{
+                          flex: 1,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          background: '#1e2230',
+                          border: '1px solid #33384d',
+                          borderRadius: '8px',
+                          padding: '10px 14px',
+                          color: '#ffffff',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          textDecoration: 'none',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Download size={15} /> Download PNG
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => window.open(currentCustomImage.imageUrl, '_blank')}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          background: '#161822',
+                          border: '1px solid #282c3f',
+                          borderRadius: '8px',
+                          padding: '10px 14px',
+                          color: '#cbd5e1',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <ExternalLink size={15} /> Open Full Size
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ minHeight: '380px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#0a0a0f', borderRadius: '10px', border: '1px dashed #2a2e3f', padding: '30px', textAlign: 'center' }}>
+                    <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(229,9,20,0.1)', display: 'grid', placeItems: 'center', color: '#ff3b45', marginBottom: '16px' }}>
+                      <WandSparkles size={26} />
+                    </div>
+                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#f8fafc', marginBottom: '6px' }}>Ready to Synthesize</div>
+                    <div style={{ fontSize: '12px', color: '#94a3b8', maxWidth: '300px' }}>
+                      Type a prompt, pick an image style (Anime, Realistic, Cinematic, 3D Pixar, etc.), and click Generate.
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* History Gallery */}
+              {imageGenHistory.length > 0 && (
+                <div style={{ background: '#111218', border: '1.5px solid #232635', borderRadius: '12px', padding: '20px', boxShadow: '0 8px 30px rgba(0,0,0,0.45)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Recent Generations ({imageGenHistory.length})
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImageGenHistory([]);
+                        if (typeof window !== "undefined") localStorage.removeItem("image_gen_history");
+                      }}
+                      style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '11px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <Trash2 size={12} /> Clear
+                    </button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '8px' }}>
+                    {imageGenHistory.map((item, idx) => {
+                      const isSelected = currentCustomImage?.imageUrl === item.imageUrl;
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            setCurrentCustomImage(item);
+                            setImageGenPrompt(item.prompt);
+                            setImageGenStyle(item.style);
+                            setImageGenAspect(item.aspect);
+                          }}
+                          style={{
+                            position: 'relative',
+                            aspectRatio: '1',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                            border: isSelected ? '2px solid #ff3b45' : '1px solid #2a2e3f',
+                            cursor: 'pointer',
+                            background: '#0a0a0f',
+                            boxShadow: isSelected ? '0 0 10px rgba(229,9,20,0.4)' : 'none',
+                          }}
+                          title={item.prompt}
+                        >
+                          <img
+                            src={item.imageUrl}
+                            alt={item.prompt}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
       {screen === "settings" && <section className="settings-content"><div className="eyebrow"><span className="eyebrow-dot" /> WORKSPACE SETTINGS</div><h1>Your studio, <em>your way.</em></h1><p className="settings-intro">Manage automated workflows and connected social networks.</p>
       
       {/* Auto-Pilot Daily Automation Toggler (Requirement 8) */}

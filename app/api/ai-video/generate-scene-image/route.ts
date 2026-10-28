@@ -45,6 +45,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Prompt is required" }, { status: 400 });
     }
 
+    const isDirectPrompt = Boolean(body.isDirectPrompt);
+    const category = typeof body.category === "string" ? body.category : (isDirectPrompt ? "Custom" : "General");
     const style = typeof body.style === "string" ? body.style : "Cinematic Film";
     const aspect = typeof body.aspect === "string" ? body.aspect : "9:16 (Shorts / Reels)";
     const steps = typeof body.steps === "number" ? Math.max(1, Math.min(20, body.steps)) : 4;
@@ -98,7 +100,9 @@ export async function POST(req: NextRequest) {
           fs.mkdirSync(publicScenesDir, { recursive: true });
         }
         const cleanName = prompt.slice(0, 24).replace(/[^a-zA-Z0-9]/g, "_").replace(/^_+|_+$/g, "") || "scene";
-        const filename = `scene_p${partNumber}_s${sceneIndex}_${cleanName}_${Date.now()}.png`;
+        const filename = isDirectPrompt
+          ? `gen_${cleanName}_${Date.now()}.png`
+          : `scene_p${partNumber}_s${sceneIndex}_${cleanName}_${Date.now()}.png`;
         const outputPath = path.join(publicScenesDir, filename);
 
         const contentType = daemonRes.headers.get("content-type") || "";
@@ -144,7 +148,9 @@ export async function POST(req: NextRequest) {
     }
 
     const cleanName = prompt.slice(0, 24).replace(/[^a-zA-Z0-9]/g, "_").replace(/^_+|_+$/g, "") || "scene";
-    const filename = `scene_p${partNumber}_s${sceneIndex}_${cleanName}_${Date.now()}.png`;
+    const filename = isDirectPrompt
+      ? `gen_${cleanName}_${Date.now()}.png`
+      : `scene_p${partNumber}_s${sceneIndex}_${cleanName}_${Date.now()}.png`;
     const outputPath = path.join(publicScenesDir, filename);
 
     const scriptPath = path.join(process.cwd(), "image_gen_model", "local_inference.py");
@@ -155,7 +161,7 @@ export async function POST(req: NextRequest) {
     const escapedAspect = aspect.replace(/"/g, '\\"');
     const escapedNegativePrompt = negativePrompt.replace(/"/g, '\\"');
 
-    const cmd = `"${pyExe}" "${scriptPath}" --prompt "${escapedPrompt}" --style "${escapedStyle}" --aspect "${escapedAspect}" --steps ${steps} --output "${outputPath}" --negative-prompt "${escapedNegativePrompt}" --json ${seed !== undefined ? `--seed ${seed}` : ""}`;
+    const cmd = `"${pyExe}" "${scriptPath}" --prompt "${escapedPrompt}" --style "${escapedStyle}" --aspect "${escapedAspect}" --steps ${steps} --category "${category}" --output "${outputPath}" --negative-prompt "${escapedNegativePrompt}" --json ${seed !== undefined ? `--seed ${seed}` : ""}${colabGpuUrl ? ` --colab-url "${colabGpuUrl}"` : ""}`;
 
     const { stdout, stderr } = await execAsync(cmd, {
       maxBuffer: 10 * 1024 * 1024,

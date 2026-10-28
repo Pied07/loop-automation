@@ -48,11 +48,19 @@ except ImportError:
 # Cinematic style definitions
 STYLE_PRESETS = {
     "Cinematic Film": "cinematic film still, 35mm photography, dramatic atmospheric lighting, natural depth of field, photorealistic, 8k",
+    "Realism": "cinematic 35mm film still, photorealistic, dramatic natural rim lighting, volumetric atmospheric depth, photorealistic 8k UHD, masterpiece",
+    "Realistic": "cinematic 35mm film still, photorealistic, dramatic natural rim lighting, volumetric atmospheric depth, photorealistic 8k UHD, masterpiece",
+    "Anime": "Studio Ghibli inspired anime landscape, lush vibrant color palette, gorgeous hand-painted scenery, masterpiece, clean line art",
+    "Anime / Manga": "Studio Ghibli inspired anime landscape, lush vibrant color palette, gorgeous hand-painted scenery, masterpiece, clean line art",
+    "Anime / Storybook": "Studio Ghibli inspired anime landscape, lush vibrant color palette, gorgeous hand-painted scenery, masterpiece",
+    "3D Animation": "Pixar Disney 3D animation style, beautifully rendered CGI scene, warm cinematic studio 3D lighting, subsurface scattering, Octane render 8k",
+    "3D Animation / Pixar": "Pixar Disney 3D animation style, beautifully rendered CGI scene, warm cinematic studio 3D lighting, subsurface scattering, Octane render 8k",
     "Epic Fantasy": "epic fantasy digital concept art, volumetric mist, ancient majesty, masterpiece, artstation trend, 8k",
     "Sci-Fi Cyberpunk": "cyberpunk film still, glowing neon reflections, futuristic haze, high tech atmosphere, sharp focus, 8k",
     "Dark Mystery": "dark moody atmosphere, ominous dramatic shadows, amber lantern glow, chilling cinematic lighting, high contrast",
+    "Dark Fantasy": "dark fantasy cinematic concept art, volumetric dark mist, ominous shadows, amber lantern glow, chilling cinematic lighting, high contrast, 8k",
     "Historical Epic": "epic historical movie still, authentic period architecture, dramatic natural lighting, 35mm film grain, 8k",
-    "Anime / Storybook": "Studio Ghibli inspired anime landscape, lush vibrant color palette, gorgeous hand-painted scenery, masterpiece",
+    "Comic Book / Graphic Novel": "vintage retro comic book art panel, classic graphic novel illustration, bold black ink contour lines, dramatic comic noir shadows, pop-art halftone dots, 8k",
     "Photorealistic Nature": "National Geographic documentary photography, crisp organic details, golden hour sunlight, 8k UHD",
     "Raw Prompt Only": "",
 }

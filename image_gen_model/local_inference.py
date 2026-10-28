@@ -57,6 +57,7 @@ def main():
     parser.add_argument("--outdir", type=str, default="./generated_scenes", help="Directory to save output image")
     parser.add_argument("--colab-url", type=str, default=None, help="Google Colab GPU Bridge URL")
     parser.add_argument("--negative-prompt", type=str, default=None, help="Custom negative prompt to prevent distortion")
+    parser.add_argument("--category", type=str, default="Custom", help="Story category or ImageGen")
     parser.add_argument("--json", action="store_true", help="Output JSON result for API consumption")
 
     args = parser.parse_args()
@@ -80,6 +81,7 @@ def main():
         output_path=str(out_path),
         colab_gpu_url=args.colab_url,
         negative_prompt=args.negative_prompt,
+        category=args.category,
     )
     elapsed = time.time() - t0
 

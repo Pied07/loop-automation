@@ -183,16 +183,32 @@ def find_style_preset(style_name: Optional[str]) -> Dict[str, str]:
             return val
 
     # Common aliases
+    if "raw" in s_lower:
+        return {
+            "prefix": "",
+            "lighting": "",
+            "suffix": "",
+            "char_framing": "",
+            "env_framing": "",
+        }
+    if "anime" in s_lower or "manga" in s_lower or "ghibli" in s_lower:
+        return UNIFIED_STYLE_PRESETS["Anime / Storybook"]
+    if "real" in s_lower:
+        return UNIFIED_STYLE_PRESETS["Realism"]
+    if "3d" in s_lower or "pixar" in s_lower or "disney" in s_lower:
+        return UNIFIED_STYLE_PRESETS["Disney 3D"]
     if "cyber" in s_lower or "sci" in s_lower:
         return UNIFIED_STYLE_PRESETS["Sci-Fi Cyberpunk"]
+    if "comic" in s_lower or "graphic" in s_lower:
+        return UNIFIED_STYLE_PRESETS["Retro Comic"]
+    if "dark fantasy" in s_lower or "gothic" in s_lower:
+        return UNIFIED_STYLE_PRESETS["Dark Fantasy"]
     if "fantasy" in s_lower:
         return UNIFIED_STYLE_PRESETS["Epic Fantasy"]
     if "mystery" in s_lower or "dark" in s_lower:
         return UNIFIED_STYLE_PRESETS["Dark Mystery"]
     if "history" in s_lower or "period" in s_lower:
         return UNIFIED_STYLE_PRESETS["Historical Epic"]
-    if "anime" in s_lower or "ghibli" in s_lower:
-        return UNIFIED_STYLE_PRESETS["Anime / Storybook"]
     if "nature" in s_lower or "photo" in s_lower:
         return UNIFIED_STYLE_PRESETS["Photorealistic Nature"]
 
@@ -214,13 +230,20 @@ def synthesize_scene_prompt(
     - Accurately renders props, architecture, atmosphere, and action.
     """
     clean_raw = script_sentence.strip()
+    if style_preset and "raw" in style_preset.lower():
+        return clean_raw
+
     if clean_raw.lower().startswith("cinematic") and ("8k" in clean_raw.lower() or "shot" in clean_raw.lower()):
         return clean_raw
 
+    is_direct = category.lower() in ["custom", "imagegen", "direct", "image generator"]
     clean = clean_narration(script_sentence)
-    genre = infer_genre(category, topic, script_sentence)
+    genre = "General" if is_direct else infer_genre(category, topic, script_sentence)
 
-    visual_core = clean if len(clean) > 8 else clean_narration(topic)
+    if is_direct:
+        visual_core = clean if len(clean) > 5 else clean_raw
+    else:
+        visual_core = clean if len(clean) > 8 else clean_narration(topic)
     if not visual_core or len(visual_core) < 4:
         visual_core = f"{category} scene, {topic}"
 
@@ -234,12 +257,12 @@ def synthesize_scene_prompt(
     # Check whether the scene describes human characters or inanimate objects/environments
     has_characters = any(re.search(pat, visual_core, re.IGNORECASE) for pat in CHARACTER_PATTERNS)
 
-    is_horror = (
+    is_horror = (not is_direct) and (
         (genre == "Horror" or "horror" in category.lower())
         or any(w in f"{script_sentence} {topic}".lower() for w in ["ghost", "specter", "haunt", "demon", "creepy", "phantom", "apparition", "asylum", "curse", "shadowy figure", "entity"])
     ) and category.lower() not in ["romance", "comedy", "food", "motivational", "music"]
 
-    is_romance = (
+    is_romance = (not is_direct) and (
         genre == "Romance"
         or "romance" in category.lower()
         or any(w in f"{script_sentence} {topic}".lower() for w in ["romance", "love", "romantic", "couple", "kiss", "embrace", "soulmate", "dating", "sweetheart", "holding hands"])
