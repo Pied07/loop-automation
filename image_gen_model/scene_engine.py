@@ -77,10 +77,13 @@ ASPECT_RATIOS = {
 COMPREHENSIVE_NEGATIVE_PROMPT = (
     "duplicate person, multiple people, two characters, stacked body, double torso, second body, conjoined, "
     "multiple heads, two heads, extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, "
+    "messy, chaotic, visual noise, grainy, noisy, haphazard, cluttered composition, debris, floating junk, distorted shapes, messy lines, "
+    "rough sketch, scribbles, jittery lines, jagged edges, broken sword, deformed weapon, miniature sword, blunt blade, multiple swords, "
+    "solid aura, metallic blob, gold clutter, yellow blob, crushed metal, crumpled fabric, "
     "deformed hands, poorly drawn hands, fused fingers, too many fingers, missing fingers, mutated hands, "
     "mutated limbs, malformed limbs, disconnected limbs, floating limbs, "
     "bad anatomy, grotesque proportions, malformed facial features, disfigured, "
-    "multiple swords, extra swords, floating swords, crossed swords, multiple blades, extra weapons, "
+    "multiple blades, extra weapons, "
     "elongated torso, long torso, stretched body, unnaturally tall torso, stacked torso, double torso, accordion torso, repeating armor, ribbed armor distortion, repeating patterns, "
     "full body far away, distant tiny character, "
     "retro comic, vintage comic, western comic, comic book panel, ink hatching, crosshatching, heavy linework, woodblock print, ukiyo-e, sketch, line drawing, "
@@ -514,16 +517,14 @@ class StorySceneEngine:
         elapsed = time.time() - t0
         print(f"[OK] Scene generated in {elapsed:.1f}s")
 
-        # Post-processing: Enhance contrast, color saturation, and sharpness
+        # Post-processing: Enhance contrast and color saturation naturally without artificial sharpness noise
         processed = raw_img.copy()
         if is_anime:
-            processed = ImageEnhance.Color(processed).enhance(1.18)
-            processed = ImageEnhance.Contrast(processed).enhance(1.12)
-            processed = ImageEnhance.Sharpness(processed).enhance(1.12)
+            processed = ImageEnhance.Color(processed).enhance(1.08)
+            processed = ImageEnhance.Contrast(processed).enhance(1.04)
         else:
-            processed = ImageEnhance.Contrast(processed).enhance(1.06)
             processed = ImageEnhance.Color(processed).enhance(1.06)
-            processed = ImageEnhance.Sharpness(processed).enhance(1.10)
+            processed = ImageEnhance.Contrast(processed).enhance(1.04)
 
         # Ensure exact requested output dimensions
         if target_resolution and (processed.width != target_resolution[0] or processed.height != target_resolution[1]):

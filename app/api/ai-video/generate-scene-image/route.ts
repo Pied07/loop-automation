@@ -16,6 +16,9 @@ const LOCAL_DAEMON_URL = "http://127.0.0.1:5055";
 const COMPREHENSIVE_NEGATIVE_PROMPT =
   "duplicate person, multiple people, two characters, stacked body, double torso, second body, conjoined, " +
   "multiple heads, two heads, extra limbs, extra arms, extra hands, extra legs, duplicate hands, duplicate arms, multi-armed, " +
+  "messy, chaotic, visual noise, grainy, noisy, haphazard, cluttered composition, debris, floating junk, distorted shapes, messy lines, " +
+  "rough sketch, scribbles, jittery lines, jagged edges, broken sword, deformed weapon, miniature sword, blunt blade, multiple swords, " +
+  "solid aura, metallic blob, gold clutter, yellow blob, crushed metal, crumpled fabric, " +
   "deformed hands, poorly drawn hands, fused fingers, too many fingers, missing fingers, mutated hands, " +
   "mutated limbs, malformed limbs, disconnected limbs, floating limbs, " +
   "bad anatomy, grotesque proportions, malformed facial features, disfigured, " +

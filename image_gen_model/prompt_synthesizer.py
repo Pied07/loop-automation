@@ -162,12 +162,36 @@ def clean_narration(text: str) -> str:
     clean = re.sub(r"\b(?:and\s+)+and\b", "and", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\b(?:and\s+and\s+)+", "and ", clean, flags=re.IGNORECASE)
 
-    # Convert passive standing phrases to dynamic stances so diffusion models don't render rigid vertical statues
-    clean = re.sub(r"\b(?:still\s+standing(?:\s+strongly)?|standing\s+(?:straight|upright|strongly|still))\b", "poised in combat stance", clean, flags=re.IGNORECASE)
+    # Convert aura/radiating energy to subtle atmospheric lighting instead of solid physical clutter
+    def _aura_sub(m):
+        color = (m.group(1) or "golden").strip()
+        return f"soft ethereal {color} backlight glow, subtle luminous floating embers"
+
+    clean = re.sub(
+        r"\b(?:and\s+)?(?:a\s+)?(golden|bright|fiery|blue|purple|dark|shining|radiant|glowing)?\s*(?:aura|energy|flames?|light)\s*radiating(?:\s+(?:from|around)(?:\s+(?:his|her|their|the))?\s+body)?\b",
+        _aura_sub,
+        clean,
+        flags=re.IGNORECASE,
+    )
+
+    # Remove redundant/awkward stance and holding phrases that clash with specialized framing and weapon tags
+    clean = re.sub(
+        r"\b(?:in\s+a\s+fighting\s+pose|still\s+standing(?:\s+strongly)?|standing\s+(?:straight|upright|strongly|still)|poised\s+in\s+combat\s+stance)\b",
+        "",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    clean = re.sub(
+        r"\b(?:holding\s+(?:his|her|their|the|a)\s+(?:katana|sword|blade))\b",
+        "",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    clean = re.sub(r"\b(?:and\s+)+", " ", clean, flags=re.IGNORECASE)
 
     # Clean punctuation and quotes
     clean = re.sub(r'["\'*_#`~]', "", clean)
-    clean = re.sub(r"\s+", " ", clean).strip()
+    clean = re.sub(r"\s+", " ", clean).strip(" ,")
     return clean
 
 
@@ -372,34 +396,33 @@ def synthesize_scene_prompt(
 
     if is_anime:
         char_tag = "1girl, beautiful anime heroine" if is_female else ("1boy, handsome anime warrior" if is_male else "1character, anime protagonist")
-        framing_part = f"solo, {char_tag}, medium close-up shot, upper body portrait framing, character filling the frame, dynamic three-quarter view" if has_characters else preset["env_framing"]
-        face_part = "exquisite detailed anime face, large expressive luminous anime eyes with reflections, delicate small nose and lips, sharp clean anime chin, smooth flawless porcelain skin" if has_characters else ""
-        weapon_part = "holding a single sharp glowing electric-blue katana diagonally across chest, single sword only, perfectly drawn anime hands with five fingers, authentic weapon grip" if has_weapon else (pose_guidance if has_characters else "")
+        style_core = "Masterpiece 2D Japanese anime, clean crisp lineart, Makoto Shinkai and Ufotable studio key visual"
+        framing_part = f"solo, {char_tag}, upper body portrait, dynamic three-quarter view" if has_characters else preset["env_framing"]
+        face_part = "exquisite anime face, sharp luminous amber eyes, clean jawline, flawless smooth skin" if has_characters else ""
+        weapon_part = "holding a single sharp glowing electric-blue katana diagonally, single sword only, perfect hands" if has_weapon else (pose_guidance if has_characters else "")
 
         prompt_parts = [
-            "Masterpiece 2D Japanese anime visual art",
+            style_core,
             framing_part,
             face_part,
-            visual_core,
             weapon_part,
-            env_setting,
-            "dramatic anime lighting, cool electric-blue rim light on shoulders and hair, warm ambient golden lantern glow, volumetric bloom",
-            "crisp cel-shaded line art, rich vibrant saturated colors, Makoto Shinkai and Ufotable key visual, trending on Pixiv 8k anime wallpaper",
+            visual_core,
+            "clean cel shading, rich vibrant saturated colors, dramatic volumetric lighting, cinematic bloom",
         ]
     elif is_realistic:
         real_char_tag = "1woman, beautiful female portrait" if is_female else ("1man, handsome male portrait" if is_male else "1person, authentic portrait")
-        real_framing_part = f"solo, {real_char_tag}, medium close-up shot, upper body portrait framing, subject filling the frame, dynamic three-quarter view" if has_characters else preset["env_framing"]
-        real_face_part = "exquisite detailed human face, authentic realistic eyes with catchlights, natural skin texture with visible fine pores, lifelike features" if has_characters else ""
-        real_weapon_part = "holding a single sharp weapon with natural grip, authentic anatomy, exactly two arms, two hands only, five fingers per hand" if has_weapon else (pose_guidance if has_characters else "")
+        style_core = "Masterpiece raw 35mm DSLR color photograph, award winning portrait photography, shot on Sony A7R V, 85mm f/1.4 GM lens"
+        real_framing_part = f"solo, {real_char_tag}, upper body portrait, dynamic three-quarter view" if has_characters else preset["env_framing"]
+        real_face_part = "exquisite detailed human face, authentic realistic eyes with catchlights, natural skin texture with visible fine pores" if has_characters else ""
+        real_weapon_part = "holding a single sharp weapon with natural grip, exactly two arms, two hands only, five fingers per hand" if has_weapon else (pose_guidance if has_characters else "")
 
         prompt_parts = [
-            "Masterpiece raw 35mm DSLR color photograph",
+            style_core,
             real_framing_part,
             real_face_part,
-            visual_core,
             real_weapon_part,
-            env_setting,
-            "natural golden hour lighting, cinematic rim light, authentic optical bokeh, shot on Sony A7R V, 85mm f/1.4 GM lens, 8k UHD National Geographic portrait",
+            visual_core,
+            "natural golden hour lighting, cinematic rim light, authentic optical bokeh, 8k UHD National Geographic portrait",
         ]
     elif is_horror:
         horror_lighting = "chilling moonlight piercing cold shadows, volumetric supernatural mist, eerie amber glow"
