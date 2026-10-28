@@ -2050,6 +2050,70 @@ export default function Home() {
     setScreen("library");
   }
 
+  const handleSaveImageToHistory = (newImg: any) => {
+    if (!newImg || !newImg.imageUrl) return;
+    setImageGenHistory((prev) => {
+      const prevArr = Array.isArray(prev) ? prev : [];
+      const updated = [newImg, ...prevArr.filter((item: any) => item && item.imageUrl !== newImg.imageUrl).slice(0, 24)];
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("image_gen_history", JSON.stringify(updated));
+        } catch {}
+      }
+      return updated;
+    });
+  };
+
+  const handleGenerateCustomImage = async () => {
+    if (!imageGenPrompt.trim()) {
+      notify("Please enter an image description prompt.");
+      return;
+    }
+    setIsGeneratingCustomImage(true);
+    setImageGenError("");
+    try {
+      const res = await fetch("/api/ai-video/generate-scene-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: imageGenPrompt.trim(),
+          style: imageGenStyle,
+          aspect: imageGenAspect,
+          steps: imageGenSteps || 4,
+          seed: imageGenSeed ? parseInt(imageGenSeed, 10) : undefined,
+          negativePrompt: imageGenNegative.trim() || undefined,
+          isDirectPrompt: true,
+          category: "Custom",
+          colabGpuUrl: colabGpuUrl.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || "Image generation failed.");
+      }
+      const newImg = {
+        id: `img_${Date.now()}`,
+        imageUrl: data.imageUrl,
+        prompt: imageGenPrompt.trim(),
+        style: imageGenStyle,
+        aspect: imageGenAspect,
+        engine: data.engine || "native-ml",
+        elapsed: data.elapsed,
+        timestamp: Date.now(),
+      };
+      setCurrentCustomImage(newImg);
+      handleSaveImageToHistory(newImg);
+      notify("✨ Image generated successfully by your ML model!");
+    } catch (err: any) {
+      console.error("Custom Image Generation error:", err);
+      const msg = err.message || "Failed to generate image.";
+      setImageGenError(msg);
+      notify(msg);
+    } finally {
+      setIsGeneratingCustomImage(false);
+    }
+  };
+
   async function handleClearLibrary() {
     if (!window.confirm("Are you sure you want to clear your video library? This will wipe the library clean so you can start fresh.")) return;
     const currentUser = auth?.currentUser;
