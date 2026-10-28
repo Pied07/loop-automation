@@ -14,6 +14,8 @@ export const dynamic = "force-dynamic";
 const LOCAL_DAEMON_URL = "http://127.0.0.1:5055";
 
 const COMPREHENSIVE_NEGATIVE_PROMPT =
+  "distant character, tiny person, miniature character, zoomed out wide shot, full body far away, walking down path, long shot, " +
+  "neon pink, oversaturated pink, bright pink flowers, cherry blossom overload, cartoonish garden, children book illustration, 8-bit, pixel art, " +
   "dark void, empty black background, plain black background, solid black background, studio backdrop, indoor stage, stage lighting, spotlights, spotlight beams, disco lights, floating sparkles, yellow laser line, floating glitter, " +
   "multiple hands, extra hands, four hands, four arms, three hands, three arms, duplicate hands, duplicate arms, multi-armed, mutated arms, mutated hands, sprouted arms, " +
   "scars, scarred face, body scars, facial scars, cuts, wounds, lacerations, blemish, acne, rough skin, weathered face, wrinkles, aged skin, ugly face, " +

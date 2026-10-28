@@ -50,8 +50,8 @@ STYLE_PRESETS = {
     "Cinematic Film": "cinematic film still, 35mm photography, dramatic atmospheric lighting, natural depth of field, photorealistic, 8k",
     "Realism": "cinematic 35mm film still, photorealistic, dramatic natural rim lighting, volumetric atmospheric depth, photorealistic 8k UHD, masterpiece",
     "Realistic": "cinematic 35mm film still, photorealistic, dramatic natural rim lighting, volumetric atmospheric depth, photorealistic 8k UHD, masterpiece",
-    "Anime": "cinematic anime manga art style, detailed Japanese anime illustration, crisp clean line art, dramatic dynamic lighting, glowing highlights, masterpiece anime artwork, trending on Pixiv, 8k",
-    "Anime / Manga": "cinematic anime manga art style, detailed Japanese anime illustration, crisp clean line art, dramatic dynamic lighting, glowing highlights, masterpiece anime artwork, trending on Pixiv, 8k",
+    "Anime": "cinematic dark anime illustration, masterpiece Japanese anime character art, sharp clean linework, dramatic atmospheric lighting, 8k",
+    "Anime / Manga": "cinematic dark anime illustration, masterpiece Japanese anime character art, sharp clean linework, dramatic atmospheric lighting, 8k",
     "Anime / Storybook": "Studio Ghibli inspired anime landscape, lush vibrant color palette, gorgeous hand-painted scenery, masterpiece",
     "3D Animation": "Pixar Disney 3D animation style, beautifully rendered CGI scene, warm cinematic studio 3D lighting, subsurface scattering, Octane render 8k",
     "3D Animation / Pixar": "Pixar Disney 3D animation style, beautifully rendered CGI scene, warm cinematic studio 3D lighting, subsurface scattering, Octane render 8k",
@@ -75,6 +75,8 @@ ASPECT_RATIOS = {
 
 # Industry standard anti-distortion negative prompt targeting horrifying faces, eye strabismus, anatomy mutations, and static portrait headshots
 COMPREHENSIVE_NEGATIVE_PROMPT = (
+    "distant character, tiny person, miniature character, zoomed out wide shot, full body far away, walking down path, long shot, "
+    "neon pink, oversaturated pink, bright pink flowers, cherry blossom overload, cartoonish garden, children book illustration, 8-bit, pixel art, "
     "dark void, empty black background, plain black background, solid black background, studio backdrop, indoor stage, stage lighting, spotlights, spotlight beams, disco lights, floating sparkles, yellow laser line, floating glitter, "
     "multiple hands, extra hands, four hands, four arms, three hands, three arms, duplicate hands, duplicate arms, multi-armed, mutated arms, mutated hands, sprouted arms, "
     "scars, scarred face, body scars, facial scars, cuts, wounds, lacerations, blemish, acne, rough skin, weathered face, wrinkles, aged skin, ugly face, "

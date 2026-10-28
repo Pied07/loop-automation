@@ -80,11 +80,11 @@ UNIFIED_STYLE_PRESETS: Dict[str, Dict[str, str]] = {
         "env_framing": "authentic ancient architecture, monumental stone ruins, sweeping vista",
     },
     "Anime / Manga": {
-        "prefix": "authentic 2D Japanese anime visual artwork, Ufotable and Makoto Shinkai aesthetic, crisp clean hand-drawn line art",
-        "lighting": "vibrant anime lighting, rich cel-shaded shadows, radiant anime highlights",
-        "suffix": "masterpiece anime artwork, trending on Pixiv, stunning 2D anime illustration, crisp clean contours, 8k",
-        "char_framing": "dynamic 2D anime battle stance, sharp anime character design, dramatic anime action framing",
-        "env_framing": "breathtaking painted anime scenery, lush scenic landscape under vibrant painterly sky",
+        "prefix": "cinematic dark anime illustration, masterpiece Japanese anime character art, sharp clean linework",
+        "lighting": "cinematic moody rain lighting, dramatic atmospheric rim light, volumetric dark mist, deep contrast shadows",
+        "suffix": "trending on Pixiv, highly detailed dark anime aesthetic, Demon Slayer and Dororo style, 8k",
+        "char_framing": "cinematic medium close-up shot, character dominating the frame, waist-up composition, prominent hero focus",
+        "env_framing": "atmospheric dark anime background, cinematic rain streaks, moody misty forest with depth of field blur",
     },
     "Anime / Storybook": {
         "prefix": "Studio Ghibli inspired anime scenery, gorgeous hand-painted art",
@@ -289,9 +289,9 @@ def synthesize_scene_prompt(
 
     if has_combat_action:
         if has_weapon:
-            pose_guidance = "dynamic martial arts combat stance, fighting posture with bent knees, low center of gravity, angled body ready to strike, intense battle-ready action pose, wielding weapon in ready battle guard"
+            pose_guidance = "dynamic martial arts combat stance, hands firmly gripping katana hilt drawing blade, intense focused downward gaze, windblown tied hair with loose bangs over face, leaning forward ready to strike, prominent upper body posture"
         else:
-            pose_guidance = "dynamic martial arts fighting stance, athletic combat posture with bent knees, low center of gravity, raised defensive guard, angled dynamic action pose"
+            pose_guidance = "dynamic fighting stance, athletic combat posture with bent knees, low center of gravity, raised defensive guard, angled dynamic action pose"
     elif has_characters:
         pose_guidance = "natural dynamic posture, relaxed organic body stance, expressive body language"
     else:
@@ -315,11 +315,11 @@ def synthesize_scene_prompt(
         is_eastern_warrior = bool(re.search(r"\b(?:ronin|samurai|ninja|katana|warrior|swordsman|blade|martial\s*arts)\b", f"{visual_core} {script_sentence}", re.IGNORECASE))
         if is_eastern_warrior:
             if is_anime:
-                env_setting = "in an ancient Japanese mountain temple courtyard with falling pink sakura cherry blossoms, stone pathway, misty bamboo groves under a painterly anime sky"
+                env_setting = "moody dark rain-drenched misty forest background, cinematic falling rain streaks, atmospheric mist and subtle floating embers, soft depth of field blur"
             elif is_realistic:
-                env_setting = "outdoors on location in a lush Japanese bamboo forest in Arashiyama, ancient mossy stone lanterns, misty mountains, natural outdoor sunlight"
+                env_setting = "outdoors on location in a misty rain-drenched bamboo grove, moody atmosphere, natural outdoor lighting"
             else:
-                env_setting = "outdoors in a lush misty ancient temple grove with stone lanterns and mountain backdrop"
+                env_setting = "moody atmospheric outdoor background with rain and mist"
         else:
             if is_anime:
                 env_setting = "in a breathtaking vibrant anime landscape, blooming wildflowers, lush green hills, fluffy clouds under a clear blue anime sky"
@@ -368,16 +368,16 @@ def synthesize_scene_prompt(
     framing_tag = "vertical 9:16 composition" if "9:16" in aspect_ratio else "widescreen 16:9 composition"
 
     if has_combat_action:
-        staging = "dynamic three-quarters angle action shot, full body fighting stance with bent legs, cinematic foreshortening, dramatic action composition"
+        staging = "cinematic medium close-up shot, character dominating the frame, waist-up composition, prominent hero focus, dynamic battle stance"
     else:
         staging = preset["char_framing"] if has_characters else preset["env_framing"]
 
     if is_anime:
-        anime_lighting = "vibrant anime lighting, rich cel-shaded shadows, radiant energy aura"
+        anime_lighting = "cinematic moody rain lighting, dramatic rim light, volumetric dark mist, deep atmospheric chiaroscuro shadows"
         prompt_parts = [
-            f"Authentic 2D Japanese anime visual of {visual_core}",
-            env_setting,
+            f"Masterpiece Japanese anime visual artwork of {visual_core}",
             preset["prefix"],
+            env_setting,
             human_enhancement,
             staging,
             framing_tag,
