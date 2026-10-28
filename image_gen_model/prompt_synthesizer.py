@@ -406,20 +406,41 @@ def synthesize_scene_prompt(
 
     has_scars = bool(re.search(r"\b(?:scars?|scarred|battle\s+scars?)\b", f"{script_sentence} {topic}", re.IGNORECASE))
 
-    # Detect user-specified environment to ensure it is never dropped and grounds the canvas
-    env_match = re.search(
-        r"\b(?:battlefield|battle\s*ground|warzone|war-torn|ruins?|temple|shrine|castle|palace|fortress|city|forest|bamboo|dungeon|arena|mountain|chamber|throne\s*room)\b",
+    # 1. Extract user-specified environment/background directly, or infer contextually relevant fallback
+    prep_match = re.search(
+        r"\b(?:standing\s+(?:in|on|at|inside)|in\s+front\s+of|inside|in\s+(?:a|an|the)|on\s+(?:a|an|the|top\s+of)|at\s+(?:a|an|the))\s+([a-zA-Z0-9\s\-]+?)(?:,|$|\.|\band\b|\bwith\b|\bholding\b|\bpoised\b)",
         f"{script_sentence} {topic}",
         re.IGNORECASE,
     )
-    if env_match:
-        m_env = env_match.group(0).lower()
-        if any(w in m_env for w in ["battle", "war"]):
-            env_bg = "epic war-torn battlefield background, scorched earth terrain below, smoking embers and war banners"
-        else:
-            env_bg = f"detailed {m_env} background, atmospheric depth, grounded terrain below"
+    user_bg = None
+    if prep_match:
+        cand = prep_match.group(1).strip()
+        if cand and not re.search(r"\b(?:fighting\s+pose|pose|combat|stance|armor|clothes|robes|dress|suit|uniform|shoes|boots)\b", cand, re.I):
+            user_bg = cand
+
+    if not user_bg:
+        direct_env = re.search(
+            r"\b(battlefield|battle\s*ground|warzone|war-torn|dojo|temple|shrine|castle|palace|fortress|dungeon|arena|cyberpunk\s*city|neon\s*street|city\s*street|alley|rooftop|forest|woods|bamboo\s*grove|mountain|snowy\s*peaks?|desert|ocean|sea|beach|waterfall|space|alien\s*planet|sky|clouds|throne\s*room|laboratory|library|tavern|cave)\b",
+            f"{script_sentence} {topic}",
+            re.IGNORECASE,
+        )
+        if direct_env:
+            user_bg = direct_env.group(0).strip()
+
+    if user_bg:
+        env_bg = f"set against {user_bg} background, atmospheric depth"
     else:
-        env_bg = "epic battlefield background, scorched earth ground below, smoking embers" if has_combat_action else "detailed cinematic atmospheric background, grounded depth below"
+        comb_lower = f"{script_sentence} {topic}".lower()
+        if has_combat_action or any(w in comb_lower for w in ["ronin", "samurai", "katana", "ninja", "warrior", "sword"]):
+            env_bg = "set against epic battle ground background, atmospheric smoke and depth"
+        elif any(w in comb_lower for w in ["space", "alien", "planet", "cyber", "sci-fi"]):
+            env_bg = "set against futuristic neon city background, atmospheric ambient depth"
+        elif "horror" in comb_lower or is_horror:
+            env_bg = "set against moody atmospheric ruins background, eerie mist"
+        elif any(w in comb_lower for w in ["nature", "animal", "wilderness"]):
+            env_bg = "set against lush scenic natural wilderness background, soft atmospheric depth"
+        else:
+            env_bg = "set against detailed cinematic background, soft atmospheric depth"
 
     if is_anime:
         char_tag = "1girl, beautiful anime heroine" if is_female else ("1boy, handsome anime warrior" if is_male else "1character, anime hero")
