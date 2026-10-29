@@ -50,7 +50,7 @@ except Exception:
 def build_clean_visual_prompt(scene_text: str, fallback_subject: str = "", style_descriptor: str = "", category: str = "") -> str:
     """Builds clean, high-impact visual prompts with specialized styling for the requested sceneStyle."""
     clean = re.sub(r"\b(?:Part\s+\d+|Welcome back to Part\s+\d+|Follow for Part\s+\d+|Watch Part\s+\d+|Save this video|follow for more|subscribe|share this|comment below)[^.]*", "", scene_text, flags=re.IGNORECASE)
-    clean = re.sub(r"\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|eighteen|twenty|thirty|forty|fifty|hundred|thousand|million)\s+(?:times|doors|days|hours|years|copies|rejections)\b", "", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|eighteen|twenty|thirty|forty|fifty|hundred|thousand|million)\s+(?:times|days|hours|years|copies|rejections)\b", "", clean, flags=re.IGNORECASE)
     clean = re.sub(r'["\'*_#`~]', " ", clean)
     clean = re.sub(r"[^a-zA-Z0-9\s,.-]", " ", clean)
     clean = re.sub(r"\s+", " ", clean).strip()

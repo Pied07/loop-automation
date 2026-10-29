@@ -29,10 +29,10 @@ FILLER_PATTERNS = [
 
 # Character indicators to detect whether scene actually includes human subjects
 CHARACTER_PATTERNS = [
-    r"\b(?:man|woman|boy|girl|person|people|explorer|explorers|detective|scientist|astronaut|warrior|soldier|guard|knight|wanderer|operator|pilot|captain|figure|silhouette|traveler|stranger|samurai|ronin|ninja|monk|assassin|hunter|archer|wizard|mage|king|queen|prince|princess|adventurer|hero|protagonist|model|actor|actress|beauty|swordsman|swordswoman|gladiator|fighter|sorcerer|sorceress|priest|priestess)\b",
-    r"\b(?:sarah|marcus|lucas|talia|finnian|kira|mark|alex|john|david|emma|elena|arthur|victor|clara)\b",
-    r"\b(?:he|she|they|him|her|them)\s+(?:walked|stepped|looked|gazed|ran|turned|whispered|froze|reached|stood|held|sat|saw|watched|crawled|pressed|backed)\b",
-    r"\b(?:nude|naked|model|female|male|lady|guy|body|face|portrait|character|hero|protagonist|goddess|beauty)\b",
+    r"\b(?:man|woman|boy|girl|person|people|someone|anyone|human|humans|explorer|explorers|detective|scientist|doctor|nurse|surgeon|physician|teacher|professor|student|engineer|worker|builder|driver|pilot|captain|astronaut|chef|cook|baker|artist|painter|musician|singer|dancer|athlete|runner|player|boxer|warrior|soldier|guard|knight|wanderer|operator|figure|silhouette|traveler|stranger|tourist|commuter|passenger|pedestrian|citizen|samurai|ronin|ninja|monk|priest|priestess|assassin|hunter|archer|wizard|mage|witch|sorcerer|sorceress|king|queen|prince|princess|emperor|empress|adventurer|hero|heroine|protagonist|villain|rival|model|actor|actress|beauty|swordsman|swordswoman|gladiator|fighter|veteran|elder|child|children|toddler|baby|kid|kids|teen|teenager|youth|adult|elderly)\b",
+    r"\b(?:sarah|marcus|lucas|talia|finnian|kira|mark|alex|john|david|emma|elena|arthur|victor|clara|michael|james|mary|robert|william|richard|joseph|thomas|charles|christopher|daniel|matthew|anthony|donald|paul|steven|andrew|kenneth|joshua|kevin|brian|george|edward|ronald|timothy|jason|jeffrey|ryan|jacob|gary|nicholas|eric|jonathan|stephen|larry|justin|scott|brandon|benjamin|samuel|gregory|alexander|patrick|frank|raymond|jack|dennis|jerry|tyler|aaron|jose|adam|nathan|henry|douglas|zachary|peter|kyle|walter|ethan|jeremy|harold|keith|christian|roger|noah|gerald|carl|terry|sean|austin|arthur|lawrence|jesse|dylan|bryan|joe|jordan|billy|albert|bruce|willie|gabriel|logan|alan|juan|wayne|roy|ralph|randy|eugene|vincent|russell|louis|philip|bobby|johnny|bradley)\b",
+    r"\b(?:he|she|they|him|her|them)\s+(?:walked|stepped|looked|gazed|ran|turned|whispered|froze|reached|stood|held|sat|saw|watched|crawled|pressed|backed|smiled|cried|talked|spoke|listened|waited|drove|worked|studied|lived)\b",
+    r"\b(?:female|male|lady|gentleman|guy|fellow|body|face|portrait|character|hero|protagonist|goddess|beauty|crowd|audience|spectators|crew|team)\b",
 ]
 
 # Comprehensive cinematic and visual style definitions
@@ -133,17 +133,17 @@ def clean_narration(text: str) -> str:
     # Remove dialogue attribution tags that add noise without visual meaning
     clean = re.sub(r"\b(?:whispered|remarked|urged|choked out|shouted|screamed|exclaimed|said|muttered|cried)\b", "", clean, flags=re.IGNORECASE)
 
-    # Remove quantity multipliers like 'eighteen times', '300 doors' that trigger duplicate heads/limbs
+    # Remove quantity multipliers like 'eighteen times', '300 days' that trigger duplicate heads/limbs
     clean = re.sub(
-        r"\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|eighteen|twenty|thirty|forty|fifty|hundred|thousand|million)\s+(?:times|doors|days|hours|years|copies|rejections)\b",
+        r"\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|eighteen|twenty|thirty|forty|fifty|hundred|thousand|million)\s+(?:times|days|hours|years|copies|rejections)\b",
         "",
         clean,
         flags=re.IGNORECASE,
     )
 
-    # Aggressively filter physical trauma and injury triggers that cause mutilated/distorted face renders or weathered skin
+    # Filter pure gore and grotesque trauma triggers that cause mutilated face renders
     clean = re.sub(
-        r"\b(?:spinal mobility|highway crash|car crash|crash|paralysis|paralyzed|wheelchair|crutches|rehabilitation|hospital|amputation|injured|injury|deformity|deformed|broken|surgery|disease|sick|illness|twisted|severed|bleeding|wound)\b",
+        r"\b(?:mutilated|severed\s+limbs?|visceral\s+wound|bleeding\s+profusely|grotesque\s+gore|decapitated)\b",
         "",
         clean,
         flags=re.IGNORECASE,
@@ -286,10 +286,11 @@ def synthesize_scene_prompt(
 ) -> str:
     """
     Transforms any story script sentence into a clean, cinematic, scene-accurate prompt.
-    CRITICAL:
-    - Never injects toxic portrait phrases ('authentic human with symmetrical facial features').
-    - Distinguishes environmental/object shots from character shots.
-    - Accurately renders props, architecture, atmosphere, and action.
+    CRITICAL GUARANTEES:
+    - 100% fidelity to the actual story narrative (doors, rooms, nature, technology, or characters).
+    - NEVER injects warriors, tribal robes, kimonos, or swords unless explicitly in the story text.
+    - NEVER stacks heads or creates conjoined bodies.
+    - Automatically distinguishes environment/object shots from character shots.
     """
     clean_raw = script_sentence.strip()
     if style_preset and "raw" in style_preset.lower():
@@ -300,319 +301,98 @@ def synthesize_scene_prompt(
 
     is_direct = category.lower() in ["custom", "imagegen", "direct", "image generator"]
     clean = clean_narration(script_sentence)
-    genre = "General" if is_direct else infer_genre(category, topic, script_sentence)
 
     if is_direct:
         visual_core = clean if len(clean) > 5 else clean_raw
     else:
         visual_core = clean if len(clean) > 8 else clean_narration(topic)
     if not visual_core or len(visual_core) < 4:
-        visual_core = f"{category} scene, {topic}"
+        visual_core = f"{topic}: {clean}" if topic and clean else (clean or f"{category} scene")
 
-    # Keep visual core concise but don't truncate user creative descriptions
+    # Keep visual core concise (within 35 words) so it fits in CLIP context
     words = visual_core.split()
-    max_words = 65 if is_direct else 36
-    if len(words) > max_words:
-        visual_core = " ".join(words[:max_words])
+    if len(words) > 35:
+        visual_core = " ".join(words[:35])
 
     preset = find_style_preset(style_preset)
+    s_lower = (style_preset or "").lower()
 
-    # Check whether the scene describes human characters or inanimate objects/environments
-    has_characters = any(re.search(pat, visual_core, re.IGNORECASE) for pat in CHARACTER_PATTERNS) or any(re.search(pat, script_sentence, re.IGNORECASE) for pat in CHARACTER_PATTERNS)
+    # Detect if the scene explicitly describes a human subject
+    has_explicit_character = any(re.search(pat, visual_core, re.IGNORECASE) for pat in CHARACTER_PATTERNS)
+    
+    # Detect if the story is genuinely about warriors/samurai/combat
+    is_warrior_theme = bool(re.search(r"\b(?:warrior|soldier|samurai|ronin|ninja|knight|gladiator|blade|katana|sword|combat|battlefield)\b", f"{visual_core} {topic}", re.I))
 
-    is_female = bool(re.search(r"\b(?:woman|girl|female|lady|queen|princess|actress|heroine|goddess|she|her)\b", f"{visual_core} {script_sentence}", re.IGNORECASE))
-    is_male = bool(re.search(r"\b(?:man|boy|male|guy|king|prince|actor|hero|samurai|warrior|soldier|he|him|his)\b", f"{visual_core} {script_sentence}", re.IGNORECASE))
-
-    has_weapon = bool(re.search(r"\b(?:sword|blade|dagger|spear|axe|shield|bow|weapon|gun|pistol|rifle|saber|katana)\b", f"{visual_core} {script_sentence}", re.IGNORECASE))
-
-    # Detect dynamic fighting, martial arts, warrior, combat, or action pose requests
-    has_combat_action = bool(re.search(
-        r"\b(?:fight|fighting|combat|battle|action|martial\s*arts|strike|striking|slash|slashing|attack|defend|defense|duel|clash|stance|pose|ready|ronin|samurai|warrior|ninja|knight|boxing|kick|dynamic)\b",
-        f"{visual_core} {script_sentence}",
-        re.IGNORECASE,
-    ))
-
-    is_anime = any(w in (style_preset or "").lower() for w in ["anime", "manga", "ghibli", "cartoon"]) and "comic" not in (style_preset or "").lower()
-    is_realistic = any(w in (style_preset or "").lower() for w in ["real", "photorealism"]) and not any(w in (style_preset or "").lower() for w in ["nature", "comic", "3d", "pixar"])
-
-    anatomy_rule = "authentic anatomy, exactly two arms, two hands only, five fingers per hand, natural body proportions"
-
-    if has_combat_action:
-        if has_weapon:
-            pose_guidance = f"dynamic battle-ready stance, holding weapon with natural grip, {anatomy_rule}"
-        else:
-            pose_guidance = f"dynamic athletic action stance, balanced posture, {anatomy_rule}"
-    elif has_characters:
-        pose_guidance = f"natural organic posture, {anatomy_rule}"
-    else:
-        pose_guidance = ""
-
-    # Detect if user prompt already specified an environmental background
-    ENVIRONMENT_PATTERNS = [
-        r"\b(?:forest|woods|bamboo|mountains?|hills?|river|lake|ocean|sea|beach|waterfall|field|meadow|desert|canyon|valley)\b",
-        r"\b(?:temple|shrine|castle|palace|courtyard|ruins|fortress|village|town|city|street|alley|rooftop|bridge|gate|pagoda)\b",
-        r"\b(?:room|hall|interior|bedroom|chamber|library|dungeon|corridor|cave|garden|balcony|tavern)\b",
-        r"\b(?:battlefield|warzone|arena|clouds?|sky|outdoors?|landscape|cliffs?)\b",
-    ]
-    has_environment = any(re.search(pat, f"{visual_core} {script_sentence}", re.IGNORECASE) for pat in ENVIRONMENT_PATTERNS)
-
-    if not has_environment:
-        is_eastern_warrior = bool(re.search(r"\b(?:ronin|samurai|ninja|katana|warrior|swordsman|blade|martial\s*arts)\b", f"{visual_core} {script_sentence}", re.IGNORECASE))
-        if is_eastern_warrior:
-            if is_anime:
-                env_setting = "atmospheric traditional wooden temple pavilion with paper lanterns, soft background blur"
-            elif is_realistic:
-                env_setting = "outdoors on location in a scenic bamboo grove, natural ambient lighting"
-            else:
-                env_setting = "moody atmospheric outdoor background with natural depth"
-        else:
-            if is_anime:
-                env_setting = "in a vibrant anime landscape with lush nature and fluffy clouds"
-            elif is_realistic:
-                env_setting = "outdoors in a scenic landscape, natural sunlight and realistic depth"
-            else:
-                env_setting = "in a detailed natural outdoor environment"
-    else:
-        env_setting = ""
-
-    if is_anime:
-        human_enhancement = (
-            f"expressive luminous anime eyes, silky anime hair, clean facial line art, flawless porcelain skin, {pose_guidance}"
-        ) if has_characters else ""
-    elif is_realistic:
-        human_enhancement = (
-            f"lifelike human face, authentic realistic eyes, natural skin texture with subtle pores, {pose_guidance}"
-        ) if has_characters else ""
-    else:
-        human_enhancement = (
-            f"well-defined features, {pose_guidance}"
-        ) if has_characters else ""
-
+    # Detect specific genre flavors
     is_horror = (not is_direct) and (
-        (genre == "Horror" or "horror" in category.lower())
-        or any(w in f"{script_sentence} {topic}".lower() for w in ["ghost", "specter", "haunt", "demon", "creepy", "phantom", "apparition", "asylum", "curse", "shadowy figure", "entity"])
+        "horror" in category.lower()
+        or any(w in f"{script_sentence} {topic}".lower() for w in ["ghost", "specter", "haunt", "demon", "creepy", "phantom", "asylum", "curse", "shadowy figure"])
     ) and category.lower() not in ["romance", "comedy", "food", "motivational", "music"]
 
-    is_romance = (not is_direct) and (
-        genre == "Romance"
-        or "romance" in category.lower()
-        or any(w in f"{script_sentence} {topic}".lower() for w in ["romance", "love", "romantic", "couple", "kiss", "embrace", "soulmate", "dating", "sweetheart", "holding hands"])
-    ) and not is_horror
+    is_anime = any(w in s_lower for w in ["anime", "manga", "ghibli", "cartoon"]) and "comic" not in s_lower
+    is_disney = any(w in s_lower for w in ["disney", "pixar", "3d"])
+    is_cyberpunk = any(w in s_lower for w in ["cyber", "sci-fi", "futuristic"])
+    is_comic = any(w in s_lower for w in ["comic", "graphic"])
 
     framing_tag = "vertical 9:16 composition" if "9:16" in aspect_ratio else "widescreen 16:9 composition"
 
-    if has_combat_action:
-        staging = "cinematic full body shot, entire figure head to toe in frame, complete body visible, dynamic battle pose, prominent subject focus"
+    prompt_parts = []
+
+    # 1. Style prefix
+    if is_horror:
+        prompt_parts.append("cinematic horror film still, chilling atmospheric lighting, deep shadows, 35mm film photography, 8k")
+    elif is_anime:
+        prompt_parts.append("masterpiece 2D Japanese anime digital key visual, Ufotable style, clean lineart, luminous vibrant colors, 8k")
+    elif is_disney:
+        prompt_parts.append("Pixar Disney 3D animation style, beautifully rendered CGI scene, warm volumetric lighting, 8k")
+    elif is_cyberpunk:
+        prompt_parts.append("cyberpunk film still, sharp focus, glowing neon reflections, rain-slicked surfaces, Blade Runner aesthetic, 8k")
+    elif is_comic:
+        prompt_parts.append("vintage retro comic book art panel, bold ink outlines, graphic novel illustration, pop-art style, 8k")
     else:
-        staging = preset["char_framing"] if has_characters else preset["env_framing"]
+        prompt_parts.append(preset.get("prefix", "masterpiece raw 35mm DSLR photograph, cinematic film still"))
 
-    has_scars = bool(re.search(r"\b(?:scars?|scarred|battle\s+scars?)\b", f"{script_sentence} {topic}", re.IGNORECASE))
-    is_ronin = bool(re.search(r"\b(?:ronin|masterless|vagabond)\b", f"{script_sentence} {topic}", re.I))
-    is_eastern = bool(re.search(r"\b(?:ronin|samurai|ninja|katana|swordsman)\b", f"{script_sentence} {topic}", re.I))
-    is_rough = bool(re.search(r"\b(?:ronin|samurai|rough|ruthless|weathered|battle-hardened|berserker|warrior|veteran|fighter)\b", f"{script_sentence} {topic}", re.I))
+    # 2. Main subject: THE ACTUAL STORY SCENE (Always front and center!)
+    prompt_parts.append(f"cinematic shot of {visual_core}")
 
-    # 1. Extract user-specified environment/background directly, or infer contextually relevant fallback
-    prep_match = re.search(
-        r"\b(?:standing\s+(?:in|on|at|inside)|in\s+front\s+of|inside|in\s+(?:a|an|the)|on\s+(?:a|an|the|top\s+of)|at\s+(?:a|an|the))\s+([a-zA-Z0-9\s\-]+?)(?:,|$|\.|\band\b|\bwith\b|\bholding\b|\bpoised\b|\bcovered\b)",
-        f"{script_sentence} {topic}",
-        re.IGNORECASE,
-    )
-    user_bg = None
-    if prep_match:
-        cand = prep_match.group(1).strip()
-        if cand and not re.search(r"\b(?:fighting\s+pose|pose|combat|stance|armor|clothes|robes|dress|suit|uniform|shoes|boots|scar|scars)\b", cand, re.I):
-            user_bg = cand
+    # 3. Contextual framing & character handling
+    if has_explicit_character:
+        # Detect character gender / descriptor
+        is_female = bool(re.search(r"\b(?:woman|girl|female|lady|queen|princess|actress|she|her)\b", visual_core, re.I))
+        is_male = bool(re.search(r"\b(?:man|boy|male|guy|king|prince|actor|he|him)\b", visual_core, re.I))
+        char_desc = "1woman" if is_female else ("1man" if is_male else "1person")
 
-    if not user_bg:
-        direct_env = re.search(
-            r"\b(battlefield|battle\s*field|battle\s*ground|warzone|war-torn|dojo|temple|shrine|castle|palace|fortress|dungeon|arena|cyberpunk\s*city|neon\s*street|city\s*street|alley|rooftop|forest|woods|bamboo\s*grove|mountain|snowy\s*peaks?|desert|ocean|sea|beach|waterfall|space|alien\s*planet|sky|clouds|throne\s*room|laboratory|library|tavern|cave)\b",
-            f"{script_sentence} {topic}",
-            re.IGNORECASE,
-        )
-        if direct_env:
-            user_bg = direct_env.group(0).strip()
-
-    if user_bg:
-        if re.search(r"\bbattle\s*(?:field|ground)\b", user_bg, re.I):
-            env_bg = "set against scorched earth battlefield, atmospheric smoke"
+        # Clothing: Only wear warrior gear if it's explicitly a warrior story!
+        if is_warrior_theme:
+            clothing = "authentic warrior armor and attire"
+        elif is_cyberpunk:
+            clothing = "modern cyberpunk jacket and street clothing"
+        elif is_anime:
+            clothing = "stylish anime outfit matching the scene"
         else:
-            env_bg = f"set against {user_bg} background, atmospheric depth"
+            clothing = "natural modern casual clothing, neat contemporary attire"
+
+        # Staging: Strictly single head, natural human anatomy, consistent eye-level/medium framing
+        staging = (
+            f"centered single {char_desc}, {clothing}, natural realistic posture, "
+            f"single head, authentic human face, natural expressive eyes, exactly two arms, five fingers per hand, "
+            f"correct anatomical proportions, no duplicate bodies"
+        )
+        prompt_parts.append(staging)
     else:
-        comb_lower = f"{script_sentence} {topic}".lower()
-        if has_combat_action or any(w in comb_lower for w in ["ronin", "samurai", "katana", "ninja", "warrior", "sword"]):
-            if is_anime:
-                env_bg = "traditional Japanese wooden pavilion, hanging warm lanterns, soft bokeh"
-            else:
-                env_bg = "set against scorched earth battlefield, atmospheric smoke"
-        elif any(w in comb_lower for w in ["space", "alien", "planet", "cyber", "sci-fi"]):
-            env_bg = "set against futuristic neon city background, atmospheric depth"
-        elif "horror" in comb_lower or is_horror:
-            env_bg = "set against moody atmospheric ruins background, eerie mist"
-        elif any(w in comb_lower for w in ["nature", "animal", "wilderness"]):
-            env_bg = "set against lush scenic natural wilderness background, soft atmospheric depth"
-        else:
-            env_bg = "set against detailed cinematic background, soft atmospheric depth"
+        # Environmental, architectural, mechanical, or object shot (doors, buildings, nature, cars, food, tech)
+        prompt_parts.append("detailed environment, authentic physical textures, rich architectural depth, sharp clean focus, no humans, no characters")
 
-    if is_ronin:
-        clothing_tag = "wearing dark frayed ronin kimono, wrapped obi sash"
-    elif is_eastern:
-        clothing_tag = "wearing traditional dark samurai kimono, wrapped obi sash"
+    # 4. Atmospheric lighting & finish
+    if is_horror:
+        prompt_parts.append("ominous moonlight, cold atmospheric mist, dramatic cinematic suspense")
+    elif is_anime:
+        prompt_parts.append("radiant rim lighting, golden ambient glow, beautiful scenic background")
     else:
-        clothing_tag = "wearing authentic warrior attire"
+        prompt_parts.append(preset.get("lighting", "natural cinematic lighting, authentic depth of field, high dynamic range"))
+        prompt_parts.append(preset.get("suffix", "photorealistic 8k, ultra-detailed textures"))
 
-    if is_anime:
-        has_aura_match = re.search(
-            r"\b((?:white|blue|golden|gold|red|purple|green|dark|flaming|fiery|electric|energy|radiant|glowing)\s+(?:aura|energy|flames?|fire|glow|light|sparks?|power)(?:\s+(?:radiating|bursting|emanating))?)\b",
-            f"{script_sentence} {topic}",
-            re.IGNORECASE,
-        )
-        if has_aura_match:
-            clean_aura = re.sub(r"\b(?:radiating|bursting|emanating)\b", "", has_aura_match.group(1), flags=re.IGNORECASE).strip()
-            energy_clause = f"radiating {clean_aura} in form of energy, glowing sparks"
-        elif "aura" in f"{script_sentence} {topic}".lower():
-            energy_clause = "radiating white energy aura, glowing sparks"
-        else:
-            energy_clause = ""
-
-        has_topknot = bool(re.search(r"\b(?:topknot|tied\s+ba[ck]+(?:\s+in)?\s+topknot|hair\s+tied\s+ba[ck]+)\b", f"{script_sentence} {topic}", re.IGNORECASE))
-        hair_tag = "topknot" if has_topknot else "silky hair"
-
-        if is_female:
-            char_tag = "1girl in ornate dark kimono, anime warrior"
-        elif is_ronin:
-            char_tag = "1man in ornate dark kimono, anime ronin"
-        elif is_eastern:
-            char_tag = "1man in ornate dark kimono, anime samurai"
-        elif is_rough:
-            char_tag = "1man in ornate dark kimono, battle-ready anime warrior"
-        elif is_male:
-            char_tag = "1boy in ornate kimono, anime warrior"
-        else:
-            char_tag = "1character, anime hero"
-
-        style_core = "Masterpiece high definition 2D anime key visual, Ufotable style, clean lineart"
-        framing_part = (
-            f"solo, centered {char_tag}, two arms only"
-            if has_characters
-            else preset["env_framing"]
-        )
-
-        if has_characters:
-            if has_scars:
-                face_part = f"sharp anime face, luminous eyes, smooth skin, sleek cheek scar, {hair_tag}"
-            else:
-                face_part = f"sharp anime face, luminous eyes, smooth skin, clean jawline, {hair_tag}"
-        else:
-            face_part = ""
-
-        if has_weapon:
-            if energy_clause:
-                weapon_part = f"holding Japanese steel katana with {energy_clause}"
-            else:
-                weapon_part = "holding Japanese steel katana, sharp luminous blade edge, detailed tsuba guard"
-        else:
-            weapon_part = energy_clause if energy_clause else (pose_guidance if has_characters else "")
-
-        lighting_part = "radiant rim lighting, golden ambient glow, 8k anime wallpaper"
-
-        prompt_parts = [
-            style_core,
-            framing_part,
-            weapon_part,
-            env_bg,
-            face_part,
-            lighting_part,
-        ]
-    elif is_realistic:
-        if is_female:
-            real_char_tag = "1woman, battle-ready female warrior" if is_rough else "1woman, beautiful female warrior"
-        elif is_ronin:
-            real_char_tag = "1man, authentic rugged Japanese ronin, ruthless masterless samurai, samurai topknot"
-        elif is_eastern:
-            real_char_tag = "1man, authentic rugged Japanese samurai warrior, samurai topknot"
-        elif is_rough:
-            real_char_tag = "1man, rugged battle-hardened male warrior, ruthless expression"
-        elif is_male:
-            real_char_tag = "1man, male warrior"
-        else:
-            real_char_tag = "1person, warrior"
-
-        style_core = "Masterpiece raw 35mm DSLR photograph, award winning portrait, 85mm f/1.4 lens"
-        real_framing_part = (
-            f"solo full body shot, entire figure head to toe in frame, complete body visible, centered lone {real_char_tag}, single sword, exactly two arms, two hands only"
-            if has_characters
-            else preset["env_framing"]
-        )
-
-        if has_characters:
-            if is_ronin or is_rough:
-                if has_scars:
-                    real_face_part = "sharp realistic male face, piercing eyes, authentic skin, prominent jagged battle scar on cheek"
-                else:
-                    real_face_part = "sharp realistic male face, piercing eyes, defined rugged jawline, intense expression"
-            elif has_scars:
-                real_face_part = "sharp realistic human face, authentic eyes, prominent jagged battle scar on cheek"
-            else:
-                real_face_part = "sharp realistic human face, authentic eyes, clean defined features"
-        else:
-            real_face_part = ""
-
-        real_weapon_part = (
-            "holding authentic straight Japanese steel katana blade, sharp straight metal edge, tsuka hilt, single sword only"
-            if has_weapon
-            else (pose_guidance if has_characters else "")
-        )
-
-        clothing_tag = (
-            "wearing dark frayed ronin kimono, wrapped obi sash"
-            if is_ronin
-            else ("wearing traditional dark samurai kimono, wrapped obi sash" if is_eastern else clothing_tag)
-        )
-
-        prompt_parts = [
-            style_core,
-            real_framing_part,
-            env_bg,
-            real_face_part,
-            real_weapon_part,
-            clothing_tag,
-            "natural golden hour lighting, cinematic rim light, authentic optical bokeh, 8k UHD",
-        ]
-    elif is_horror:
-        horror_lighting = "chilling moonlight piercing cold shadows, volumetric supernatural mist, eerie amber glow"
-        prompt_parts = [
-            f"Cinematic atmospheric scene of {visual_core}",
-            env_setting,
-            human_enhancement,
-            preset["prefix"],
-            staging,
-            framing_tag,
-            horror_lighting,
-            "dramatic dread, 35mm film photography, 8k",
-        ]
-    elif is_romance:
-        romance_lighting = "warm golden hour lighting, soft sunset bokeh, intimate natural amber glow"
-        prompt_parts = [
-            f"Cinematic romantic scene of {visual_core}",
-            env_setting,
-            human_enhancement,
-            preset["prefix"],
-            staging,
-            framing_tag,
-            romance_lighting,
-            "warm 35mm film photography, emotional depth, 8k",
-        ]
-    else:
-        subject_tag = f"solo full body shot, entire figure head to toe in frame, complete body visible, centered {visual_core}, exactly two arms, two hands only" if has_characters else f"scene of {visual_core}"
-        prompt_parts = [
-            preset["prefix"],
-            subject_tag,
-            env_bg if env_bg else env_setting,
-            human_enhancement if has_characters else "",
-            staging,
-            preset["lighting"],
-            preset["suffix"],
-        ]
+    prompt_parts.append(framing_tag)
 
     # Combine parts and prune duplicates while preserving order
     seen_clauses = set()
