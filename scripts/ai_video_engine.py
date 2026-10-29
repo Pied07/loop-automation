@@ -1026,16 +1026,55 @@ class AIVideoEngine:
 
         vf_str = ",".join(overlay_filters)
 
+        # Locate persistent brand watermark asset to pin statically onto bottom-right of video
+        wm_candidates = [
+            ROOT_DIR / "public" / "assets" / "watermark_gemini_accent.png",
+            ROOT_DIR / "scripts" / "assets" / "watermark_gemini_accent.png",
+            ROOT_DIR / "public" / "assets" / "watermark_gemini_white.png",
+            ROOT_DIR / "scripts" / "assets" / "watermark_gemini_white.png",
+        ]
+        wm_path = None
+        for cand in wm_candidates:
+            if cand.exists():
+                wm_path = cand
+                break
+
+        def _build_v_filter(sub_filters: str, wm_input_idx: Optional[int]) -> str:
+            """Constructs FFmpeg video filter: renders subtitles, then pins watermark statically at bottom-right."""
+            if wm_input_idx is not None:
+                if sub_filters:
+                    return (
+                        f"[0:v]{sub_filters}[v_subs];"
+                        f"[{wm_input_idx}:v]scale=190:-1[wm];"
+                        f"[v_subs][wm]overlay=x=main_w-overlay_w-36:y=main_h-overlay_h-48[vout]"
+                    )
+                else:
+                    return (
+                        f"[{wm_input_idx}:v]scale=190:-1[wm];"
+                        f"[0:v][wm]overlay=x=main_w-overlay_w-36:y=main_h-overlay_h-48[vout]"
+                    )
+            else:
+                if sub_filters:
+                    return f"[0:v]{sub_filters}[vout]"
+                else:
+                    return "[0:v]null[vout]"
+
         is_music_category = (meta.get("category") == "Music")
 
         if is_music_category:
             # Music category: complete song with singing vocals and instruments synthesized with ML from scratch
-            filter_complex = f"[0:v]{vf_str}[vout];[1:a]volume=1.0[aout]"
+            wm_idx = 2 if wm_path else None
+            v_filter = _build_v_filter(vf_str, wm_idx)
+            filter_complex = f"{v_filter};[1:a]volume=1.0[aout]"
             cmd = [
                 str(FFMPEG_BIN),
                 "-y",
                 "-i", str(video_track_mp4),
                 "-i", str(audio_path),
+            ]
+            if wm_path:
+                cmd.extend(["-i", str(wm_path)])
+            cmd.extend([
                 "-filter_complex", filter_complex,
                 "-map", "[vout]",
                 "-map", "[aout]",
@@ -1047,7 +1086,7 @@ class AIVideoEngine:
                 "-movflags", "+faststart",
                 "-t", f"{total_duration:.2f}",
                 str(output_mp4),
-            ]
+            ])
         else:
             # For all other categories: Synthesize genre-specific background music with ML from scratch every time!
             bg_music_wav = audio_path.parent / f"ml_bg_music_{int(time.time())}.wav"
@@ -1068,8 +1107,10 @@ class AIVideoEngine:
             if has_bg_music:
                 # Speech narration voiceover at volume=1.00
                 # Background music ducked to low volume=0.08 (never louder than the voice!) with smooth 2s fade out
+                wm_idx = 3 if wm_path else None
+                v_filter = _build_v_filter(vf_str, wm_idx)
                 filter_complex = (
-                    f"[0:v]{vf_str}[vout];"
+                    f"{v_filter};"
                     f"[1:a]volume=1.0,apad=whole_dur={total_duration:.2f}[speech];"
                     f"[2:a]volume=0.08,afade=t=out:st={max(0.1, total_duration - 2):.2f}:d=2[bgm];"
                     f"[speech][bgm]amix=inputs=2:duration=first:dropout_transition=2[aout]"
@@ -1080,6 +1121,10 @@ class AIVideoEngine:
                     "-i", str(video_track_mp4),
                     "-i", str(audio_path),
                     "-i", str(bg_music_wav),
+                ]
+                if wm_path:
+                    cmd.extend(["-i", str(wm_path)])
+                cmd.extend([
                     "-filter_complex", filter_complex,
                     "-map", "[vout]",
                     "-map", "[aout]",
@@ -1091,14 +1136,20 @@ class AIVideoEngine:
                     "-movflags", "+faststart",
                     "-t", f"{total_duration:.2f}",
                     str(output_mp4),
-                ]
+                ])
             else:
-                filter_complex = f"[0:v]{vf_str}[vout];[1:a]volume=1.0,apad=whole_dur={total_duration:.2f}[aout]"
+                wm_idx = 2 if wm_path else None
+                v_filter = _build_v_filter(vf_str, wm_idx)
+                filter_complex = f"{v_filter};[1:a]volume=1.0,apad=whole_dur={total_duration:.2f}[aout]"
                 cmd = [
                     str(FFMPEG_BIN),
                     "-y",
                     "-i", str(video_track_mp4),
                     "-i", str(audio_path),
+                ]
+                if wm_path:
+                    cmd.extend(["-i", str(wm_path)])
+                cmd.extend([
                     "-filter_complex", filter_complex,
                     "-map", "[vout]",
                     "-map", "[aout]",
@@ -1110,18 +1161,23 @@ class AIVideoEngine:
                     "-movflags", "+faststart",
                     "-t", f"{total_duration:.2f}",
                     str(output_mp4),
-                ]
+                ])
 
         res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
         if res.returncode != 0:
+            fb_inputs = ["-i", str(video_track_mp4), "-i", str(audio_path)]
+            if wm_path is not None:
+                fb_inputs += ["-i", str(wm_path)]
+                fb_v_filter = _build_v_filter(vf_str, 2)
+            else:
+                fb_v_filter = _build_v_filter(vf_str, None)
             cmd_fb = [
                 str(FFMPEG_BIN),
                 "-y",
-                "-i", str(video_track_mp4),
-                "-i", str(audio_path),
-                "-vf", vf_str,
-                "-map", "0:v",
-                "-map", "1:a",
+                *fb_inputs,
+                "-filter_complex", f"{fb_v_filter};[1:a]volume=1.0[aout]",
+                "-map", "[vout]",
+                "-map", "[aout]",
                 "-c:v", "libx264",
                 "-preset", "veryfast",
                 "-pix_fmt", "yuv420p",
@@ -1397,18 +1453,7 @@ class AIVideoEngine:
                     style_preset=style_preset,
                 )
 
-                        # Ensure Gemini Accent watermark is permanently applied to every scene visual
-            try:
-                from scripts.watermark_engine import watermark_file
-                watermark_file(img_file, output_path=img_file, watermark_style="gemini_accent", position="bottom-right")
-            except Exception:
-                try:
-                    from watermark_engine import watermark_file
-                    watermark_file(img_file, output_path=img_file, watermark_style="gemini_accent", position="bottom-right")
-                except Exception:
-                    pass
-
-            # Render motion clip with selected slideshow animation style
+            # Render motion clip with selected slideshow animation style (watermark is overlaid statically in final composite)
             self._render_scene_clip(img_file, cur_scene_dur, clip_file, motion_type=idx, animation_style=animation_style)
             if clip_file.exists():
                 scene_clips.append(clip_file)

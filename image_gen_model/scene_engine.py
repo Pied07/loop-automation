@@ -434,6 +434,7 @@ class StorySceneEngine:
         negative_prompt: Optional[str] = None,
         steps: Optional[int] = None,
         guidance_scale: Optional[float] = None,
+        add_watermark: bool = True,
     ) -> Optional[Image.Image]:
         """
         Main entry point for generating authentic scene visuals.
@@ -557,16 +558,17 @@ class StorySceneEngine:
         if target_resolution and (processed.width != target_resolution[0] or processed.height != target_resolution[1]):
             processed = processed.resize(target_resolution, Image.Resampling.LANCZOS)
 
-        # Apply Gemini-style brand watermark (light colored, semi-transparent)
-        try:
-            from scripts.watermark_engine import apply_watermark
-            processed = apply_watermark(processed, watermark_style="gemini", position="bottom-right")
-        except Exception:
+        # Apply Gemini-style brand watermark (light colored, semi-transparent) if enabled
+        if add_watermark:
             try:
-                from watermark_engine import apply_watermark
+                from scripts.watermark_engine import apply_watermark
                 processed = apply_watermark(processed, watermark_style="gemini", position="bottom-right")
             except Exception:
-                pass
+                try:
+                    from watermark_engine import apply_watermark
+                    processed = apply_watermark(processed, watermark_style="gemini", position="bottom-right")
+                except Exception:
+                    pass
 
         # Save to disk if requested
         if output_path:
@@ -594,6 +596,7 @@ def generate_scene_for_script(
     target_wh: Optional[Tuple[int, int]] = (1080, 1920),
     colab_gpu_url: Optional[str] = None,
     style_preset: str = "Realism",
+    add_watermark: bool = False,
 ) -> Optional[Image.Image]:
     """
     Convenience bridge for video engines to generate a scene image directly from script text.
@@ -609,6 +612,7 @@ def generate_scene_for_script(
         output_path=output_path,
         target_resolution=target_wh,
         colab_gpu_url=colab_gpu_url,
+        add_watermark=add_watermark,
     )
     return img
 
