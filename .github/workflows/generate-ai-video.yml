@@ -38,9 +38,9 @@ on:
         default: '3'
         type: string
       duration:
-        description: 'Target duration in seconds'
+        description: 'Target duration in seconds (30-300)'
         required: false
-        default: '20'
+        default: '60'
         type: string
       numParts:
         description: 'Total number of parts'

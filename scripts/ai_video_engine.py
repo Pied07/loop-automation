@@ -1200,7 +1200,7 @@ class AIVideoEngine:
         """Main entry point: Generate complete AI animated video with custom scenes, timer, and voice."""
         self.colab_gpu_url = colab_gpu_url.strip() if colab_gpu_url else ""
         num_images = max(1, min(20, int(num_images)))
-        duration = max(60, min(600, int(duration)))
+        duration = max(30, min(300, int(duration)))
         num_parts = max(1, min(5, int(num_parts)))
         part_number = max(1, min(num_parts, int(part_number)))
 
@@ -1482,7 +1482,7 @@ def main():
     parser.add_argument("--script", default="", help="Optional custom script text from editor")
     parser.add_argument("--voice", default="en-US-ChristopherNeural", help="Voice ID")
     parser.add_argument("--num-images", type=int, default=5, help="Number of AI scene images (1-20)")
-    parser.add_argument("--duration", type=int, default=60, help="Target duration in seconds (60-600)")
+    parser.add_argument("--duration", type=int, default=60, help="Target duration in seconds (30-300)")
     parser.add_argument("--num-parts", type=int, default=1, help="Number of parts (1-5)")
     parser.add_argument("--part-number", type=int, default=1, help="Current part number")
     parser.add_argument("--output-dir", default="", help="Output directory")

@@ -2172,7 +2172,7 @@ export async function generateAiVideoAction(params: {
     const captionStyle = params.captionStyle?.trim() || "viral_yellow";
     const animationStyle = params.animationStyle?.trim() || "ken_burns";
     const numImages = params.numImages ? Math.max(1, Math.min(20, Number(params.numImages))) : 5;
-    const duration = params.duration ? Math.max(60, Math.min(600, Number(params.duration))) : 60;
+    const duration = params.duration ? Math.max(30, Math.min(300, Number(params.duration))) : 60;
     const numParts = params.numParts ? Math.max(1, Math.min(5, Number(params.numParts))) : 1;
     const partNumber = params.partNumber ? Math.max(1, Math.min(numParts, Number(params.partNumber))) : 1;
 

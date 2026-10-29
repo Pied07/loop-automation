@@ -104,7 +104,7 @@ async function handleCronPublish(req: NextRequest) {
       const ALL_VOICES = ["en-US-ChristopherNeural", "en-US-JennyNeural", "en-US-GuyNeural", "en-US-AriaNeural", "en-US-BrianNeural", "en-US-EmmaNeural"];
       const ALL_CAPTIONS = ["viral_yellow", "clean_pill", "cinematic", "neon_glow", "soft_shadow_bar"];
       const ALL_STYLES = ["Realism", "Anime", "Disney 3D", "Mecha", "Dark Fantasy", "Retro Comic"];
-      const ALL_DURATIONS = [60, 90, 120, 180, 240, 300]; // 1 minute to 5 minutes
+      const ALL_DURATIONS = [30, 45, 60, 90, 120, 180, 240, 300]; // 30 seconds to 5 minutes
       const ALL_ANIMATIONS = ["ken_burns", "zoom_in", "zoom_out", "pan_down", "pan_up", "pan_horizontal", "pulse_zoom", "random"];
 
       let effectiveCategory = chosenCategory;

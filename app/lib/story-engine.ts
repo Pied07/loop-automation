@@ -859,7 +859,7 @@ export async function generateStoryParts(params: {
   const seedVal = params.seed || (Math.floor(Math.random() * 1000000) + 1);
 
   const rng = createPseudoRandom(seedVal);
-  const clampedDuration = Math.max(30, Math.min(600, duration));
+  const clampedDuration = Math.max(30, Math.min(300, duration));
   const clampedImages = Math.max(1, Math.min(20, numImages));
   const clampedParts = Math.max(1, Math.min(5, numParts));
 

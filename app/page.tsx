@@ -1303,8 +1303,8 @@ export default function Home() {
     if (!aiVoice) {
       return "Please select an AI narrator voice first.";
     }
-    if (!aiDuration || aiDuration < 10 || aiDuration > 600) {
-      return "Please select a video duration timer between 1 minute (60s) and 10 minutes (600s).";
+    if (!aiDuration || aiDuration < 10 || aiDuration > 300) {
+      return "Please select a video duration timer between 30 seconds and 5 minutes (300s).";
     }
     if (!aiNumImages || aiNumImages < 1 || aiNumImages > 20) {
       return "Please select the number of AI scene images (1 to 20).";
@@ -3268,22 +3268,22 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* Timer Slider 1 min (60s) to 10 mins (600s) - Full Length Width */}
+                    {/* Timer Slider 30 sec (30s) to 5 mins (300s) - Full Length Width */}
                     <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid #1e2230', width: '100%' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0' }}>Video Duration (1 to 10 Minutes):</span>
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0' }}>Video Duration (30s to 5 Minutes):</span>
                         <span style={{ fontSize: '12px', fontWeight: 700, color: '#a855f7', background: 'rgba(168,85,247,0.15)', padding: '2px 8px', borderRadius: '4px' }}>
-                          ⏱️ {Math.floor(aiDuration / 60)}m {aiDuration % 60 ? `${aiDuration % 60}s` : '0s'} ({aiDuration}s)
+                          ⏱️ {aiDuration >= 60 ? `${Math.floor(aiDuration / 60)}m ${aiDuration % 60 ? `${aiDuration % 60}s` : '0s'}` : `${aiDuration}s`} ({aiDuration}s)
                         </span>
                       </div>
                       <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
                         {[
+                          { sec: 30, label: "30s" },
                           { sec: 60, label: "1 min" },
+                          { sec: 90, label: "1.5 mins" },
                           { sec: 120, label: "2 mins" },
                           { sec: 180, label: "3 mins" },
                           { sec: 300, label: "5 mins" },
-                          { sec: 420, label: "7 mins" },
-                          { sec: 600, label: "10 mins" },
                         ].map((d) => (
                           <button
                             key={d.sec}
@@ -3307,18 +3307,18 @@ export default function Home() {
                       </div>
                       <input
                         type="range"
-                        min={60}
-                        max={600}
-                        step={15}
+                        min={30}
+                        max={300}
+                        step={10}
                         value={aiDuration}
                         onChange={(e) => setAiDuration(Number(e.target.value))}
                         style={{ width: '100%', cursor: 'pointer', accentColor: '#a855f7', display: 'block' }}
                       />
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#64748b', marginTop: '4px' }}>
+                        <span>30s (Short)</span>
                         <span>1 min (60s)</span>
-                        <span>3 mins (180s)</span>
-                        <span>5 mins (300s)</span>
-                        <span>10 mins (600s - Epic)</span>
+                        <span>2.5 mins (150s)</span>
+                        <span>5 mins (300s - Max)</span>
                       </div>
                     </div>
 
