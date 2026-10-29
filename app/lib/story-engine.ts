@@ -245,17 +245,66 @@ function generateMLSetting(category: string, prompt: string, latentVector: Float
     Trending: ["a high-tech investigative creator studio", "the control room of a viral live-stream event", "an encrypted data center analyzing leaked archives", "a breaking broadcast newsroom at midnight"],
   };
 
-  const modifiers = [
-    "wrapped in perpetual mist and echoing with distant resonance",
-    "where atmospheric pressure drops noticeably with every step",
-    "illuminated only by the hypnotic glow of auxiliary monitors",
-    "untouched by weather or outside observers for decades",
-    "pulsing with high-frequency static and unexplained readings",
-    "standing frozen in time beneath heavy seasonal shadows",
-  ];
+  const categoryModifiers: Record<string, string[]> = {
+    Romance: [
+      "bathed in the warm amber glow of vintage streetlamps",
+      "sheltered from the gentle evening drizzle",
+      "with autumn leaves drifting quietly along the pavement",
+      "where the soft hum of the city faded into comfortable silence",
+      "under the romantic canopy of a starlit evening",
+      "filled with the quiet intimacy of late autumn twilight",
+    ],
+    Adventure: [
+      "wrapped in perpetual mountain mist and ancient silence",
+      "where rugged stone pathways descend into forgotten terrain",
+      "flanked by towering monolithic walls untouched for centuries",
+      "echoing with the distant rumble of subterranean falls",
+    ],
+    Horror: [
+      "cloaked in deep, suffocating shadows",
+      "where temperatures plummet without warning",
+      "holding the eerie silence of an abandoned sanctuary",
+      "where flickering auxiliary bulbs cast erratic silhouettes",
+    ],
+    Action: [
+      "surrounded by towering steel frameworks and driving rain",
+      "where security feeds sweep the perimeter every thirty seconds",
+      "under the harsh glare of tactical floodlights",
+    ],
+    Food: [
+      "filled with the rich aroma of roasting herbs and simmering broth",
+      "where cast iron skillets sizzle over roaring hardwood embers",
+      "celebrating centuries of handcrafted artisan tradition",
+    ],
+    Music: [
+      "tuned to the warm acoustic resonance of polished mahogany",
+      "where vintage vacuum tubes glow in the intimate studio atmosphere",
+      "surrounded by the analog warmth of magnetic tape and brass",
+    ],
+    Comedy: [
+      "where every single automated appliance seemed destined to rebel",
+      "buzzing with the chaotic energy of well-meaning disasters",
+      "teetering on the edge of glorious, well-intentioned pandemonium",
+    ],
+    Motivational: [
+      "under the focused chill of pre-dawn determination",
+      "where champions are forged through quiet, daily sacrifice",
+      "surrounded by the echoing solitude of raw dedication",
+    ],
+    Educational: [
+      "illuminated by the clean, precise beams of optical sensors",
+      "where delicate instruments measure real-time cosmic telemetry",
+      "under the focused illumination of specialized research benches",
+    ],
+    Trending: [
+      "bathed in the electric hum of high-bandwidth digital feeds",
+      "where breaking information streams across synchronized monitors",
+    ],
+  };
 
   const structures = baseStructures[category] || baseStructures["Trending"];
-  return `${rng.choice(structures)} ${rng.choice(modifiers)}`;
+  const chosenMods = categoryModifiers[category] || categoryModifiers["Trending"];
+  return `${rng.choice(structures)} ${rng.choice(chosenMods)}`;
 }
 
 // ─── RICH CATEGORY-SPECIFIC NARRATIVE DATA ────────────────────────────────
@@ -779,49 +828,258 @@ function generateProceduralBeat(
   c2: string,
   setting: string,
   category: string,
-  rng: ReturnType<typeof createPseudoRandom>
+  rng: ReturnType<typeof createPseudoRandom>,
+  stepIdx: number = 0
 ): string {
-  if (category === "Adventure") {
-    const verbs = ["carefully navigated", "surveyed the perimeter of", "closely examined", "illuminated a concealed niche in", "cleared debris from"];
-    const features = ["an ancient stone lintel", "a subterranean fault line", "a network of copper conduit tracks", "a calcified relief carving", "a forgotten drainage sluice", "a weathered surveyor's mark"];
-    const effects = ["noting how the subterranean echoes carried faint vibrations", "realizing the craftsmanship matched no recorded civilization", "as the ambient humidity condensed on their equipment", "finding traces of an earlier expedition that vanished decades ago"];
-    return `${c1} ${rng.choice(verbs)} ${rng.choice(features)} inside ${setting}, ${rng.choice(effects)}.`;
+  const mode = stepIdx % 4;
+
+  if (category === "Romance") {
+    if (mode === 0) {
+      const dialogues = [
+        `'${c1}, I used to think solitude was safety,' ${c2} whispered, 'until I learned what being understood feels like.'`,
+        `'${c2}, promise me we won\\'t let tomorrow undo what we found tonight,' ${c1} said with quiet tenderness.`,
+        `'Every path I ever walked feels like it was quietly leading here to you,' ${c2} murmured gently.`,
+        `'${c1}, you have no idea how long I waited to hear someone say that,' ${c2} smiled softly.`,
+        `'Even if the entire world forgets us,' ${c1} whispered, 'I will remember this exact heartbeat.'`,
+        `'${c2}, stay for just one more moment—let the rain keep falling,' ${c1} said, gently holding their gaze.`,
+      ];
+      return rng.choice(dialogues);
+    } else if (mode === 1) {
+      const actions = [
+        `${c1} reached out gently, letting their fingers brush against ${c2}'s warm hand.`,
+        `${c2} tucked a stray lock of hair behind their ear, their gaze softening as they looked at ${c1}.`,
+        `${c1} took a slow breath, stepping closer as the evening chill drew them together.`,
+        `${c2} rested a comforting hand over ${c1}'s shoulder, letting the peaceful silence speak for them.`,
+        `${c1} offered a reassuring smile, holding ${c2}'s hand with quiet certainty.`,
+        `${c2} leaned in closer, sharing a laugh that made all the distant noise of the city fade away.`,
+      ];
+      return rng.choice(actions);
+    } else if (mode === 2) {
+      const sensory = [
+        "The gentle rhythm of the evening breeze rustled the nearby trees, wrapping them in a private world.",
+        "Streetlights cast long, warm reflections across the pavement as the distant hum of traffic dissolved.",
+        "A comfortable warmth settled between them, clearer and deeper than any spoken words could ever be.",
+        "Raindrops tapped a soft, melodic rhythm against the awnings, shielding them from the outside world.",
+        "The clock tower in the distance chimed midnight, but neither of them made a move to leave.",
+        "Autumn leaves swirled gently through the amber light, marking the passage of hours that felt like seconds.",
+      ];
+      return rng.choice(sensory);
+    } else {
+      const realizations = [
+        `${c1} watched the subtle change in ${c2}'s expression, recognizing a vulnerability rarely shared with anyone else.`,
+        `${c2} looked toward the winding path ahead, realizing that home was no longer a place, but a person.`,
+        `Without exchanging another word, ${c1} and ${c2} shared a glance that bridged years of unspoken longing.`,
+        `${c1} felt an overwhelming sense of peace, knowing that some chance encounters are destined to change everything.`,
+        `${c2} smiled with quiet resolve, silently vowing never to let fear dictate the ending of their story.`,
+      ];
+      return rng.choice(realizations);
+    }
+  } else if (category === "Adventure") {
+    if (mode === 0) {
+      return rng.choice([
+        `'${c2}, take a closer look at this foundation,' ${c1} cautioned, 'the structural masonry is hollow behind here.'`,
+        `'${c1}, check the navigational compass—the magnetic pull has stabilized,' ${c2} reported.`,
+        `'Whatever was sealed inside this passage,' ${c1} warned, 'was locked away for a very specific reason.'`,
+        `'${c2}, we need to secure this anchor line before the tremor causes a collapse,' ${c1} urged.`,
+      ]);
+    } else if (mode === 1) {
+      return rng.choice([
+        `${c1} swept the tactical lantern beam across the subterranean fissure, illuminating calcified strata.`,
+        `${c2} carefully cleared centuries of hardened sediment from the weathered stone lintel.`,
+        `${c1} chipped away a fractured granite seal, revealing a narrow tunnel winding deeper into the rock.`,
+        `${c2} calibrated the digital altimeter as subterranean air currents gusted through the opening.`,
+      ]);
+    } else if (mode === 2) {
+      return rng.choice([
+        "Subterranean echoes carried the faint, rhythmic vibration of rushing water far below the bedrock.",
+        "The ambient temperature plummeted rapidly, condensing moisture against their protective gear.",
+        "A deep geological hum reverberated through the living stone, signaling massive subterranean voids ahead.",
+      ]);
+    } else {
+      return rng.choice([
+        `${c1} and ${c2} paused at the edge of the chasm, realizing they were standing where no human had walked in centuries.`,
+        `${c2} documented the uncataloged markings, certain that this single discovery would rewrite regional archaeology.`,
+      ]);
+    }
   } else if (category === "Horror") {
-    const observations = ["noticed a sudden drop in room temperature", "heard the faint rhythm of deliberate breathing nearby", "watched the shadows lengthen against the natural lighting", "felt an icy draft sweep through the sealed doorway", "spotted faint claw indentations along the wooden baseboard"];
-    const reactions = ["sending a visceral jolt of adrenaline down their spine", "freezing both of them in absolute, breathless silence", "making the hair on the back of their neck stand on end", "confirming their worst fears that they were not alone"];
-    return `Passing deeper into ${setting}, ${c2} ${rng.choice(observations)}, ${rng.choice(reactions)}.`;
+    if (mode === 0) {
+      return rng.choice([
+        `'${c1}, tell me you heard that too,' ${c2} whispered, barely breathing.`,
+        `'${c2}, don\\'t look toward the corridor ceiling,' ${c1} warned in a trembling tone.`,
+        `'We need to find the exit before the auxiliary generator cuts out,' ${c2} urged quietly.`,
+      ]);
+    } else if (mode === 1) {
+      return rng.choice([
+        `${c1} reached for the door handle, freezing as a muffled scratching originated from within the wall.`,
+        `${c2} raised the flashlight beam toward the corner, watching the darkness swallow the light entirely.`,
+        `${c1} backed slowly toward the threshold, eyes locked on the rhythmic breathing shadow ahead.`,
+      ]);
+    } else if (mode === 2) {
+      return rng.choice([
+        "An icy draft swept through the sealed chamber, extinguishing the faint amber filaments in the bulbs.",
+        "The unnatural silence became suffocating, broken only by the deliberate scrape of metal on concrete.",
+        "A sudden drop in temperature turned their breath into white mist in the enclosed space.",
+      ]);
+    } else {
+      return rng.choice([
+        `${c1} felt a visceral jolt of adrenaline down their spine, confirming their worst fear: they were not alone.`,
+        `${c2} gripped ${c1}'s arm in breathless terror as the realization set in that something was stalking them.`,
+      ]);
+    }
   } else if (category === "Action") {
-    const moves = ["breached the secondary doorway", "sprinted across the exposed catwalk", "checked the weapon slide and tactical feed", "scanned the heat signatures through the smoke", "secured the perimeter anchor line"];
-    const contexts = ["as emergency klaxons pulsed rhythmically in the ceiling", "while surveillance drones circled aggressively overhead", "matching their breathing to the rapid tempo of the countdown", "with tactical precision honed through years of covert field work"];
-    return `With seconds slipping away, ${c1} ${rng.choice(moves)} inside ${setting}, ${rng.choice(contexts)}.`;
-  } else if (category === "Romance") {
-    const tenderActions = ["paused to admire the quiet glow of twilight", "shared an unspoken glance full of deep understanding", "listened to the gentle rhythm of the rain outside", "reminisced about the chance encounter that brought them together"];
-    const atmospheres = ["feeling as though the rest of the world had melted away", "knowing in their hearts that this evening would change everything", "finding solace in the warm comfort of each other's presence", "cherishing every fragile second before the dawn arrived"];
-    return `Standing together in ${setting}, ${c1} and ${c2} ${rng.choice(tenderActions)}, ${rng.choice(atmospheres)}.`;
+    if (mode === 0) {
+      return rng.choice([
+        `'${c2}, breach the perimeter on three,' ${c1} commanded, checking the chamber.`,
+        `'${c1}, surveillance drones are circling the upper catwalks,' ${c2} alerted through the comms.`,
+      ]);
+    } else if (mode === 1) {
+      return rng.choice([
+        `${c1} vaulted over the barricade, firing a suppression round toward the automated sensor turret.`,
+        `${c2} spliced into the security terminal, bypassing the encrypted perimeter gateway in seconds.`,
+      ]);
+    } else if (mode === 2) {
+      return rng.choice([
+        "Sparks showered from the overhead conduit as high-caliber impacts shattered the concrete pillar.",
+        "Tactical alarms blared across the complex, bathing the metal gantries in flashing amber warning strobes.",
+      ]);
+    } else {
+      return rng.choice([
+        `${c1} and ${c2} coordinated their movement with flawless military precision, maintaining the offensive.`,
+        `With seconds slipping away, ${c1} executed the tactical override just as the reinforcements arrived.`,
+      ]);
+    }
   } else if (category === "Motivational") {
-    const grits = ["pushed through the burning sensation in their lungs", "refocused their mental energy on the ultimate objective", "ignored the rising fatigue that tempted them to slow down", "remembered every single person who said they would never make it"];
-    const triumphs = ["forging an unbreakable standard of excellence", "proving that consistency defeats raw talent every time", "refusing to accept anything less than total victory", "channeling the struggle into pure, unstoppable momentum"];
-    return `Facing the grueling challenge of ${setting}, ${c1} ${rng.choice(grits)}, ${rng.choice(triumphs)}.`;
+    if (mode === 0) {
+      return rng.choice([
+        `'${c2}, remember why we endured every agonizing hour of preparation,' ${c1} said with fierce conviction.`,
+        `'Pain is temporary,' ${c2} declared, 'but the regret of quitting lasts forever.'`,
+      ]);
+    } else if (mode === 1) {
+      return rng.choice([
+        `${c1} took a deep, centering breath, channeling the fatigue into unstoppable kinetic drive.`,
+        `${c2} locked their gaze on the finish line, refusing to yield a single inch to exhaustion.`,
+      ]);
+    } else if (mode === 2) {
+      return rng.choice([
+        "The cold morning air bit into their lungs, but the internal fire burned hotter than any obstacle.",
+        "Every heartbeat echoed like a war drum, driving home the unstoppable momentum of disciplined focus.",
+      ]);
+    } else {
+      return rng.choice([
+        `${c1} realized that the greatest victory wasn't defeating rivals, but mastering their own doubt.`,
+        `Forged through relentless grit, ${c2} proved that unwavering consistency conquers impossible odds.`,
+      ]);
+    }
   } else if (category === "Educational") {
-    const sciences = ["calibrated the optical sensors to eliminate atmospheric distortion", "cross-checked the real-time telemetry against historical baselines", "analyzed the frequency distribution of the unexpected signal", "isolated the thermal variance detected across the test zone"];
-    const insights = ["revealing an intricate mathematical pattern woven into the phenomena", "providing definitive proof for a theory proposed decades earlier", "shedding new light on the fundamental mechanics of the cosmos", "demonstrating that nature often conceals its greatest secrets in plain sight"];
-    return `Working methodically inside ${setting}, ${c1} and ${c2} ${rng.choice(sciences)}, ${rng.choice(insights)}.`;
+    if (mode === 0) {
+      return rng.choice([
+        `'${c2}, look at the spectral anomaly,' ${c1} noted, 'the wavelength matches theoretical predictions.'`,
+        `'${c1}, the sensor telemetry just verified a five-sigma statistical deviation,' ${c2} confirmed.`,
+      ]);
+    } else if (mode === 1) {
+      return rng.choice([
+        `${c1} adjusted the precision laser interferometer, recalibrating the optical resonance cavity.`,
+        `${c2} isolated the anomalous frequency band, filtering background noise from the core signal.`,
+      ]);
+    } else if (mode === 2) {
+      return rng.choice([
+        "Cleanroom monitors displayed clean geometric waveforms confirming the experimental hypothesis.",
+        "The mathematical symmetry revealed in the dataset offered proof for phenomena theorized decades ago.",
+      ]);
+    } else {
+      return rng.choice([
+        `${c1} and ${c2} realized that nature had once again concealed its most profound mechanics in plain sight.`,
+        `This single validated measurement opened up a whole new frontier for modern scientific exploration.`,
+      ]);
+    }
   } else if (category === "Food") {
-    const cooks = ["tasted the slow-simmered emulsion for the final balance of acidity", "adjusted the hearth embers to maintain a constant gentle heat", "scattered freshly crushed sea salt and toasted herbs over the dish", "observed the golden caramelization forming along the edges"];
-    const flavors = ["releasing an intoxicating aroma that filled the entire space", "bringing centuries of culinary tradition into a single sublime bite", "achieving a harmony of textures that delighted every sense", "showcasing the uncompromising standard of genuine artisan craftsmanship"];
-    return `At the heart of ${setting}, ${c1} ${rng.choice(cooks)}, ${rng.choice(flavors)}.`;
+    if (mode === 0) {
+      return rng.choice([
+        `'${c2}, taste this broth reduction,' ${c1} smiled, 'the acidity perfectly balances the rich umami.'`,
+        `'${c1}, the caramelization on this crust is textbook artisan perfection,' ${c2} remarked.`,
+      ]);
+    } else if (mode === 1) {
+      return rng.choice([
+        `${c1} scattered freshly harvested sea salt and toasted herbs over the slow-roasted dish.`,
+        `${c2} adjusted the hardwood hearth embers, maintaining an exact gentle simmer.`,
+      ]);
+    } else if (mode === 2) {
+      return rng.choice([
+        "An intoxicating aroma of roasted garlic, smoked butter, and fresh herbs filled the entire room.",
+        "The satisfying crackle of the wood-fired oven signaled that the crust had reached golden perfection.",
+      ]);
+    } else {
+      return rng.choice([
+        `${c1} and ${c2} plated the final creation, celebrating generations of uncompromising culinary heritage.`,
+        `Every flavor spoke of patience, care, and the transcendent beauty of true handcrafted food.`,
+      ]);
+    }
   } else if (category === "Music") {
-    const melodies = ["tweaked the analog bias control on the master tape deck", "listened to the lush harmonic decay within the acoustic chamber", "blended the warm tube saturation into the rhythm track", "adjusted the vintage microphone positioning by a fraction of an inch"];
-    const resonances = ["capturing a raw emotional resonance that digital plugins could never recreate", "letting the natural reverb of the room wrap around the melody", "creating a sonic atmosphere that pulled the listener straight into the song", "letting the instruments breathe together as one cohesive voice"];
-    return `Late into the night inside ${setting}, ${c2} ${rng.choice(melodies)}, ${rng.choice(resonances)}.`;
+    if (mode === 0) {
+      return rng.choice([
+        `'${c2}, listen to how the analog tape adds body to the vocal track,' ${c1} beamed.`,
+        `'${c1}, let the natural acoustic reverb of this room breathe into the chorus,' ${c2} suggested.`,
+      ]);
+    } else if (mode === 1) {
+      return rng.choice([
+        `${c1} gently turned the vintage tube bias knob, letting the rich second-order harmonics bloom.`,
+        `${c2} adjusted the ribbon microphone angle by a fraction of an inch to capture the air.`,
+      ]);
+    } else if (mode === 2) {
+      return rng.choice([
+        "Warm vacuum tubes glowed softly in the dimly lit control room as the acoustic chords decayed.",
+        "The harmonic resonance enveloped the space, pulling the listener straight into the emotional core.",
+      ]);
+    } else {
+      return rng.choice([
+        `${c1} and ${c2} smiled as the final chord faded, knowing they had captured raw emotional magic on tape.`,
+        `Some melodies do more than entertain—they evoke memories long forgotten.`,
+      ]);
+    }
   } else if (category === "Comedy") {
-    const mishaps = ["tripped over a stray extension cord while trying to look dignified", "watched in horror as the automatic gadget began whistling aggressively", "attempted to fix the loose hinge, only to detach the entire counter", "pretended that the sudden loud explosion was completely intentional"];
-    const punchlines = ["prompting an incredulous stare that spoke a thousand words", "causing nearby onlookers to erupt into uncontrollable giggles", "ensuring that neither of them would ever live down this catastrophe", "sealing their reputation as the most chaotic duo in town"];
-    return `In the middle of ${setting}, ${c1} ${rng.choice(mishaps)}, ${rng.choice(punchlines)}.`;
+    if (mode === 0) {
+      return rng.choice([
+        `'${c2}, on a scale of one to ten, how completely ruined is this plan?' ${c1} sighed.`,
+        `'${c1}, whatever you do, do NOT press the red button on the blender,' ${c2} gasped.`,
+      ]);
+    } else if (mode === 1) {
+      return rng.choice([
+        `${c1} attempted to catch the flying tray, only to slide spectacularly across the freshly waxed floor.`,
+        `${c2} watched in disbelief as the automated gadget began whistling aggressively and shooting steam.`,
+      ]);
+    } else if (mode === 2) {
+      return rng.choice([
+        "Nearby onlookers erupted into uncontrollable giggles as the cascading catastrophe unfolded.",
+        "A puff of harmless white smoke signaled that the gadget had officially conceded defeat.",
+      ]);
+    } else {
+      return rng.choice([
+        `${c1} and ${c2} exchanged a defeated glance before bursting into helpless, tearful laughter.`,
+        `Neither of them would ever live this day down, but at least they made unforgettable memories.`,
+      ]);
+    }
   } else {
-    const cyber = ["monitored the real-time geographic distribution of the incoming traffic", "verified the digital cryptographic certificate across multiple nodes", "isolated the broadcast feed to protect the whistleblower's identity", "compiled the timestamped video evidence into an unalterable package"];
-    const impacts = ["watching the viral wave sweep across social media networks", "knowing that once this information was public, there was no going back", "holding the undeniable receipts that the public had demanded for years", "demonstrating the unprecedented power of decentralized digital journalism"];
-    return `Working under intense pressure inside ${setting}, ${c1} ${rng.choice(cyber)}, ${rng.choice(impacts)}.`;
+    if (mode === 0) {
+      return rng.choice([
+        `'${c2}, verify the cryptographic ledger across secondary verification nodes,' ${c1} instructed.`,
+        `'${c1}, the analytics spike just crossed three million impressions,' ${c2} reported.`,
+      ]);
+    } else if (mode === 1) {
+      return rng.choice([
+        `${c1} monitored the real-time geographic distribution of the breaking broadcast feed.`,
+        `${c2} encrypted the timestamped digital evidence into an unalterable decentralized archive.`,
+      ]);
+    } else if (mode === 2) {
+      return rng.choice([
+        "High-bandwidth telemetry feeds flashed across the dual monitors in rapid succession.",
+        "A viral surge rippled across the social graph, capturing the attention of millions worldwide.",
+      ]);
+    } else {
+      return rng.choice([
+        `${c1} and ${c2} watched the story break, knowing that once this truth went public, nothing could silence it.`,
+        `The undeniable evidence stood validated, demonstrating the unstoppable power of modern digital journalism.`,
+      ]);
+    }
   }
 }
 
@@ -948,6 +1206,30 @@ export async function generateStoryParts(params: {
       if (!clean) return false;
       const sig = clean.toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
       if (globalUsedSignatures.has(sig)) return false;
+
+      // Anti-repetition: Reject if same 4-word opening prefix already used in current part
+      const words = clean.split(/\s+/);
+      if (words.length >= 4) {
+        const prefix = words.slice(0, 4).join(" ").toLowerCase();
+        if (sents.some((prev) => prev.split(/\s+/).slice(0, 4).join(" ").toLowerCase() === prefix)) {
+          return false;
+        }
+      }
+
+      // Anti-repetition: Reject if high word similarity (> 55%) to any sentence in the current part
+      const cleanWordSet = new Set(words.filter((w) => w.length > 3).map((w) => w.toLowerCase()));
+      for (const prev of sents) {
+        const prevWordSet = new Set(prev.split(/\s+/).filter((w) => w.length > 3).map((w) => w.toLowerCase()));
+        if (cleanWordSet.size > 0 && prevWordSet.size > 0) {
+          let common = 0;
+          for (const w of cleanWordSet) {
+            if (prevWordSet.has(w)) common++;
+          }
+          const overlap = common / Math.max(cleanWordSet.size, prevWordSet.size);
+          if (overlap > 0.55) return false;
+        }
+      }
+
       globalUsedSignatures.add(sig);
       sents.push(clean);
       return true;
@@ -1026,7 +1308,7 @@ export async function generateStoryParts(params: {
       }
 
       if (!added) {
-        const proceduralBeat = generateProceduralBeat(c1, c2, setting, effectiveCat, rng);
+        const proceduralBeat = generateProceduralBeat(c1, c2, setting, effectiveCat, rng, stepCounter);
         addSentence(proceduralBeat);
       }
 

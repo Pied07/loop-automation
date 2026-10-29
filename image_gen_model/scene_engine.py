@@ -75,6 +75,9 @@ ASPECT_RATIOS = {
 
 # Industry standard anti-distortion negative prompt prioritizing anatomical integrity & limb correctness
 COMPREHENSIVE_NEGATIVE_PROMPT = (
+    "backwards head, head turned backwards, twisted neck, unnatural neck rotation, reversed head, exorcist twist, broken neck, head facing backward, body facing away with head facing forward, backward facing body with forward facing head, rotated neck, 180 degree head rotation, neck twist, head facing reverse, inverted head, reversed torso, backwards body, "
+    "misaligned eyes, asymmetrical eyes, uneven eyes, uneven pupils, strabismus, crossed eyes, cockeyed, wandering eye, lazy eye, melting eyes, blank eyes, distorted iris, missing pupils, pupil blur, off-axis eyes, distorted eye sockets, one eye higher than the other, deformed anime eyes, asymmetrical pupils, mismatched eye levels, "
+    "stacked characters, totem pole, vertical character stack, stacked bodies, character growing out of shoulder, double body, second body on top, conjoined twins, fused bodies, conjoined limbs, "
     "tribal robes, tribal clothing, barbarian, primitive beads, face paint, primitive attire, head on head, stacked heads, two heads, double head, second head, floating head, neck extension, mutated neck, double chin deformation, stacked torso, double torso, "
     "cropped character, cropped feet, cropped legs, cut off at knees, cut off at waist, out of frame, close-up, zoom-in, macro shot, matte, dull colors, flat shading, washed out, drab lighting, low contrast, "
     "bent sword, crooked sword, warped blade, rubber sword, curved blade, duplicate blade, split blade, double blade, multiple swords, extra swords, extra arms, third arm, 3 arms, arm behind shoulder, extra hands, three hands, distorted face, smudged face, melted face, deformed eyes, crossed eyes, bad eyes, blurry face, messy face, two people, 2 characters, background people, crowd, blank background, plain background, white background, border, frame, margin, parchment, "
@@ -480,6 +483,21 @@ class StorySceneEngine:
         user_neg = f", {negative_prompt.strip()}" if negative_prompt and negative_prompt.strip() else ""
         style_neg = f"{style_negative_prefix.strip().rstrip(',')}, " if style_negative_prefix.strip() else ""
         effective_negative = f"{style_neg}{base_negative}{user_neg}"
+
+        # If scene involves a couple/duo, remove 'two people' from negative prompt so diffusion doesn't conjoin them
+        is_couple_scene = (
+            category.lower() == "romance"
+            or bool(re.search(r"\b(?:two|both|together|couple|pair|duo|side\s+by\s+side|each\s+other|holding\s+hands|hand\s+in\s+hand|shoulders)\b", f"{prompt} {topic}", re.I))
+            or len(re.findall(r"\b[A-Z][a-z]{2,}\b", prompt)) >= 2
+        )
+        if is_couple_scene:
+            effective_negative = re.sub(
+                r"\b(?:two\s+people|2\s+characters|two\s+characters|duplicate\s+person)\b,?\s*",
+                "",
+                effective_negative,
+                flags=re.IGNORECASE,
+            )
+            effective_negative = f"three or more people, 3 people, crowd, extra characters, background crowd, {effective_negative}"
 
         has_scars = bool(re.search(r"\b(?:scars?|scarred|battle\s+scars?)\b", f"{prompt} {topic}", re.I))
         is_rough = bool(re.search(r"\b(?:ronin|samurai|rough|ruthless|weathered|battle-hardened|scarred|scars?)\b", f"{prompt} {topic}", re.I))

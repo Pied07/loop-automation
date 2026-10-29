@@ -14,6 +14,9 @@ export const dynamic = "force-dynamic";
 const LOCAL_DAEMON_URL = "http://127.0.0.1:5055";
 
 const COMPREHENSIVE_NEGATIVE_PROMPT =
+  "backwards head, head turned backwards, twisted neck, unnatural neck rotation, reversed head, exorcist twist, broken neck, head facing backward, body facing away with head facing forward, backward facing body with forward facing head, rotated neck, 180 degree head rotation, neck twist, head facing reverse, inverted head, reversed torso, backwards body, " +
+  "misaligned eyes, asymmetrical eyes, uneven eyes, uneven pupils, strabismus, crossed eyes, cockeyed, wandering eye, lazy eye, melting eyes, blank eyes, distorted iris, missing pupils, pupil blur, off-axis eyes, distorted eye sockets, one eye higher than the other, deformed anime eyes, asymmetrical pupils, mismatched eye levels, " +
+  "stacked characters, totem pole, vertical character stack, stacked bodies, character growing out of shoulder, double body, second body on top, conjoined twins, fused bodies, conjoined limbs, " +
   "tribal robes, tribal clothing, barbarian, primitive beads, face paint, primitive attire, head on head, stacked heads, two heads, double head, second head, floating head, neck extension, mutated neck, double chin deformation, stacked torso, double torso, " +
   "cropped character, cropped feet, cropped legs, cut off at knees, cut off at waist, out of frame, close-up, zoom-in, macro shot, matte, dull colors, flat shading, washed out, drab lighting, low contrast, " +
   "bent sword, crooked sword, warped blade, rubber sword, curved blade, duplicate blade, split blade, double blade, multiple swords, extra swords, extra arms, third arm, 3 arms, arm behind shoulder, extra hands, three hands, distorted face, smudged face, melted face, deformed eyes, crossed eyes, bad eyes, blurry face, messy face, two people, 2 characters, background people, crowd, blank background, plain background, white background, border, frame, margin, parchment, " +
@@ -98,6 +101,16 @@ export async function POST(req: NextRequest) {
     const hasScars = /\b(?:scars?|scarred|battle\s+scars?)\b/i.test(prompt);
     const isRough = /\b(?:ronin|samurai|rough|ruthless|weathered|battle-hardened|scarred|scars?)\b/i.test(prompt);
     let effectiveBaseNegative = baseNegative;
+
+    const isCoupleScene =
+      category.toLowerCase() === "romance" ||
+      /\b(?:two|both|together|couple|pair|duo|side\s+by\s+side|each\s+other|holding\s+hands|hand\s+in\s+hand|shoulders)\b/i.test(prompt) ||
+      (prompt.match(/\b[A-Z][a-z]{2,}\b/g) || []).length >= 2;
+    if (isCoupleScene) {
+      effectiveBaseNegative = effectiveBaseNegative.replace(/\b(?:two\s+people|2\s+characters|two\s+characters|duplicate\s+person)\b,?\s*/gi, "");
+      effectiveBaseNegative = `three or more people, 3 people, crowd, extra characters, background crowd, ${effectiveBaseNegative}`;
+    }
+
     if (hasScars || isRough) {
       if (!isAnime) {
         effectiveBaseNegative = effectiveBaseNegative.replace(/\b(?:scars?|scarred(?:\s+face)?|body\s+scars?|rough\s+skin|weathered\s+face|aged\s+skin)\b,?\s*/gi, "");

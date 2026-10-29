@@ -336,13 +336,40 @@ def synthesize_scene_prompt(
 
     framing_tag = "vertical 9:16 composition" if "9:16" in aspect_ratio else "widescreen 16:9 composition"
 
+    # Detect human presence and character relationships
+    has_explicit_character = any(re.search(pat, visual_core, re.IGNORECASE) for pat in CHARACTER_PATTERNS)
+    has_human_interaction = bool(re.search(
+        r"\b(?:smile|smiled|smiling|laugh|laughed|glance|glanced|gaze|gazes|gazed|look|looked|looking|stare|stared|eyes|eye|face|faces|hand|hands|holding|touch|touched|embrace|kiss|whisper|whispered|confess|confessed|teacup|coffee|shoulders|walked|stepped|reminisce|reminisced|dreams|dream|tears|voice|together|couple|duo|pair|both|each\s+other)\b",
+        visual_core,
+        re.IGNORECASE,
+    ))
+    has_named_person = len(re.findall(r"\b[A-Z][a-z]{2,}\b", visual_core)) >= 1
+    has_characters = has_explicit_character or has_human_interaction or has_named_person
+
+    # Detect couple / two-person interactions vs single person
+    is_couple = (
+        "romance" in category.lower()
+        or bool(re.search(r"\b(?:two|both|together|couple|pair|duo|side\s+by\s+side|each\s+other|hand\s+in\s+hand|holding\s+hands|shared\s+a|locked\s+across|their\s+shoulders)\b", visual_core, re.I))
+        or len(re.findall(r"\b[A-Z][a-z]{2,}\b", visual_core)) >= 2
+        or (bool(re.search(r"\b(?:man|boy|he|him)\b", visual_core, re.I)) and bool(re.search(r"\b(?:woman|girl|she|her)\b", visual_core, re.I)))
+    ) and has_characters
+
+    # Detect if the story is genuinely about warriors/samurai/combat
+    is_warrior_theme = bool(re.search(r"\b(?:warrior|soldier|samurai|ronin|ninja|knight|gladiator|blade|katana|sword|combat|battlefield)\b", f"{visual_core} {topic}", re.I))
+
+    # Detect specific genre flavors
+    is_horror = (not is_direct) and (
+        "horror" in category.lower()
+        or any(w in f"{script_sentence} {topic}".lower() for w in ["ghost", "specter", "haunt", "demon", "creepy", "phantom", "asylum", "curse", "shadowy figure"])
+    ) and category.lower() not in ["romance", "comedy", "food", "motivational", "music"]
+
     prompt_parts = []
 
     # 1. Style prefix
     if is_horror:
         prompt_parts.append("cinematic horror film still, chilling atmospheric lighting, deep shadows, 35mm film photography, 8k")
     elif is_anime:
-        prompt_parts.append("masterpiece 2D Japanese anime digital key visual, Ufotable style, clean lineart, luminous vibrant colors, 8k")
+        prompt_parts.append("masterpiece 2D Japanese anime digital key visual, Ufotable Kyoto Animation style, clean crisp lineart, luminous vibrant colors, beautifully drawn aligned anime eyes, sharp clear pupils, 8k")
     elif is_disney:
         prompt_parts.append("Pixar Disney 3D animation style, beautifully rendered CGI scene, warm volumetric lighting, 8k")
     elif is_cyberpunk:
@@ -356,7 +383,25 @@ def synthesize_scene_prompt(
     prompt_parts.append(f"cinematic shot of {visual_core}")
 
     # 3. Contextual framing & character handling
-    if has_explicit_character:
+    if is_couple:
+        if is_anime:
+            staging = (
+                "romantic anime couple, young man and young woman together side by side, natural graceful posture, "
+                "both characters facing the same natural direction, head and body oriented consistently, "
+                "authentic anatomically correct necks, beautifully drawn faces, perfectly aligned symmetrical anime eyes, "
+                "sharp clear pupils, clear iris, natural gentle expressions, exactly two arms each, five fingers per hand, "
+                "distinct separate bodies, no conjoined limbs, no stacked characters"
+            )
+        else:
+            staging = (
+                "two people, man and woman together side by side, natural realistic posture, "
+                "both characters facing the same natural direction, head and body oriented consistently, "
+                "authentic anatomically correct necks, beautifully rendered faces, perfectly aligned symmetrical eyes, "
+                "sharp clear pupils, authentic facial expressions, exactly two arms each, five fingers per hand, "
+                "distinct separate bodies, no conjoined limbs, no stacked characters"
+            )
+        prompt_parts.append(staging)
+    elif has_characters:
         # Detect character gender / descriptor
         is_female = bool(re.search(r"\b(?:woman|girl|female|lady|queen|princess|actress|she|her)\b", visual_core, re.I))
         is_male = bool(re.search(r"\b(?:man|boy|male|guy|king|prince|actor|he|him)\b", visual_core, re.I))
@@ -373,15 +418,24 @@ def synthesize_scene_prompt(
             clothing = "natural modern casual clothing, neat contemporary attire"
 
         # Staging: Strictly single head, natural human anatomy, consistent eye-level/medium framing
-        staging = (
-            f"centered single {char_desc}, {clothing}, natural realistic posture, "
-            f"single head, authentic human face, natural expressive eyes, exactly two arms, five fingers per hand, "
-            f"correct anatomical proportions, no duplicate bodies"
-        )
+        if is_anime:
+            staging = (
+                f"single anime {char_desc}, {clothing}, natural graceful posture, "
+                f"head and body facing the same natural direction, authentic anatomically correct neck, "
+                f"single head, perfectly aligned symmetrical anime eyes, sharp detailed pupils, clear iris, "
+                f"exactly two arms, five fingers per hand, correct anatomical proportions, no duplicate bodies"
+            )
+        else:
+            staging = (
+                f"centered single {char_desc}, {clothing}, natural realistic posture, "
+                f"head and body facing the same natural direction, authentic anatomically correct neck, "
+                f"single head, perfectly aligned symmetrical eyes, sharp detailed pupils, clear iris, "
+                f"exactly two arms, five fingers per hand, correct anatomical proportions, no duplicate bodies"
+            )
         prompt_parts.append(staging)
     else:
         # Environmental, architectural, mechanical, or object shot (doors, buildings, nature, cars, food, tech)
-        prompt_parts.append("detailed environment, authentic physical textures, rich architectural depth, sharp clean focus, no humans, no characters")
+        prompt_parts.append("detailed environment, authentic physical textures, rich architectural depth, sharp clean focus, scenic view, no humans, no characters")
 
     # 4. Atmospheric lighting & finish
     if is_horror:
