@@ -11,7 +11,7 @@ import subprocess
 import urllib.request
 import urllib.parse
 from pathlib import Path
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional, Union
 
 import numpy as np
 import onnxruntime as ort
