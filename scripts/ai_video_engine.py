@@ -1232,7 +1232,7 @@ class AIVideoEngine:
             scene_text = " ".join(sub_sent)
 
             if build_clean_visual_prompt is not None:
-                visual_prompt = build_clean_visual_prompt(scene_text, cat_clean.lower(), theme["style_prompt"])
+                visual_prompt = build_clean_visual_prompt(scene_text, cat_clean.lower(), theme["style_prompt"], category=cat_clean)
             else:
                 key_tokens = extract_scene_keywords(scene_text)
                 scene_subject = " ".join(key_tokens[:4]) if key_tokens else cat_clean.lower()

@@ -47,7 +47,7 @@ except Exception:
         viral_tagger = None
 
 
-def build_clean_visual_prompt(scene_text: str, fallback_subject: str, style_descriptor: str) -> str:
+def build_clean_visual_prompt(scene_text: str, fallback_subject: str = "", style_descriptor: str = "", category: str = "") -> str:
     """Builds clean, high-impact visual prompts with specialized styling for the requested sceneStyle."""
     clean = re.sub(r"\b(?:Part\s+\d+|Welcome back to Part\s+\d+|Follow for Part\s+\d+|Watch Part\s+\d+|Save this video|follow for more|subscribe|share this|comment below)[^.]*", "", scene_text, flags=re.IGNORECASE)
     clean = re.sub(r"\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|eighteen|twenty|thirty|forty|fifty|hundred|thousand|million)\s+(?:times|doors|days|hours|years|copies|rejections)\b", "", clean, flags=re.IGNORECASE)
@@ -69,9 +69,12 @@ def build_clean_visual_prompt(scene_text: str, fallback_subject: str, style_desc
         if len(setting_part) > 3:
             visual_action = f"{visual_action}, set in {setting_part}"
 
-    is_horror = category.lower() == "horror" or (
-        bool(re.search(r"\b(?:haunted|ghost|demon|creepy|paranormal|nightmare|asylum|spectral|phantom)\b", f"{scene_text} {fallback_subject}", re.IGNORECASE))
-        and category.lower() not in ["romance", "comedy", "food", "motivational", "music"]
+    cat_lower = (category or "").strip().lower()
+    combined_ctx = f"{scene_text} {fallback_subject} {category}".lower()
+    is_horror = cat_lower == "horror" or (
+        bool(re.search(r"\b(?:haunted|ghost|demon|creepy|paranormal|nightmare|asylum|spectral|phantom)\b", combined_ctx, re.IGNORECASE))
+        and cat_lower not in ["romance", "comedy", "food", "motivational", "music"]
+        and not bool(re.search(r"\b(?:romance|comedy|food|motivational|music)\b", combined_ctx, re.IGNORECASE))
     )
     is_realism = bool(re.search(r"realism|photoreal|35mm", style_descriptor, re.IGNORECASE))
     is_anime = bool(re.search(r"anime|manga|ghibli", style_descriptor, re.IGNORECASE))
@@ -1163,7 +1166,8 @@ def generate_story(
             visual_prompt = build_clean_visual_prompt(
                 scene_text,
                 f"{part['c1']} and {part['c2']}, {part['setting']}",
-                scene_style
+                scene_style,
+                category=category,
             )
 
             scenes.append({
