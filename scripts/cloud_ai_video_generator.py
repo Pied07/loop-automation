@@ -40,6 +40,7 @@ SCENE_IMAGES = os.environ.get("SCENE_IMAGES", "").strip()
 COLAB_GPU_URL = os.environ.get("COLAB_GPU_URL", "").strip()
 STYLE_PRESET = os.environ.get("STYLE_PRESET", "Realism").strip()
 CAPTION_STYLE = os.environ.get("CAPTION_STYLE", "viral_yellow").strip()
+ANIMATION_STYLE = os.environ.get("ANIMATION_STYLE", "ken_burns").strip()
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_PAT", "").strip()
 GITHUB_REPO = os.environ.get("GITHUB_REPOSITORY", "Pied07/loop-automation").strip()
 
@@ -228,6 +229,7 @@ def run():
             colab_gpu_url=COLAB_GPU_URL,
             style_preset=STYLE_PRESET,
             caption_style=CAPTION_STYLE,
+            animation_style=ANIMATION_STYLE,
         )
 
         if not result.get("success") or not result.get("videoPath"):

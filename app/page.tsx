@@ -526,6 +526,81 @@ function StyleImageCard({ s, isSelected, onClick }: { s: any, isSelected: boolea
   );
 }
 
+export const ANIMATION_STYLES = [
+  {
+    id: "ken_burns",
+    name: "Ken Burns (Cinematic)",
+    badge: "VIRAL STANDARD",
+    accent: "#ec4899",
+    icon: "🎬",
+    description: "Alternates smooth zooms, epic pullbacks, and vertical gliding pan shots.",
+    animationClass: "anim-ken-burns",
+  },
+  {
+    id: "zoom_in",
+    name: "Slow Focus Push (Zoom In)",
+    badge: "SUSPENSE",
+    accent: "#38bdf8",
+    icon: "🔍",
+    description: "Slow continuous push toward the center subject to heighten focus & tension.",
+    animationClass: "anim-zoom-in",
+  },
+  {
+    id: "zoom_out",
+    name: "Epic Panoramic (Zoom Out)",
+    badge: "REVEAL",
+    accent: "#a855f7",
+    icon: "🔭",
+    description: "Begins up-close on dramatic details and smoothly pulls back to reveal the scene.",
+    animationClass: "anim-zoom-out",
+  },
+  {
+    id: "pan_down",
+    name: "Vertical Glide (Top to Down)",
+    badge: "9:16 SHORTS",
+    accent: "#10b981",
+    icon: "⬇️",
+    description: "Cinematic vertical camera glide from sky to ground — designed for mobile 9:16 vertical video.",
+    animationClass: "anim-pan-down",
+  },
+  {
+    id: "pan_up",
+    name: "Vertical Rise (Bottom to Up)",
+    badge: "ELEVATION",
+    accent: "#06b6d4",
+    icon: "⬆️",
+    description: "Smooth vertical camera rise upward, inspiring awe and grand scale.",
+    animationClass: "anim-pan-up",
+  },
+  {
+    id: "pan_horizontal",
+    name: "Horizon Sweep (Tracking)",
+    badge: "WIDE TRACK",
+    accent: "#f59e0b",
+    icon: "↔️",
+    description: "Horizontal tracking camera sweep across the landscape like a big-budget movie.",
+    animationClass: "anim-pan-horizontal",
+  },
+  {
+    id: "pulse_zoom",
+    name: "Rhythmic Pulse (Energy)",
+    badge: "BEAT SYNC",
+    accent: "#ef4444",
+    icon: "⚡",
+    description: "Subtle rhythmic breathing pulse keeping viewer retention high on dynamic narrative beats.",
+    animationClass: "anim-pulse",
+  },
+  {
+    id: "random",
+    name: "Auto-Cycle / Random Shuffle",
+    badge: "ALL STYLES",
+    accent: "#6366f1",
+    icon: "🎲",
+    description: "Randomly varies moves on each scene. In Cron Auto-Pilot, picks a fresh style every run.",
+    animationClass: "anim-random",
+  },
+];
+
 export default function Home() {
   const [screen, setScreen] = useState<Screen>("home");
   const [signedIn, setSignedIn] = useState(false);
@@ -578,6 +653,39 @@ export default function Home() {
   const [generatedStoryParts, setGeneratedStoryParts] = useState<any[]>([]);
   const [selectedSceneStyle, setSelectedSceneStyle] = useState<string>("Realism");
   const [selectedCaptionStyle, setSelectedCaptionStyle] = useState<string>("viral_yellow");
+  const [selectedAnimationStyles, setSelectedAnimationStyles] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("tvd-selected-animation-styles");
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return ["ken_burns"];
+  });
+
+  const toggleAnimationStyle = (id: string) => {
+    let next: string[];
+    if (id === "random") {
+      next = ["random"];
+    } else {
+      const withoutRandom = selectedAnimationStyles.filter((s) => s !== "random");
+      if (withoutRandom.includes(id)) {
+        next = withoutRandom.length > 1 ? withoutRandom.filter((s) => s !== id) : withoutRandom;
+      } else {
+        next = [...withoutRandom, id];
+      }
+    }
+    setSelectedAnimationStyles(next);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("tvd-selected-animation-styles", JSON.stringify(next));
+    }
+    if (database) {
+      setDoc(doc(database, "app_config", "auto_pilot"), {
+        chosenAnimation: next.join(","),
+        updatedAt: new Date().toISOString(),
+      }, { merge: true }).catch(() => {});
+    }
+  };
   const [generatingSceneIdx, setGeneratingSceneIdx] = useState<number | null>(null);
   const [isGeneratingAllScenes, setIsGeneratingAllScenes] = useState<boolean>(false);
   const [colabGpuUrl, setColabGpuUrl] = useState<string>("");
@@ -1487,6 +1595,7 @@ export default function Home() {
               colabGpuUrl: colabGpuUrl.trim(),
               stylePreset: selectedSceneStyle,
               captionStyle: selectedCaptionStyle,
+              animationStyle: selectedAnimationStyles.join(","),
             }),
           });
           clearInterval(partTimer);
@@ -1829,6 +1938,7 @@ export default function Home() {
           chosenDuration: aiDuration,
           chosenCaption: selectedCaptionStyle,
           chosenSceneStyle: selectedSceneStyle,
+          chosenAnimation: selectedAnimationStyles.join(","),
           updatedAt: new Date().toISOString()
         }, { merge: true });
       }
@@ -3249,6 +3359,177 @@ export default function Home() {
                           ? "✅ Active! Your live website will now synthesize all scenes in 2–3s using your custom trained SDXL LoRA on Google Colab."
                           : "💡 Your ML model is trained on SDXL (6.6 GB), which runs on Google Colab's Tesla T4 GPU. Run Cell 9 in your Colab notebook and paste the trycloudflare.com URL above, or use '📁 Upload Colab Scene' on the scene cards below."}
                       </p>
+                    </div>
+                  </div>
+
+                  {/* 🎬 Slideshow Camera Animation Styles Segment */}
+                  <div style={{ marginTop: '16px', background: '#12141c', padding: '14px 16px', borderRadius: '10px', border: '1px solid #1e2230' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc' }}>
+                            🎬 Slideshow Camera Animation Styles
+                          </span>
+                          <span style={{ fontSize: '10px', fontWeight: 700, color: '#ec4899', background: 'rgba(236,72,153,0.15)', padding: '2px 6px', borderRadius: '4px' }}>
+                            MULTI-SELECT
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '11px', color: '#94a3b8', margin: '3px 0 0' }}>
+                          Select one or multiple animation styles. Scenes cycle through your chosen moves, or choose Random for auto-variety.
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => toggleAnimationStyle("random")}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            border: `1px solid ${selectedAnimationStyles.includes("random") ? '#6366f1' : '#272a38'}`,
+                            background: selectedAnimationStyles.includes("random") ? 'rgba(99,102,241,0.2)' : '#181b24',
+                            color: selectedAnimationStyles.includes("random") ? '#a5b4fc' : '#cbd5e1',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          🎲 Random Mode
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const allExceptRandom = ANIMATION_STYLES.filter((s) => s.id !== "random").map((s) => s.id);
+                            setSelectedAnimationStyles(allExceptRandom);
+                            if (typeof window !== "undefined") {
+                              localStorage.setItem("tvd-selected-animation-styles", JSON.stringify(allExceptRandom));
+                            }
+                          }}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid #272a38',
+                            background: '#181b24',
+                            color: '#cbd5e1',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          ✨ Select All
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Animation Style Cards Grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px', marginTop: '10px' }}>
+                      {ANIMATION_STYLES.map((anim) => {
+                        const isSelected = selectedAnimationStyles.includes(anim.id);
+                        return (
+                          <div
+                            key={anim.id}
+                            onClick={() => toggleAnimationStyle(anim.id)}
+                            style={{
+                              background: isSelected ? 'rgba(236,72,153,0.08)' : '#141722',
+                              border: `1.5px solid ${isSelected ? anim.accent : '#25293a'}`,
+                              borderRadius: '8px',
+                              padding: '10px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              gap: '10px',
+                              alignItems: 'center',
+                              transition: 'all 0.2s ease',
+                              boxShadow: isSelected ? `0 0 12px ${anim.accent}22` : 'none',
+                            }}
+                          >
+                            {/* Live Animated Sample Box */}
+                            <div
+                              style={{
+                                width: '48px',
+                                height: '68px',
+                                borderRadius: '6px',
+                                overflow: 'hidden',
+                                flexShrink: 0,
+                                position: 'relative',
+                                background: '#0a0d14',
+                                border: `1px solid ${isSelected ? anim.accent : '#2e3446'}`,
+                              }}
+                            >
+                              <div
+                                className={anim.animationClass}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  background: 'linear-gradient(135deg, #1e1b4b, #431407, #064e3b)',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  justifyContent: 'center',
+                                  alignItems: 'center',
+                                  fontSize: '18px',
+                                }}
+                              >
+                                {anim.icon}
+                              </div>
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  bottom: '2px',
+                                  right: '2px',
+                                  fontSize: '8px',
+                                  background: 'rgba(0,0,0,0.7)',
+                                  color: '#fff',
+                                  padding: '1px 3px',
+                                  borderRadius: '2px',
+                                }}
+                              >
+                                9:16
+                              </div>
+                            </div>
+
+                            {/* Details & Info */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ fontSize: '11px', fontWeight: 700, color: isSelected ? '#ffffff' : '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {anim.name}
+                                </span>
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => {}}
+                                  style={{ accentColor: anim.accent, cursor: 'pointer' }}
+                                />
+                              </div>
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  fontSize: '9px',
+                                  fontWeight: 700,
+                                  color: anim.accent,
+                                  background: `${anim.accent}22`,
+                                  padding: '1px 5px',
+                                  borderRadius: '3px',
+                                  marginTop: '2px',
+                                }}
+                              >
+                                {anim.badge}
+                              </span>
+                              <p style={{ fontSize: '10px', color: '#94a3b8', margin: '4px 0 0', lineHeight: 1.3 }}>
+                                {anim.description}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#64748b' }}>
+                      <span>
+                        Active: <strong style={{ color: '#f472b6' }}>
+                          {selectedAnimationStyles.includes("random")
+                            ? "Random Shuffle (Alternates every scene)"
+                            : `${selectedAnimationStyles.length} style${selectedAnimationStyles.length > 1 ? 's' : ''} active (${selectedAnimationStyles.map(s => ANIMATION_STYLES.find(a => a.id === s)?.name || s).join(", ")})`}
+                        </strong>
+                      </span>
+                      <span>💡 For Cron Auto-Pilot, random mode randomly selects styles per job.</span>
                     </div>
                   </div>
 

@@ -80,6 +80,7 @@ async function handleCronPublish(req: NextRequest) {
       let chosenDuration = 60;
       let chosenCaption = "viral_yellow";
       let chosenSceneStyle = "Realism";
+      let chosenAnimation = "ken_burns";
 
       if (database) {
         try {
@@ -93,6 +94,7 @@ async function handleCronPublish(req: NextRequest) {
             if (d.chosenDuration) chosenDuration = Number(d.chosenDuration) || 60;
             if (d.chosenCaption) chosenCaption = d.chosenCaption;
             if (d.chosenSceneStyle) chosenSceneStyle = d.chosenSceneStyle;
+            if (d.chosenAnimation) chosenAnimation = d.chosenAnimation;
           }
         } catch {}
       }
@@ -103,11 +105,13 @@ async function handleCronPublish(req: NextRequest) {
       const ALL_CAPTIONS = ["viral_yellow", "clean_pill", "cinematic", "neon_glow", "soft_shadow_bar"];
       const ALL_STYLES = ["Realism", "Anime", "Disney 3D", "Mecha", "Dark Fantasy", "Retro Comic"];
       const ALL_DURATIONS = [60, 90, 120, 180, 240, 300]; // 1 minute to 5 minutes
+      const ALL_ANIMATIONS = ["ken_burns", "zoom_in", "zoom_out", "pan_down", "pan_up", "pan_horizontal", "pulse_zoom", "random"];
 
       let effectiveCategory = chosenCategory;
       let effectiveVoice = chosenVoice;
       let effectiveCaption = chosenCaption;
       let effectiveStyle = chosenSceneStyle;
+      let effectiveAnimation = chosenAnimation;
       let effectiveParts = chosenParts;
       let effectiveDuration = chosenDuration;
 
@@ -116,6 +120,7 @@ async function handleCronPublish(req: NextRequest) {
         effectiveVoice = ALL_VOICES[Math.floor(Math.random() * ALL_VOICES.length)];
         effectiveCaption = ALL_CAPTIONS[Math.floor(Math.random() * ALL_CAPTIONS.length)];
         effectiveStyle = ALL_STYLES[Math.floor(Math.random() * ALL_STYLES.length)];
+        effectiveAnimation = ALL_ANIMATIONS[Math.floor(Math.random() * ALL_ANIMATIONS.length)];
         effectiveDuration = ALL_DURATIONS[Math.floor(Math.random() * ALL_DURATIONS.length)];
         effectiveParts = Math.floor(Math.random() * 5) + 1; // 1 to 5 parts randomly
       }
@@ -149,6 +154,7 @@ async function handleCronPublish(req: NextRequest) {
           voice: effectiveVoice,
           captionStyle: effectiveCaption,
           stylePreset: effectiveStyle,
+          animationStyle: effectiveAnimation,
           numImages: calculatedImages,
           duration: effectiveDuration,
           numParts: effectiveParts,

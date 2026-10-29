@@ -109,6 +109,11 @@ on:
         required: false
         default: 'viral_yellow'
         type: string
+      animationStyle:
+        description: 'Slideshow animation style'
+        required: false
+        default: 'ken_burns'
+        type: string
 
 jobs:
   generate-ai-video:
@@ -173,6 +178,7 @@ jobs:
           COLAB_GPU_URL: ${{ inputs.colabGpuUrl }}
           STYLE_PRESET: ${{ inputs.stylePreset }}
           CAPTION_STYLE: ${{ inputs.captionStyle }}
+          ANIMATION_STYLE: ${{ inputs.animationStyle }}
           APP_URL: ${{ inputs.appUrl != '' && inputs.appUrl || 'https://the-viral-desk.vercel.app' }}
           CLOUDINARY_CLOUD_NAME: ${{ inputs.cloudinaryCloudName != '' && inputs.cloudinaryCloudName || secrets.CLOUDINARY_CLOUD_NAME }}
           CLOUDINARY_API_KEY: ${{ inputs.cloudinaryApiKey != '' && inputs.cloudinaryApiKey || secrets.CLOUDINARY_API_KEY }}

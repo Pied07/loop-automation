@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
     const colabGpuUrl = typeof body.colabGpuUrl === "string" ? body.colabGpuUrl.trim() : "";
     const stylePreset = typeof body.stylePreset === "string" ? body.stylePreset.trim() : "Realism";
     const captionStyle = typeof body.captionStyle === "string" ? body.captionStyle.trim() : "viral_yellow";
+    const animationStyle = typeof body.animationStyle === "string" ? body.animationStyle.trim() : "ken_burns";
 
     const result = await generateAiVideoAction({
       category,
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
       colabGpuUrl,
       stylePreset,
       captionStyle,
+      animationStyle,
     });
 
     return NextResponse.json(result);

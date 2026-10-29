@@ -217,6 +217,14 @@ def main():
         if not out_file.exists():
             raise RuntimeError("ML model completed without outputting an image file.")
 
+        # Apply Gemini-style brand watermark (light colored, semi-transparent)
+        try:
+            from scripts.watermark_engine import watermark_file
+            watermark_file(out_file, output_path=out_file, watermark_style="gemini", position="bottom-right")
+            print("🎨 Applied Gemini-style translucent watermark to generated image.")
+        except Exception as we:
+            print(f"Notice: Watermark overlay notice: {we}")
+
         elapsed = round(time.time() - t0, 2)
         print(f"✅ Native ML Image generated in {elapsed}s: {out_file.stat().st_size} bytes")
 

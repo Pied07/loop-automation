@@ -2143,6 +2143,7 @@ export async function generateAiVideoAction(params: {
   colabGpuUrl?: string;
   stylePreset?: string;
   captionStyle?: string;
+  animationStyle?: string;
 }): Promise<{
   success: boolean;
   cloudMode?: string;
@@ -2169,6 +2170,7 @@ export async function generateAiVideoAction(params: {
     const voice = params.voice?.trim() || "en-US-ChristopherNeural";
     const stylePreset = params.stylePreset?.trim() || "Realism";
     const captionStyle = params.captionStyle?.trim() || "viral_yellow";
+    const animationStyle = params.animationStyle?.trim() || "ken_burns";
     const numImages = params.numImages ? Math.max(1, Math.min(20, Number(params.numImages))) : 5;
     const duration = params.duration ? Math.max(60, Math.min(600, Number(params.duration))) : 60;
     const numParts = params.numParts ? Math.max(1, Math.min(5, Number(params.numParts))) : 1;
@@ -2241,6 +2243,7 @@ export async function generateAiVideoAction(params: {
             colabGpuUrl: params.colabGpuUrl || "",
             stylePreset,
             captionStyle,
+            animationStyle,
           },
         }),
       });
@@ -2307,6 +2310,7 @@ export async function generateAiVideoAction(params: {
       `--voice "${voice.replace(/"/g, "")}"`,
       `--style-preset "${stylePreset.replace(/"/g, "")}"`,
       `--caption-style "${captionStyle.replace(/"/g, "")}"`,
+      `--animation-style "${animationStyle.replace(/"/g, "")}"`,
       `--num-images ${numImages}`,
       `--duration ${duration}`,
       `--num-parts ${numParts}`,

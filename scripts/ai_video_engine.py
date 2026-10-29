@@ -861,24 +861,73 @@ class AIVideoEngine:
 
         return sentences_timing
 
-    def _render_scene_clip(self, img_path: Path, duration: float, output_clip: Path, motion_type: int = 0) -> None:
-        """Render a single scene with dynamic Ken Burns cinematic camera motion (zoompan)."""
+    def _render_scene_clip(
+        self,
+        img_path: Path,
+        duration: float,
+        output_clip: Path,
+        motion_type: int = 0,
+        animation_style: str = "ken_burns",
+    ) -> None:
+        """Render a single scene with dynamic cinematic camera motion & slideshow animations (zoompan)."""
+        import random
         fps = 24
         total_frames = int(duration * fps)
 
-        # 3 camera movement styles: zoom-in, zoom-out, pan-down
-        if motion_type % 3 == 0:
-            zoom_expr = f"min(zoom+0.0015,1.25)"
+        # Support multiple comma-separated animation styles or 'random'
+        chosen_style = animation_style.strip().lower() if animation_style else "ken_burns"
+        if "," in chosen_style:
+            styles_list = [s.strip() for s in chosen_style.split(",") if s.strip()]
+            if styles_list:
+                chosen_style = styles_list[motion_type % len(styles_list)]
+
+        if chosen_style in ("random", "all", "cycle"):
+            candidate_styles = ["zoom_in", "zoom_out", "pan_down", "pan_up", "pan_horizontal", "pulse_zoom"]
+            rng = random.Random(42 + motion_type * 37)
+            chosen_style = rng.choice(candidate_styles)
+
+        # Evaluate camera movement expressions
+        if chosen_style in ("zoom_in", "focus_push"):
+            zoom_expr = "min(zoom+0.0016, 1.28)"
             x_expr = "iw/2-(iw/zoom/2)"
             y_expr = "ih/2-(ih/zoom/2)"
-        elif motion_type % 3 == 1:
-            zoom_expr = f"max(1.25-0.0015*on,1.0)"
+        elif chosen_style in ("zoom_out", "epic_reveal"):
+            zoom_expr = "max(1.28-0.0016*on, 1.0)"
             x_expr = "iw/2-(iw/zoom/2)"
             y_expr = "ih/2-(ih/zoom/2)"
-        else:
-            zoom_expr = "1.15"
+        elif chosen_style in ("pan_down", "vertical_glide"):
+            zoom_expr = "1.20"
             x_expr = "iw/2-(iw/zoom/2)"
-            y_expr = f"(ih/zoom)*(on/{total_frames})*0.2"
+            y_expr = f"(ih-ih/zoom)*(on/{total_frames})"
+        elif chosen_style in ("pan_up", "glide_up"):
+            zoom_expr = "1.20"
+            x_expr = "iw/2-(iw/zoom/2)"
+            y_expr = f"(ih-ih/zoom)*(1.0-on/{total_frames})"
+        elif chosen_style in ("pan_horizontal", "pan_right", "sweep"):
+            zoom_expr = "1.20"
+            x_expr = f"(iw-iw/zoom)*(on/{total_frames})"
+            y_expr = "ih/2-(ih/zoom/2)"
+        elif chosen_style in ("pulse_zoom", "pulse", "bounce"):
+            zoom_expr = f"1.10+0.08*sin(2*3.14159*on/{fps}*0.5)"
+            x_expr = "iw/2-(iw/zoom/2)"
+            y_expr = "ih/2-(ih/zoom/2)"
+        else:  # Default "ken_burns" / "cinematic" alternating style
+            if motion_type % 4 == 0:
+                zoom_expr = "min(zoom+0.0015, 1.26)"
+                x_expr = "iw/2-(iw/zoom/2)"
+                y_expr = "ih/2-(ih/zoom/2)"
+            elif motion_type % 4 == 1:
+                zoom_expr = "max(1.26-0.0015*on, 1.0)"
+                x_expr = "iw/2-(iw/zoom/2)"
+                y_expr = "ih/2-(ih/zoom/2)"
+            elif motion_type % 4 == 2:
+                zoom_expr = "1.18"
+                x_expr = "iw/2-(iw/zoom/2)"
+                y_expr = f"(ih-ih/zoom)*(on/{total_frames})"
+            else:
+                zoom_expr = "1.18"
+                x_expr = f"(iw-iw/zoom)*(on/{total_frames})"
+                y_expr = "ih/2-(ih/zoom/2)"
 
         filter_str = (
             f"scale=1080:1920:force_original_aspect_ratio=increase,"
@@ -973,10 +1022,7 @@ class AIVideoEngine:
                     f"x=(w-text_w)/2:y=1440:enable='between(t,{c_st:.2f},{c_en:.2f})'"
                 )
 
-        # Progress bar
-        overlay_filters.append(
-            f"drawbox=x=0:y=1890:w='1080*(t/{total_duration:.2f})':h=18:color={accent_color}:t=fill"
-        )
+        # Clean video layout without bottom progress line
 
         vf_str = ",".join(overlay_filters)
 
@@ -1149,6 +1195,7 @@ class AIVideoEngine:
         colab_gpu_url: str = "",
         style_preset: str = "Realism",
         caption_style: str = "viral_yellow",
+        animation_style: str = "ken_burns",
     ) -> Dict[str, Any]:
         """Main entry point: Generate complete AI animated video with custom scenes, timer, and voice."""
         self.colab_gpu_url = colab_gpu_url.strip() if colab_gpu_url else ""
@@ -1350,8 +1397,19 @@ class AIVideoEngine:
                     style_preset=style_preset,
                 )
 
-            # Render Ken Burns motion clip
-            self._render_scene_clip(img_file, cur_scene_dur, clip_file, motion_type=idx)
+                        # Ensure Gemini Accent watermark is permanently applied to every scene visual
+            try:
+                from scripts.watermark_engine import watermark_file
+                watermark_file(img_file, output_path=img_file, watermark_style="gemini_accent", position="bottom-right")
+            except Exception:
+                try:
+                    from watermark_engine import watermark_file
+                    watermark_file(img_file, output_path=img_file, watermark_style="gemini_accent", position="bottom-right")
+                except Exception:
+                    pass
+
+            # Render motion clip with selected slideshow animation style
+            self._render_scene_clip(img_file, cur_scene_dur, clip_file, motion_type=idx, animation_style=animation_style)
             if clip_file.exists():
                 scene_clips.append(clip_file)
                 # FFmpeg concat requires forward slashes on Windows
@@ -1432,6 +1490,7 @@ def main():
     parser.add_argument("--colab-gpu-url", default="", help="Optional Google Colab GPU bridge tunnel URL")
     parser.add_argument("--style-preset", default="Realism", help="Visual art style preset (Realism, Anime, Disney 3D, Mecha, Dark Fantasy, Retro Comic)")
     parser.add_argument("--caption-style", default="viral_yellow", help="Caption style (viral_yellow, clean_pill, cinematic, neon_glow, soft_shadow_bar)")
+    parser.add_argument("--animation-style", default="ken_burns", help="Slideshow animation style (ken_burns, zoom_in, zoom_out, pan_down, pan_up, pan_horizontal, pulse_zoom, random)")
 
     args = parser.parse_args()
     engine = AIVideoEngine()
@@ -1450,6 +1509,7 @@ def main():
         colab_gpu_url=args.colab_gpu_url,
         style_preset=args.style_preset,
         caption_style=args.caption_style,
+        animation_style=args.animation_style,
     )
     print(json.dumps(result, indent=2))
 

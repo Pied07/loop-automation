@@ -557,6 +557,17 @@ class StorySceneEngine:
         if target_resolution and (processed.width != target_resolution[0] or processed.height != target_resolution[1]):
             processed = processed.resize(target_resolution, Image.Resampling.LANCZOS)
 
+        # Apply Gemini-style brand watermark (light colored, semi-transparent)
+        try:
+            from scripts.watermark_engine import apply_watermark
+            processed = apply_watermark(processed, watermark_style="gemini", position="bottom-right")
+        except Exception:
+            try:
+                from watermark_engine import apply_watermark
+                processed = apply_watermark(processed, watermark_style="gemini", position="bottom-right")
+            except Exception:
+                pass
+
         # Save to disk if requested
         if output_path:
             out_p = Path(output_path)
