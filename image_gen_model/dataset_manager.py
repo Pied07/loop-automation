@@ -91,6 +91,36 @@ ACTUAL_SCENE_BENCHMARKS = [
         "prompt": "Sunken marble ruins of an ancient underwater Atlantis civilization illuminated by bioluminescent aquatic creatures and radiant sunbeams piercing through crystal clear azure water",
         "color_palette": [(5, 30, 45), (20, 120, 160), (100, 230, 210)],
     },
+    {
+        "id": "human_warrior_11",
+        "genre": "Human Figures & Anatomy",
+        "prompt": "A cinematic full body portrait of an athletic armored knight standing tall on a stone path, anatomically correct hands with 5 distinct fingers resting on sword hilt, authentic human face with expressive eyes, natural posture, 35mm photograph, 8k",
+        "color_palette": [(25, 25, 35), (140, 110, 80), (220, 190, 160)],
+    },
+    {
+        "id": "human_sorceress_12",
+        "genre": "Human Figures & Anatomy",
+        "prompt": "A medium cinematic portrait of a wise female sorceress casting a glowing amber spell, perfectly rendered hands and slender fingers, realistic human skin pores, detailed iris reflections, flowing dark velvet cloak, cinematic lighting",
+        "color_palette": [(20, 10, 30), (160, 40, 120), (255, 180, 80)],
+    },
+    {
+        "id": "human_detective_13",
+        "genre": "Human Figures & Anatomy",
+        "prompt": "A full length portrait of a cyberpunk detective in trench coat walking under rainy neon lights, authentic human anatomy, realistic face with natural stubble, clear hand holding umbrella, lifelike street photography, 8k",
+        "color_palette": [(10, 15, 25), (220, 40, 110), (0, 200, 240)],
+    },
+    {
+        "id": "human_explorer_14",
+        "genre": "Human Figures & Anatomy",
+        "prompt": "A close-up National Geographic style portrait of a rugged explorer, authentic smiling human eyes with crows feet, genuine skin texture and pores, natural golden hour lighting, award-winning photography, pin-sharp focus",
+        "color_palette": [(35, 20, 15), (180, 110, 60), (240, 190, 140)],
+    },
+    {
+        "id": "human_samurai_15",
+        "genre": "Human Figures & Anatomy",
+        "prompt": "A cinematic wide angle shot of a lone samurai master in battle stance, head to toe in frame, anatomically proportioned arms and legs, weathered realistic human face, hands gripping katana with proper fingers, golden hour rim lighting",
+        "color_palette": [(30, 15, 20), (190, 70, 50), (250, 210, 160)],
+    },
 ]
 
 
