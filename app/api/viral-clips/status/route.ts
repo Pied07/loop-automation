@@ -132,6 +132,33 @@ export async function GET(req: NextRequest) {
       });
       if (relRes.ok) {
         const relData = await relRes.json();
+        // Check for binary release asset (e.g. img_...png)
+        const imageAsset = relData.assets?.find((a: any) =>
+          a.name?.endsWith(".png") || a.name?.endsWith(".jpg") || a.content_type?.startsWith("image/")
+        );
+        const resolvedUrl = imageAsset?.browser_download_url ||
+          (relData.assets?.length ? `https://github.com/${githubRepo}/releases/download/clips-${jobId}/${relData.assets[0].name}` : undefined);
+
+        if (resolvedUrl) {
+          const donePayload: CachedJob = {
+            status: "done",
+            progress: 100,
+            step: "✅ Image generated successfully by your native ML model!",
+            imageUrl: resolvedUrl,
+            clips: [{ id: jobId, url: resolvedUrl, imageUrl: resolvedUrl }],
+            sourceTitle: relData.name?.replace(/^AI Image:\s*/, "") || "AI Generated Image",
+            userId: job?.userId,
+            updatedAt: Date.now(),
+          };
+          jobCache.set(jobId, donePayload);
+          if (database) {
+            try {
+              await setDoc(doc(database, "jobs", jobId), donePayload, { merge: true });
+            } catch {}
+          }
+          return NextResponse.json(donePayload);
+        }
+
         if (relData.body) {
           try {
             const parsed = JSON.parse(relData.body);

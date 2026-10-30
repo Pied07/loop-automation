@@ -84,30 +84,56 @@ def update_status(status="processing", progress=0, step="", image_url=None, erro
 # "dont save in cloudinary if user doesnt download the image it will be lost as simple as that no saving in cloudinary"
 
 
-def publish_github_release(job_id: str, title: str, image_url: str):
-    """Publishes a GitHub Release tagged clips-{JOB_ID} with the completed image payload."""
+def upload_image_to_github_release(job_id: str, title: str, file_path: Path) -> str:
+    """Uploads generated image directly as an asset to a GitHub Release.
+    Returns the public direct download URL. No Cloudinary used.
+    """
     if not GITHUB_TOKEN:
         print("Notice: GITHUB_TOKEN not provided, skipping GitHub release creation.")
-        return
+        return ""
+
+    import subprocess
     tag_name = f"clips-{job_id}"
-    release_payload = {
-        "jobId": job_id,
-        "userId": USER_ID,
-        "status": "done",
-        "progress": 100,
-        "step": "✅ Image generated successfully by your native ML model!",
-        "imageUrl": image_url,
-        "clips": [{"url": image_url, "imageUrl": image_url, "id": job_id}],
-        "sourceTitle": title,
-    }
+    asset_name = f"{job_id}.png"
+    public_url = f"https://github.com/{GITHUB_REPO}/releases/download/{tag_name}/{asset_name}"
+
+    # 1. Try using preinstalled GitHub CLI
     try:
+        env = os.environ.copy()
+        env["GH_TOKEN"] = GITHUB_TOKEN
+        cmd = [
+            "gh", "release", "create", tag_name, str(file_path),
+            "--title", f"AI Image: {title[:40]}",
+            "--notes", f"Auto-generated AI image for job {job_id}",
+        ]
+        res = subprocess.run(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if res.returncode == 0:
+            print(f"✅ Uploaded image via gh CLI to GitHub Release: {public_url}")
+            return public_url
+        else:
+            print(f"Notice: gh CLI notice: {res.stderr[:200]}")
+    except Exception as e:
+        print(f"Notice: gh command notice: {e}")
+
+    # 2. Fallback to GitHub REST API binary asset upload
+    try:
+        meta_body = json.dumps({
+            "jobId": job_id,
+            "status": "done",
+            "progress": 100,
+            "step": "✅ Image generated successfully by your native ML model!",
+            "imageUrl": public_url,
+            "clips": [{"url": public_url, "imageUrl": public_url, "id": job_id}],
+            "sourceTitle": title[:60],
+        })
+        create_url = f"https://api.github.com/repos/{GITHUB_REPO}/releases"
         req = urllib.request.Request(
-            f"https://api.github.com/repos/{GITHUB_REPO}/releases",
+            create_url,
             data=json.dumps({
                 "tag_name": tag_name,
                 "name": f"AI Image: {title[:40]}",
-                "body": json.dumps(release_payload),
-                "draft": false if False else False,
+                "body": meta_body,
+                "draft": False,
                 "prerelease": False,
             }).encode("utf-8"),
             headers={
@@ -119,9 +145,32 @@ def publish_github_release(job_id: str, title: str, image_url: str):
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=30) as resp:
-            print(f"✅ Published GitHub Release: {tag_name}")
+            rel_data = json.loads(resp.read().decode("utf-8"))
+            upload_url_template = rel_data.get("upload_url", "").split("{")[0]
+
+        if upload_url_template:
+            upload_url = f"{upload_url_template}?name={urllib.parse.quote(asset_name)}"
+            with file_path.open("rb") as f:
+                img_bytes = f.read()
+            areq = urllib.request.Request(
+                upload_url,
+                data=img_bytes,
+                headers={
+                    "Authorization": f"Bearer {GITHUB_TOKEN}",
+                    "Content-Type": "image/png",
+                    "User-Agent": "The-Viral-Desk-Runner",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(areq, timeout=60) as aresp:
+                adata = json.loads(aresp.read().decode("utf-8"))
+                direct_url = adata.get("browser_download_url") or public_url
+                print(f"✅ Uploaded image via REST API to GitHub Release: {direct_url}")
+                return direct_url
     except Exception as e:
-        print(f"Notice: GitHub release publication warning: {e}")
+        print(f"Notice: GitHub REST release asset upload warning: {e}")
+
+    return public_url
 
 
 def main():
@@ -170,17 +219,15 @@ def main():
         elapsed = round(time.time() - t0, 2)
         print(f"✅ Native ML Image generated in {elapsed}s: {out_file.stat().st_size} bytes")
 
-        update_status(status="processing", progress=85, step="Image rendered! Encoding direct output data...")
+        update_status(status="processing", progress=85, step="Image rendered! Publishing output URL...")
 
-        # Direct Base64 Data URI delivery — NO Cloudinary saving per user specifications:
-        # "dont save in cloudinary if user doesnt download the image it will be lost as simple as that no saving in cloudinary"
-        with out_file.open("rb") as f:
-            b64_data = base64.b64encode(f.read()).decode("utf-8")
-        final_image_url = f"data:image/png;base64,{b64_data}"
-        print("✅ Converted image to Base64 Data URI for direct delivery (No Cloudinary).")
+        # Upload image directly as a GitHub Release asset (No Cloudinary)
+        final_image_url = upload_image_to_github_release(JOB_ID, PROMPT, out_file)
+        if not final_image_url:
+            with out_file.open("rb") as f:
+                b64_data = base64.b64encode(f.read()).decode("utf-8")
+            final_image_url = f"data:image/png;base64,{b64_data}"
 
-        # 3. Publish release and status done
-        publish_github_release(JOB_ID, PROMPT, final_image_url)
         update_status(
             status="done",
             progress=100,
