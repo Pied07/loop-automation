@@ -2,35 +2,15 @@ import path from "path";
 import fs from "fs";
 
 /**
- * Safely saves an image buffer in both serverless (Vercel read-only)
- * and local PC environments.
- * 
- * 1. If Cloudinary credentials are set, uploads to Cloudinary CDN.
- * 2. If on local writable disk, saves to public/generated_scenes.
- * 3. Fallback for read-only serverless: returns a Base64 data URI (never throws ENOENT).
+ * Image storage handler:
+ * Per user instructions: DO NOT save generated images to Cloudinary.
+ * Images are returned directly as Base64 Data URIs (in-memory / session).
+ * If the user does not download the image, it is lost when session ends.
  */
 export async function saveImageBuffer(imageBuffer: Buffer, filename: string): Promise<string> {
-  // 1. Try Cloudinary CDN if credentials exist in environment
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-  const apiKey = process.env.CLOUDINARY_API_KEY;
-  const apiSecret = process.env.CLOUDINARY_API_SECRET;
-
-  if (cloudName && apiKey && apiSecret) {
-    try {
-      const { uploadImageToCloudinary } = await import("@/app/cloudinary-upload");
-      const publicId = filename.replace(/\.[a-zA-Z0-9]+$/, "");
-      const res = await uploadImageToCloudinary(imageBuffer, publicId);
-      if (res?.secureUrl) {
-        return res.secureUrl;
-      }
-    } catch (cErr: any) {
-      console.warn("Cloudinary upload fallback:", cErr?.message || cErr);
-    }
-  }
-
-  // 2. Try saving to public/generated_scenes if writable (local development)
+  // If running in local dev and public/generated_scenes exists, we can optionally write for local reference
   const isVercel = process.env.VERCEL === "1" || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
-  if (!isVercel) {
+  if (!isVercel && process.env.SAVE_LOCAL_FILES === "1") {
     try {
       const publicDir = path.join(process.cwd(), "public", "generated_scenes");
       if (!fs.existsSync(publicDir)) {
@@ -39,12 +19,10 @@ export async function saveImageBuffer(imageBuffer: Buffer, filename: string): Pr
       const filePath = path.join(publicDir, filename);
       fs.writeFileSync(filePath, imageBuffer);
       return `/generated_scenes/${filename}`;
-    } catch (fsErr: any) {
-      console.warn("Local disk write warning:", fsErr?.message || fsErr);
-    }
+    } catch {}
   }
 
-  // 3. Resilient fallback for Vercel / serverless: Data URI
+  // Pure in-memory Base64 Data URI: Instant delivery, zero cloud footprint, zero Cloudinary
   const mimeType = filename.endsWith(".jpg") || filename.endsWith(".jpeg") ? "image/jpeg" : "image/png";
   return `data:${mimeType};base64,${imageBuffer.toString("base64")}`;
 }

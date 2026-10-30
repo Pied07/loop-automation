@@ -52,48 +52,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Direct Cloudinary asset probe for AI image jobs
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dbgvwyhdr";
-  if (cloudName && jobId.startsWith("img_")) {
-    const candidateUserIds = Array.from(new Set([
-      userId,
-      job?.userId,
-      "okWQqztlltfKTzJ2ATYDwnqCdo52",
-      "creator",
-    ].filter(Boolean) as string[]));
 
-    for (const candidateUid of candidateUserIds) {
-      const safeUid = candidateUid.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "creator";
-      const safeJid = jobId.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "job";
-      const candidateImageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/ai_images/${safeUid}/${safeJid}.png`;
-
-      try {
-        const headRes = await fetch(candidateImageUrl, {
-          method: "HEAD",
-          signal: AbortSignal.timeout(3000),
-        });
-        if (headRes.ok) {
-          const resolvedPayload: CachedJob = {
-            status: "done",
-            progress: 100,
-            step: "✅ Image generated successfully by your native ML model!",
-            imageUrl: candidateImageUrl,
-            clips: [{ id: jobId, url: candidateImageUrl, imageUrl: candidateImageUrl }],
-            sourceTitle: job?.sourceTitle || "AI Generated Image",
-            userId: safeUid,
-            updatedAt: Date.now(),
-          };
-          jobCache.set(jobId, resolvedPayload);
-          if (database) {
-            try {
-              await setDoc(doc(database, "jobs", jobId), resolvedPayload, { merge: true });
-            } catch {}
-          }
-          return NextResponse.json(resolvedPayload);
-        }
-      } catch {}
-    }
-  }
 
   // Direct Cloudinary asset probe for AI video jobs (or any job with uploaded video)
   if (cloudName && (jobId.startsWith("ai_") || job?.step?.toLowerCase().includes("cloudinary"))) {

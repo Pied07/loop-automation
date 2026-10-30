@@ -80,66 +80,8 @@ def update_status(status="processing", progress=0, step="", image_url=None, erro
                 time.sleep(wait_sec)
 
 
-def upload_file_to_cloudinary(file_path: Path, public_id: str) -> str:
-    """Signed multipart upload of the image to Cloudinary."""
-    if not (CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET):
-        print("Notice: Cloudinary credentials not fully supplied.")
-        return ""
-
-    try:
-        timestamp = str(int(time.time()))
-        signed_params = {"public_id": public_id, "timestamp": timestamp}
-        to_sign = "&".join(f"{k}={signed_params[k]}" for k in sorted(signed_params))
-        signature = hashlib.sha1((to_sign + CLOUDINARY_API_SECRET).encode("utf-8")).hexdigest()
-
-        boundary = f"----CloudAIImage{int(time.time() * 1000)}"
-        with file_path.open("rb") as f:
-            file_bytes = f.read()
-
-        fields = {
-            "api_key": CLOUDINARY_API_KEY,
-            "timestamp": timestamp,
-            "public_id": public_id,
-            "signature": signature,
-        }
-
-        parts = []
-        for name, value in fields.items():
-            parts.extend([
-                f"--{boundary}\r\n".encode(),
-                f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode(),
-                value.encode("utf-8"),
-                b"\r\n",
-            ])
-
-        parts.extend([
-            f"--{boundary}\r\n".encode(),
-            f'Content-Disposition: form-data; name="file"; filename="{file_path.name}"\r\n'.encode(),
-            b"Content-Type: image/png\r\n\r\n",
-            file_bytes,
-            b"\r\n",
-            f"--{boundary}--\r\n".encode(),
-        ])
-
-        body = b"".join(parts)
-        req = urllib.request.Request(
-            f"https://api.cloudinary.com/v1_1/{CLOUDINARY_CLOUD_NAME}/image/upload",
-            data=body,
-            headers={
-                "Content-Type": f"multipart/form-data; boundary={boundary}",
-                "User-Agent": "The-Viral-Desk-Runner",
-            },
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            sec_url = data.get("secure_url") or data.get("url")
-            if sec_url:
-                print(f"✅ Uploaded image to Cloudinary: {sec_url}")
-                return sec_url
-    except Exception as e:
-        print(f"Notice: Cloudinary upload warning: {e}")
-    return ""
+# Cloudinary upload removed per user specifications:
+# "dont save in cloudinary if user doesnt download the image it will be lost as simple as that no saving in cloudinary"
 
 
 def publish_github_release(job_id: str, title: str, image_url: str):
@@ -228,18 +170,14 @@ def main():
         elapsed = round(time.time() - t0, 2)
         print(f"✅ Native ML Image generated in {elapsed}s: {out_file.stat().st_size} bytes")
 
-        update_status(status="processing", progress=85, step="Image rendered! Publishing output URL...")
+        update_status(status="processing", progress=85, step="Image rendered! Encoding direct output data...")
 
-        # 1. Try Cloudinary
-        public_id = f"ai_images/{USER_ID}/{JOB_ID}"
-        final_image_url = upload_file_to_cloudinary(out_file, public_id)
-
-        # 2. If Cloudinary not available, convert to base64 Data URI
-        if not final_image_url:
-            with out_file.open("rb") as f:
-                b64_data = base64.b64encode(f.read()).decode("utf-8")
-            final_image_url = f"data:image/png;base64,{b64_data}"
-            print("✅ Converted image to Base64 Data URI for direct delivery.")
+        # Direct Base64 Data URI delivery — NO Cloudinary saving per user specifications:
+        # "dont save in cloudinary if user doesnt download the image it will be lost as simple as that no saving in cloudinary"
+        with out_file.open("rb") as f:
+            b64_data = base64.b64encode(f.read()).decode("utf-8")
+        final_image_url = f"data:image/png;base64,{b64_data}"
+        print("✅ Converted image to Base64 Data URI for direct delivery (No Cloudinary).")
 
         # 3. Publish release and status done
         publish_github_release(JOB_ID, PROMPT, final_image_url)

@@ -39,6 +39,7 @@ import {
   X,
   Trash2,
   RefreshCw,
+  Copy,
   Volume2,
   VolumeX,
   Swords,
@@ -698,8 +699,11 @@ export default function Home() {
   const [imageGenSeed, setImageGenSeed] = useState<string>("");
   const [imageGenNegative, setImageGenNegative] = useState<string>("");
   const [isGeneratingCustomImage, setIsGeneratingCustomImage] = useState<boolean>(false);
+  const [imageGenProgress, setImageGenProgress] = useState<number>(0);
   const [imageGenError, setImageGenError] = useState<string>("");
   const [imageGenStatus, setImageGenStatus] = useState<string>("");
+  const [synthesizedPromptPreview, setSynthesizedPromptPreview] = useState<string>("");
+  const [isSynthesizingPrompt, setIsSynthesizingPrompt] = useState<boolean>(false);
   const [currentCustomImage, setCurrentCustomImage] = useState<any>(null);
   const [imageGenHistory, setImageGenHistory] = useState<any[]>([]);
   const [showAdvancedImageGen, setShowAdvancedImageGen] = useState<boolean>(false);
@@ -713,9 +717,11 @@ export default function Home() {
         if (hist) {
           const parsed = JSON.parse(hist);
           if (Array.isArray(parsed)) {
-            setImageGenHistory(parsed);
-            if (parsed.length > 0 && parsed[0] && typeof parsed[0] === "object" && parsed[0].imageUrl) {
-              setCurrentCustomImage(parsed[0]);
+            // Clean up any stale Cloudinary URLs per user instructions
+            const valid = parsed.filter((item: any) => item?.imageUrl && !item.imageUrl.includes("cloudinary"));
+            setImageGenHistory(valid);
+            if (valid.length > 0 && valid[0]?.imageUrl) {
+              setCurrentCustomImage(valid[0]);
             }
           }
         }
@@ -2175,15 +2181,44 @@ export default function Home() {
     });
   };
 
+  const handleSynthesizePromptPreview = async () => {
+    if (!imageGenPrompt.trim()) {
+      notify("Please enter an idea to synthesize.");
+      return;
+    }
+    setIsSynthesizingPrompt(true);
+    try {
+      const res = await fetch("/api/ai-video/synthesize-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: imageGenPrompt.trim(),
+          style: imageGenStyle,
+          aspect: imageGenAspect,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.synthesizedPrompt) {
+        setSynthesizedPromptPreview(data.synthesizedPrompt);
+        notify("✨ Synthesized with local ML model!");
+      }
+    } catch {
+      notify("Synthesis preview failed.");
+    } finally {
+      setIsSynthesizingPrompt(false);
+    }
+  };
+
   const handleGenerateCustomImage = async () => {
     if (!imageGenPrompt.trim()) {
-      notify("Please enter an image description prompt.");
+      notify("Please enter an image description or idea.");
       return;
     }
     setIsGeneratingCustomImage(true);
+    setImageGenProgress(15);
     setImageGenError("");
     setCurrentCustomImage(null);
-    setImageGenStatus("Submitting prompt to native ML pipeline...");
+    setImageGenStatus("Synthesizing prompt with native ML model...");
     try {
       const res = await fetch("/api/ai-video/generate-scene-image", {
         method: "POST",
@@ -2206,20 +2241,26 @@ export default function Home() {
         throw new Error(data.error || "Image generation failed.");
       }
 
+      if (data.prompt) {
+        setSynthesizedPromptPreview(data.prompt);
+      }
+
       // If dispatched to GitHub Actions Cloud Runner
       if (data.pending && data.jobId) {
-        setImageGenStatus("Queued in GitHub Actions cloud runner...");
+        setImageGenProgress(25);
+        setImageGenStatus("Dispatched to GitHub Actions native ML runner...");
         notify("🚀 Dispatched to GitHub Actions native ML runner!");
 
         const jobId = data.jobId;
         let pollCount = 0;
-        const maxPolls = 120; // ~6 minutes max
+        const maxPolls = 140; // ~7 minutes max
 
         const pollInterval = setInterval(async () => {
           pollCount++;
           if (pollCount > maxPolls) {
             clearInterval(pollInterval);
             setIsGeneratingCustomImage(false);
+            setImageGenProgress(0);
             setImageGenStatus("");
             setImageGenError("Generation timed out. Please check your GitHub Actions tab.");
             return;
@@ -2232,14 +2273,22 @@ export default function Home() {
               if (job.step) {
                 setImageGenStatus(job.step);
               }
+              if (typeof job.progress === "number" && job.progress > 0) {
+                setImageGenProgress(job.progress);
+              } else {
+                setImageGenProgress((p) => Math.min(92, p + 2));
+              }
+
               if (job.status === "done") {
                 clearInterval(pollInterval);
+                setImageGenProgress(100);
                 const finalUrl = job.imageUrl || (Array.isArray(job.clips) && (job.clips[0]?.imageUrl || job.clips[0]?.url));
                 if (finalUrl) {
                   const newImg = {
                     id: jobId,
                     imageUrl: finalUrl,
                     prompt: imageGenPrompt.trim(),
+                    synthesizedPrompt: job.synthesizedPrompt || data.prompt || job.sourceTitle,
                     style: imageGenStyle,
                     aspect: imageGenAspect,
                     engine: "github-actions-ml",
@@ -2248,15 +2297,16 @@ export default function Home() {
                   };
                   setCurrentCustomImage(newImg);
                   handleSaveImageToHistory(newImg);
-                  notify("✨ Image generated successfully by your native ML model in GitHub Actions!");
+                  notify("✨ Image generated successfully by your native ML model!");
                 } else {
-                  setImageGenError("GitHub Actions runner completed but no image URL was found.");
+                  setImageGenError("Runner finished without outputting an image URL.");
                 }
                 setIsGeneratingCustomImage(false);
                 setImageGenStatus("");
               } else if (job.status === "failed") {
                 clearInterval(pollInterval);
                 setIsGeneratingCustomImage(false);
+                setImageGenProgress(0);
                 setImageGenStatus("");
                 const errMsg = job.error || "GitHub Actions image generation failed.";
                 setImageGenError(errMsg);
@@ -2272,10 +2322,12 @@ export default function Home() {
       }
 
       // Synchronous completion (from Colab GPU or Local PC)
+      setImageGenProgress(100);
       const newImg = {
         id: `img_${Date.now()}`,
         imageUrl: data.imageUrl,
         prompt: imageGenPrompt.trim(),
+        synthesizedPrompt: data.prompt || data.synthesizedPrompt,
         style: imageGenStyle,
         aspect: imageGenAspect,
         engine: data.engine || "native-ml",
@@ -2293,6 +2345,7 @@ export default function Home() {
       setImageGenError(msg);
       notify(msg);
       setIsGeneratingCustomImage(false);
+      setImageGenProgress(0);
       setImageGenStatus("");
     }
   };
@@ -4648,16 +4701,25 @@ export default function Home() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               {/* Prompt Card */}
               <div style={{ background: '#111218', border: '1.5px solid #232635', borderRadius: '12px', padding: '20px', boxShadow: '0 8px 30px rgba(0,0,0,0.45)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Prompt Description
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>Scene Idea / Prompt</span>
+                    <span style={{ fontSize: '10px', background: 'rgba(229,9,20,0.15)', color: '#ff3b45', border: '1px solid rgba(229,9,20,0.3)', padding: '2px 6px', borderRadius: '4px', textTransform: 'none', fontWeight: 600 }}>
+                      Auto-Synthesized by ML Model
+                    </span>
                   </label>
                   <span style={{ fontSize: '11px', color: '#94a3b8' }}>{imageGenPrompt.length} chars</span>
                 </div>
+                <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '12px', lineHeight: 1.4 }}>
+                  Enter any brief idea or phrase. Our local ML model automatically synthesizes it into a high-fidelity cinematic prompt with professional lighting, depth, and anti-distortion protections.
+                </div>
                 <textarea
                   value={imageGenPrompt}
-                  onChange={(e) => setImageGenPrompt(e.target.value)}
-                  placeholder="Describe what you want to see... e.g. A solitary samurai standing under blooming cherry blossoms in the rain at twilight"
+                  onChange={(e) => {
+                    setImageGenPrompt(e.target.value);
+                    if (synthesizedPromptPreview) setSynthesizedPromptPreview("");
+                  }}
+                  placeholder="Describe what you want to see... e.g. A serene anime shrine in the misty mountains at sunrise"
                   rows={4}
                   style={{
                     width: '100%',
@@ -4673,10 +4735,35 @@ export default function Home() {
                     boxSizing: 'border-box',
                   }}
                 />
-                
-                {/* Prompt suggestion pills */}
+
+                {/* Prompt suggestion pills & Synthesize Action */}
                 <div style={{ marginTop: '12px' }}>
-                  <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '6px', fontWeight: 600 }}>Quick Prompt Ideas:</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                    <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>Quick Prompt Ideas:</span>
+                    <button
+                      type="button"
+                      onClick={handleSynthesizePromptPreview}
+                      disabled={isSynthesizingPrompt || !imageGenPrompt.trim()}
+                      style={{
+                        background: 'rgba(229,9,20,0.12)',
+                        border: '1px solid rgba(229,9,20,0.3)',
+                        borderRadius: '6px',
+                        color: '#ff3b45',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        padding: '4px 10px',
+                        cursor: isSynthesizingPrompt || !imageGenPrompt.trim() ? 'not-allowed' : 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        transition: 'all 0.15s ease',
+                        opacity: !imageGenPrompt.trim() ? 0.5 : 1,
+                      }}
+                    >
+                      <WandSparkles size={12} />
+                      {isSynthesizingPrompt ? "Synthesizing..." : "Preview ML Synthesized Prompt"}
+                    </button>
+                  </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     {[
                       { label: "🌸 Anime Sakura", prompt: "A serene anime shrine in the misty mountains surrounded by blooming cherry blossoms at sunrise, vibrant colors, Studio Ghibli aesthetic" },
@@ -4689,7 +4776,10 @@ export default function Home() {
                       <button
                         key={idx}
                         type="button"
-                        onClick={() => { setImageGenPrompt(item.prompt); }}
+                        onClick={() => {
+                          setImageGenPrompt(item.prompt);
+                          if (synthesizedPromptPreview) setSynthesizedPromptPreview("");
+                        }}
                         style={{
                           background: '#1b1d29',
                           border: '1px solid #2d3148',
@@ -4709,53 +4799,25 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Quick Pose & Action Stance Chips */}
-                <div style={{ marginTop: '10px' }}>
-                  <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <span>🥋 Action & Combat Stances:</span>
-                    <span style={{ fontSize: '10px', color: '#38bdf8', background: 'rgba(56,189,248,0.1)', padding: '1px 5px', borderRadius: '3px' }}>Click to append dynamic pose</span>
+                {/* Synthesized Prompt Preview (if triggered) */}
+                {synthesizedPromptPreview && (
+                  <div style={{ marginTop: '12px', background: 'rgba(229,9,20,0.06)', border: '1px solid rgba(229,9,20,0.25)', borderRadius: '8px', padding: '10px 12px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#ff3b45', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <WandSparkles size={12} />
+                      <span>Synthesized Visual Prompt (Local ML Model Output):</span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#e2e8f0', lineHeight: 1.45 }}>
+                      {synthesizedPromptPreview}
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {[
-                      { label: "⚔️ Katana Striking Stance", text: ", dynamic martial arts combat stance, bent knees, low center of gravity, blade angled ready to strike" },
-                      { label: "🥋 Martial Arts Fighting Pose", text: ", athletic combat fighting stance, raised defensive fists, angled dynamic action posture" },
-                      { label: "⚡ Heroic Battle Ready", text: ", dramatic battle-ready action pose, three-quarters angle, dynamic body tension, cinematic foreshortening" },
-                      { label: "🛡️ Defensive Guard Pose", text: ", low defensive guard stance, grounded footing, intense focused gaze, dynamic posture" },
-                      { label: "🏃 Leaping Action Strike", text: ", mid-air dynamic leaping slash, dramatic aerial combat pose, motion blur" },
-                    ].map((pose, pidx) => (
-                      <button
-                        key={pidx}
-                        type="button"
-                        onClick={() => {
-                          setImageGenPrompt(prev => {
-                            const trimmed = prev.trim();
-                            return trimmed ? `${trimmed}${pose.text}` : pose.text.replace(/^,\s*/, "");
-                          });
-                        }}
-                        style={{
-                          background: 'rgba(56, 189, 248, 0.08)',
-                          border: '1px solid rgba(56, 189, 248, 0.25)',
-                          borderRadius: '6px',
-                          color: '#38bdf8',
-                          fontSize: '11px',
-                          padding: '4px 8px',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                          fontWeight: 500,
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = '#38bdf8';
-                          e.currentTarget.style.background = 'rgba(56, 189, 248, 0.18)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.25)';
-                          e.currentTarget.style.background = 'rgba(56, 189, 248, 0.08)';
-                        }}
-                      >
-                        {pose.label}
-                      </button>
-                    ))}
-                  </div>
+                )}
+
+                {/* Direct Storage Session Notice */}
+                <div style={{ marginTop: '14px', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)', borderRadius: '6px', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '14px' }}>⚡</span>
+                  <span style={{ fontSize: '11px', color: '#cbd5e1' }}>
+                    <strong style={{ color: '#f59e0b' }}>Session Only (No Cloudinary):</strong> Images are delivered directly in-browser. Please download your image upon generation; un-downloaded images are not saved to the cloud.
+                  </span>
                 </div>
               </div>
 
@@ -5194,21 +5256,75 @@ export default function Home() {
                 </div>
 
                 {isGeneratingCustomImage ? (
-                  <div style={{ minHeight: '380px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#0a0a0f', borderRadius: '10px', border: '1px dashed #2a2e3f', padding: '30px', textAlign: 'center' }}>
-                    <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(229,9,20,0.1)', display: 'grid', placeItems: 'center', color: '#ff3b45', marginBottom: '16px' }}>
-                      <RefreshCw size={28} className="spin" />
+                  <div style={{ minHeight: '380px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#0a0a0f', borderRadius: '10px', border: '1px solid #232635', padding: '36px 24px', textAlign: 'center' }}>
+                    <div style={{ position: 'relative', width: '64px', height: '64px', marginBottom: '18px' }}>
+                      <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '3px solid rgba(255,59,69,0.15)', borderTopColor: '#ff3b45', animation: 'spin 1s linear infinite' }} />
+                      <div style={{ position: 'absolute', inset: '6px', borderRadius: '50%', background: 'rgba(255,59,69,0.08)', display: 'grid', placeItems: 'center', color: '#ff3b45' }}>
+                        <WandSparkles size={24} />
+                      </div>
                     </div>
-                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#f8fafc', marginBottom: '6px' }}>Running PyTorch ML Diffusion Model</div>
-                    <div style={{ fontSize: '12px', color: '#94a3b8', maxWidth: '320px' }}>
-                      {imageGenStatus || (colabGpuUrl ? "Synthesizing image on Colab Tesla T4 GPU in 2-3 seconds..." : "Generating with GitHub Actions Native ML Cloud Runner...")}
+                    
+                    <div style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc', marginBottom: '6px' }}>
+                      Synthesizing with Native ML Diffusion Model
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#94a3b8', maxWidth: '360px', marginBottom: '24px', lineHeight: 1.4 }}>
+                      {imageGenStatus || "Processing visual scene with PyTorch ML model & LoRA weights..."}
+                    </div>
+
+                    {/* High-Tech Animated Progress Bar */}
+                    <div style={{ width: '100%', maxWidth: '380px', background: '#12141e', border: '1px solid #232738', borderRadius: '10px', padding: '14px 16px', boxSizing: 'border-box' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#cbd5e1' }}>
+                          {imageGenProgress < 25 ? "Stage 1/4: Synthesizing Prompt" : imageGenProgress < 60 ? "Stage 2/4: Preparing Latent Diffusion" : imageGenProgress < 90 ? "Stage 3/4: Denoising Passes" : "Stage 4/4: Finalizing High-Res Render"}
+                        </span>
+                        <span style={{ fontSize: '13px', fontWeight: 800, color: '#ff3b45', letterSpacing: '0.02em' }}>
+                          {Math.max(15, Math.min(100, Math.round(imageGenProgress)))}%
+                        </span>
+                      </div>
+                      
+                      {/* Track and Fill */}
+                      <div style={{ width: '100%', height: '8px', background: '#0a0b10', borderRadius: '999px', overflow: 'hidden', border: '1px solid #1f2334', position: 'relative' }}>
+                        <div
+                          style={{
+                            width: `${Math.max(12, Math.min(100, imageGenProgress))}%`,
+                            height: '100%',
+                            background: 'linear-gradient(90deg, #e50914, #ff3b45, #ff7e86)',
+                            borderRadius: '999px',
+                            transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                            boxShadow: '0 0 14px rgba(255,59,69,0.7)',
+                          }}
+                        />
+                      </div>
+
+                      {/* 4-Step Milestone Dots */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', fontSize: '10px', color: '#64748b' }}>
+                        {[
+                          { label: "Synthesize", min: 15 },
+                          { label: "Latents", min: 40 },
+                          { label: "Diffusion", min: 70 },
+                          { label: "Render", min: 95 },
+                        ].map((st, i) => {
+                          const isDone = imageGenProgress >= st.min;
+                          return (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px', color: isDone ? '#ff3b45' : '#475569', fontWeight: isDone ? 700 : 500 }}>
+                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isDone ? '#ff3b45' : '#334155', boxShadow: isDone ? '0 0 6px #ff3b45' : 'none' }} />
+                              <span>{st.label}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: '16px', fontSize: '11px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>⚡</span> Direct browser delivery — not stored on Cloudinary
                     </div>
                   </div>
                 ) : currentCustomImage ? (
                   <div>
-                    <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', background: '#0a0a0f', border: '1px solid #2a2e3f', display: 'flex', justifyContent: 'center', alignItems: 'center', maxHeight: '520px' }}>
+                    <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', background: '#0a0a0f', border: '1px solid #2a2e3f', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '320px', maxHeight: '540px' }}>
                       <img
                         src={currentCustomImage.imageUrl}
-                        alt={currentCustomImage.prompt}
+                        alt={currentCustomImage.prompt || "AI Output"}
                         onError={(e) => {
                           const target = e.currentTarget;
                           target.style.display = 'none';
@@ -5216,18 +5332,39 @@ export default function Home() {
                           if (parent && !parent.querySelector('.img-error-box')) {
                             const err = document.createElement('div');
                             err.className = 'img-error-box';
-                            err.style.cssText = 'padding: 40px 20px; text-align: center; color: #ef4444;';
-                            err.innerHTML = '<div style="font-size:32px;margin-bottom:8px;">⚠️</div><div style="font-weight:700;font-size:14px;">Image failed to load</div><div style="font-size:11px;color:#94a3b8;margin-top:6px;">The previous cloud runner run encountered an issue or expired. Please click <strong>Generate Image with ML Model</strong> to generate anew.</div>';
+                            err.style.cssText = 'padding: 30px 20px; text-align: center; color: #ef4444;';
+                            err.innerHTML = '<div style="font-size:26px;margin-bottom:6px;">⚡</div><div style="font-weight:700;font-size:13px;">Session image expired</div><div style="font-size:11px;color:#94a3b8;margin-top:4px;">Images are held in-memory for the current session. Click <strong>Generate Image with ML Model</strong> to synthesize anew.</div>';
                             parent.appendChild(err);
                           }
                         }}
-                        style={{ width: '100%', height: 'auto', maxHeight: '520px', objectFit: 'contain', display: 'block' }}
+                        style={{ width: '100%', height: 'auto', maxHeight: '540px', objectFit: 'contain', display: 'block' }}
                       />
                     </div>
-                    <div style={{ marginTop: '12px', padding: '10px', background: '#0d0e14', borderRadius: '8px', border: '1px solid #1f2333' }}>
-                      <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '4px', fontWeight: 600 }}>Prompt:</div>
-                      <div style={{ fontSize: '12px', color: '#e2e8f0', lineHeight: 1.4 }}>{currentCustomImage.prompt}</div>
+
+                    {/* Synthesized Prompt Display */}
+                    <div style={{ marginTop: '12px', padding: '12px', background: '#0d0e14', borderRadius: '8px', border: '1px solid #1f2333' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <div style={{ fontSize: '11px', color: '#ff3b45', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <WandSparkles size={12} />
+                          <span>Synthesized Prompt (Local ML Model):</span>
+                        </div>
+                        <span style={{ fontSize: '9px', background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                          ✓ ML Synthesized
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#e2e8f0', lineHeight: 1.45, maxHeight: '90px', overflowY: 'auto' }}>
+                        {currentCustomImage.synthesizedPrompt || currentCustomImage.prompt}
+                      </div>
+
+                      {currentCustomImage.synthesizedPrompt && currentCustomImage.prompt && currentCustomImage.synthesizedPrompt !== currentCustomImage.prompt && (
+                        <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #1b1e2a', fontSize: '11px', color: '#94a3b8' }}>
+                          <span style={{ fontWeight: 600, color: '#cbd5e1' }}>Your Input: </span>
+                          <span>{currentCustomImage.prompt}</span>
+                        </div>
+                      )}
                     </div>
+
+                    {/* Action Buttons */}
                     <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
                       <a
                         href={currentCustomImage.imageUrl}
@@ -5238,15 +5375,16 @@ export default function Home() {
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '6px',
-                          background: '#1e2230',
-                          border: '1px solid #33384d',
+                          background: 'linear-gradient(135deg, #e50914, #ff3b45)',
+                          border: 'none',
                           borderRadius: '8px',
-                          padding: '10px 14px',
+                          padding: '10px 16px',
                           color: '#ffffff',
                           fontSize: '12px',
-                          fontWeight: 600,
+                          fontWeight: 700,
                           textDecoration: 'none',
                           cursor: 'pointer',
+                          boxShadow: '0 2px 12px rgba(229,9,20,0.4)',
                         }}
                       >
                         <Download size={15} /> Download PNG
@@ -5271,6 +5409,39 @@ export default function Home() {
                       >
                         <ExternalLink size={15} /> Open Full Size
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const p = currentCustomImage.synthesizedPrompt || currentCustomImage.prompt || "";
+                          if (p && typeof navigator !== "undefined" && navigator.clipboard) {
+                            navigator.clipboard.writeText(p);
+                            notify("📋 Prompt copied to clipboard!");
+                          }
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          background: '#161822',
+                          border: '1px solid #282c3f',
+                          borderRadius: '8px',
+                          padding: '10px 12px',
+                          color: '#94a3b8',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                        title="Copy prompt"
+                      >
+                        <Copy size={14} />
+                      </button>
+                    </div>
+
+                    {/* Direct Session Notice */}
+                    <div style={{ marginTop: '10px', fontSize: '11px', color: '#f59e0b', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)', borderRadius: '6px', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>⚠️</span>
+                      <span>Not saved in Cloudinary. If you don't download this image, it will be lost upon closing or refreshing this page.</span>
                     </div>
                   </div>
                 ) : (

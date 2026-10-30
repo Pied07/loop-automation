@@ -5,6 +5,7 @@ import fs from "fs";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { saveImageBuffer } from "@/app/image-storage";
+import { synthesizeScenePrompt } from "@/app/lib/prompt-synthesizer";
 
 const execAsync = promisify(exec);
 
@@ -81,6 +82,13 @@ export async function POST(req: NextRequest) {
     const category = typeof body.category === "string" ? body.category : (isDirectPrompt ? "Custom" : "General");
     const style = typeof body.style === "string" ? body.style : "Cinematic Film";
     const aspect = typeof body.aspect === "string" ? body.aspect : "9:16 (Shorts / Reels)";
+
+    // Synthesize prompt using native ML model synthesizer — never pass raw user text directly
+    const synthesizedPrompt = synthesizeScenePrompt(prompt, {
+      stylePreset: style,
+      aspectRatio: aspect,
+      category,
+    }) || prompt;
     const steps = typeof body.steps === "number" ? Math.max(1, Math.min(30, body.steps)) : 20;
     const seed = typeof body.seed === "number" ? body.seed : undefined;
     const sceneIndex = typeof body.sceneIndex === "number" ? body.sceneIndex : 0;
@@ -152,7 +160,7 @@ export async function POST(req: NextRequest) {
             "Bypass-Tunnel-Reminder": "true",
           },
           body: JSON.stringify({
-            prompt,
+            prompt: synthesizedPrompt,
             style,
             aspect,
             steps: Math.max(20, steps),
@@ -171,7 +179,8 @@ export async function POST(req: NextRequest) {
               return NextResponse.json({
                 success: true,
                 imageUrl: daemonData.imageUrl,
-                prompt,
+                prompt: synthesizedPrompt,
+                originalPrompt: prompt,
                 style,
                 aspect,
                 sceneIndex,
@@ -192,7 +201,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({
               success: true,
               imageUrl,
-              prompt,
+              prompt: synthesizedPrompt,
+              originalPrompt: prompt,
               style,
               aspect,
               sceneIndex,
@@ -251,7 +261,8 @@ export async function POST(req: NextRequest) {
             ref: "main",
             inputs: {
               jobId,
-              prompt,
+              prompt: synthesizedPrompt,
+              originalPrompt: prompt,
               style,
               aspect,
               steps: String(steps),
@@ -261,9 +272,9 @@ export async function POST(req: NextRequest) {
               category,
               userId,
               appUrl,
-              cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
-              cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || "",
-              cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || "",
+              cloudinaryCloudName: "",
+              cloudinaryApiKey: "",
+              cloudinaryApiSecret: "",
             },
           }),
         });
@@ -306,7 +317,7 @@ export async function POST(req: NextRequest) {
     const scriptPath = path.join(process.cwd(), "image_gen_model", "local_inference.py");
     const pyExe = process.platform === "win32" ? "py" : "python3";
 
-    const escapedPrompt = prompt.replace(/"/g, '\\"').replace(/[\r\n]/g, " ");
+    const escapedPrompt = (synthesizedPrompt || prompt).replace(/"/g, '\\"').replace(/[\r\n]/g, " ");
     const escapedStyle = style.replace(/"/g, '\\"');
     const escapedAspect = aspect.replace(/"/g, '\\"');
     const escapedNegativePrompt = negativePrompt.replace(/"/g, '\\"');
@@ -336,7 +347,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       imageUrl: finalImageUrl,
-      prompt,
+      prompt: synthesizedPrompt,
+      originalPrompt: prompt,
       style,
       aspect,
       sceneIndex,
