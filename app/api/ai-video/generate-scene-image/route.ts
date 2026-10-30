@@ -217,7 +217,8 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Dispatch to GitHub Actions Cloud Runner (Serverless environment or cloud mode)
-    const githubPat = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
+    const userSuppliedPat = typeof body.githubPat === "string" ? body.githubPat.trim() : "";
+    const githubPat = userSuppliedPat || process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
     const githubRepo = process.env.GITHUB_REPO || "Pied07/loop-automation";
 
     if (isVercel || forceCloud || !process.env.LOCAL_DEV) {

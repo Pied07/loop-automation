@@ -40,6 +40,7 @@ import {
   Trash2,
   RefreshCw,
   Copy,
+  Key,
   Volume2,
   VolumeX,
   Swords,
@@ -707,11 +708,15 @@ export default function Home() {
   const [currentCustomImage, setCurrentCustomImage] = useState<any>(null);
   const [imageGenHistory, setImageGenHistory] = useState<any[]>([]);
   const [showAdvancedImageGen, setShowAdvancedImageGen] = useState<boolean>(false);
+  const [githubPat, setGithubPat] = useState<string>("");
+  const [showCloudConfig, setShowCloudConfig] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("colab_gpu_bridge_url");
-      if (saved) setColabGpuUrl(saved);
+      const savedColab = localStorage.getItem("colab_gpu_bridge_url");
+      if (savedColab) setColabGpuUrl(savedColab);
+      const savedPat = localStorage.getItem("github_pat");
+      if (savedPat) setGithubPat(savedPat);
       try {
         const hist = localStorage.getItem("image_gen_history");
         if (hist) {
@@ -2233,6 +2238,7 @@ export default function Home() {
           isDirectPrompt: true,
           category: "Custom",
           colabGpuUrl: colabGpuUrl.trim(),
+          githubPat: githubPat.trim(),
           userId: auth?.currentUser?.uid || "creator",
         }),
       });
@@ -2267,7 +2273,8 @@ export default function Home() {
           }
 
           try {
-            const sRes = await fetch(`/api/viral-clips/status?jobId=${jobId}`);
+            const patParam = githubPat.trim() ? `&githubPat=${encodeURIComponent(githubPat.trim())}` : "";
+            const sRes = await fetch(`/api/viral-clips/status?jobId=${jobId}${patParam}`);
             if (sRes.ok) {
               const job = await sRes.json();
               if (job.step) {
@@ -4688,13 +4695,121 @@ export default function Home() {
               <h1>Generate images with <em>your ML model.</em></h1>
               <p>Create high-definition visuals from any prompt using your local PyTorch ML diffusion model with LoRA weights, custom styles, and instant downloads.</p>
             </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', color: colabGpuUrl ? '#10b981' : '#f59e0b', background: colabGpuUrl ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', padding: '6px 12px', borderRadius: '8px', border: `1px solid ${colabGpuUrl ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}`, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: colabGpuUrl ? '#10b981' : '#f59e0b' }} />
-                {colabGpuUrl ? 'Tesla T4 GPU Connected (2s)' : 'GitHub Actions ML Cloud Runner Active'}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '12px', color: colabGpuUrl ? '#10b981' : (githubPat ? '#10b981' : '#f59e0b'), background: colabGpuUrl ? 'rgba(16,185,129,0.1)' : (githubPat ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)'), padding: '6px 12px', borderRadius: '8px', border: `1px solid ${colabGpuUrl ? 'rgba(16,185,129,0.3)' : (githubPat ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)')}`, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: colabGpuUrl ? '#10b981' : (githubPat ? '#10b981' : '#f59e0b') }} />
+                {colabGpuUrl ? 'Tesla T4 GPU Connected (2s)' : (githubPat ? 'GitHub Actions ML Cloud Runner Active' : 'Cloud Runner Ready')}
               </span>
+              <button
+                type="button"
+                onClick={() => setShowCloudConfig(!showCloudConfig)}
+                style={{
+                  background: showCloudConfig ? 'rgba(229,9,20,0.15)' : '#161822',
+                  border: showCloudConfig ? '1px solid #ff3b45' : '1px solid #2d3148',
+                  borderRadius: '8px',
+                  color: showCloudConfig ? '#ff3b45' : '#cbd5e1',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  padding: '6px 12px',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <Key size={13} />
+                <span>{showCloudConfig ? 'Close Runner Config' : 'Configure PAT / GPU'}</span>
+              </button>
             </div>
           </div>
+
+          {/* Cloud Runner & PAT Configuration Drawer */}
+          {showCloudConfig && (
+            <div style={{ background: '#111218', border: '1.5px solid #2a2e42', borderRadius: '12px', padding: '18px 20px', marginBottom: '24px', boxShadow: '0 8px 30px rgba(0,0,0,0.5)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Key size={14} color="#ff3b45" />
+                  <span>Cloud Runner Credentials & GPU Bridge</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCloudConfig(false)}
+                  style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '12px' }}
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+                {/* GitHub PAT Input */}
+                <div style={{ background: '#0a0b10', border: '1px solid #1f2334', borderRadius: '8px', padding: '12px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: 700, color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>
+                    GitHub Personal Access Token (PAT)
+                  </label>
+                  <p style={{ margin: '0 0 8px', fontSize: '11px', color: '#64748b', lineHeight: 1.4 }}>
+                    Powers the free GitHub Actions Cloud Runner on Vercel. Starts with <code style={{ color: '#ff3b45' }}>ghp_</code>.
+                  </p>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input
+                      type="password"
+                      placeholder="Paste your ghp_... token"
+                      value={githubPat}
+                      onChange={(e) => setGithubPat(e.target.value)}
+                      style={{ flex: 1, background: '#12141d', border: '1px solid #282d3f', borderRadius: '6px', padding: '6px 10px', color: '#f8fafc', fontSize: '12px', boxSizing: 'border-box' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const trimmed = githubPat.trim();
+                        if (typeof window !== "undefined") {
+                          if (trimmed) localStorage.setItem("github_pat", trimmed);
+                          else localStorage.removeItem("github_pat");
+                        }
+                        notify(trimmed ? "✅ GitHub PAT saved in your browser session!" : "GitHub PAT cleared.");
+                      }}
+                      style={{ background: '#e50914', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '11px', fontWeight: 700, padding: '0 12px', cursor: 'pointer' }}
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+
+                {/* Colab GPU URL Input */}
+                <div style={{ background: '#0a0b10', border: '1px solid #1f2334', borderRadius: '8px', padding: '12px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: 700, color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>
+                    Google Colab Tesla T4 GPU URL (Optional - 2s Instant Gen)
+                  </label>
+                  <p style={{ margin: '0 0 8px', fontSize: '11px', color: '#64748b', lineHeight: 1.4 }}>
+                    Paste your active ngrok/localtunnel URL from your Google Colab notebook server.
+                  </p>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input
+                      type="text"
+                      placeholder="https://xxxx.ngrok-free.app"
+                      value={colabGpuUrl}
+                      onChange={(e) => setColabGpuUrl(e.target.value)}
+                      style={{ flex: 1, background: '#12141d', border: '1px solid #282d3f', borderRadius: '6px', padding: '6px 10px', color: '#f8fafc', fontSize: '12px', boxSizing: 'border-box' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const trimmed = colabGpuUrl.trim();
+                        if (typeof window !== "undefined") {
+                          if (trimmed) localStorage.setItem("colab_gpu_bridge_url", trimmed);
+                          else localStorage.removeItem("colab_gpu_bridge_url");
+                        }
+                        notify(trimmed ? "✅ Colab GPU Bridge URL saved!" : "Colab URL cleared.");
+                      }}
+                      style={{ background: '#10b981', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '11px', fontWeight: 700, padding: '0 12px', cursor: 'pointer' }}
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px', alignItems: 'start' }}>
             {/* LEFT COLUMN: Controls */}
@@ -5194,8 +5309,35 @@ export default function Home() {
 
               {/* Generate Button */}
               {imageGenError && (
-                <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '10px 14px', color: '#ef4444', fontSize: '12px' }}>
-                  ⚠️ {imageGenError}
+                <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '12px 14px', color: '#ef4444', fontSize: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                    <span>⚠️</span>
+                    <div style={{ flex: 1 }}>{imageGenError}</div>
+                  </div>
+                  {(imageGenError.includes("GITHUB_PAT") || imageGenError.includes("Colab GPU Bridge")) && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCloudConfig(true)}
+                      style={{
+                        marginTop: '10px',
+                        background: '#ff3b45',
+                        border: 'none',
+                        borderRadius: '6px',
+                        color: '#ffffff',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        padding: '6px 14px',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 8px rgba(255,59,69,0.35)',
+                      }}
+                    >
+                      <Key size={13} />
+                      <span>Configure GitHub PAT / Colab URL Now</span>
+                    </button>
+                  )}
                 </div>
               )}
 

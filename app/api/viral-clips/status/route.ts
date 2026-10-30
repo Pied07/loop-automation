@@ -116,7 +116,8 @@ export async function GET(req: NextRequest) {
   }
 
   // If not completed yet, check GitHub Actions status directly
-  const githubPat = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
+  const userSuppliedPat = searchParams.get("githubPat");
+  const githubPat = (userSuppliedPat && userSuppliedPat.trim()) || process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
   const githubRepo = process.env.GITHUB_REPO || "Pied07/loop-automation";
 
   if (githubPat) {
