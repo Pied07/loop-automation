@@ -180,7 +180,6 @@ export async function POST(req: NextRequest) {
                 success: true,
                 imageUrl: daemonData.imageUrl,
                 prompt: synthesizedPrompt,
-                originalPrompt: prompt,
                 style,
                 aspect,
                 sceneIndex,
@@ -202,7 +201,6 @@ export async function POST(req: NextRequest) {
               success: true,
               imageUrl,
               prompt: synthesizedPrompt,
-              originalPrompt: prompt,
               style,
               aspect,
               sceneIndex,
@@ -263,7 +261,6 @@ export async function POST(req: NextRequest) {
             inputs: {
               jobId,
               prompt: synthesizedPrompt,
-              originalPrompt: prompt,
               style,
               aspect,
               steps: String(steps),
@@ -292,6 +289,13 @@ export async function POST(req: NextRequest) {
         } else {
           const ghErr = await ghRes.text();
           console.error("GitHub Actions dispatch error:", ghRes.status, ghErr);
+          return NextResponse.json(
+            {
+              success: false,
+              error: `GitHub Actions runner dispatch failed (HTTP ${ghRes.status}): ${ghErr}`,
+            },
+            { status: ghRes.status || 500 }
+          );
         }
       }
 
@@ -349,7 +353,6 @@ export async function POST(req: NextRequest) {
       success: true,
       imageUrl: finalImageUrl,
       prompt: synthesizedPrompt,
-      originalPrompt: prompt,
       style,
       aspect,
       sceneIndex,
