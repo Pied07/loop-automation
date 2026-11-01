@@ -73,10 +73,21 @@ const HORROR_NEGATIVE_PROMPT =
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
-    if (!prompt) {
-      return NextResponse.json({ success: false, error: "Prompt is required" }, { status: 400 });
-    }
+    const prompt = typeof body.prompt === "string" && body.prompt.trim()
+      ? body.prompt.trim()
+      : typeof body.script === "string" && body.script.trim()
+      ? body.script.trim()
+      : typeof body.rawPrompt === "string" && body.rawPrompt.trim()
+      ? body.rawPrompt.trim()
+      : typeof body.customPrompt === "string" && body.customPrompt.trim()
+      ? body.customPrompt.trim()
+      : typeof body.text === "string" && body.text.trim()
+      ? body.text.trim()
+      : typeof body.visual_prompt === "string" && body.visual_prompt.trim()
+      ? body.visual_prompt.trim()
+      : typeof body.idea === "string" && body.idea.trim()
+      ? body.idea.trim()
+      : "A cinematic viral scene in ultra high definition";
 
     const isDirectPrompt = Boolean(body.isDirectPrompt);
     const category = typeof body.category === "string" ? body.category : (isDirectPrompt ? "Custom" : "General");
@@ -283,6 +294,9 @@ export async function POST(req: NextRequest) {
             pending: true,
             cloudMode: "github-actions",
             jobId,
+            prompt: synthesizedPrompt,
+            synthesizedPrompt,
+            rawPrompt: prompt,
             message: "Dispatched image generation to GitHub Actions native ML runner.",
             engine: "github-actions",
           });

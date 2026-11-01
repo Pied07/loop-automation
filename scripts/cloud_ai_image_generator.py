@@ -59,6 +59,7 @@ def update_status(status="processing", progress=0, step="", image_url=None, erro
         "imageUrl": image_url,
         "clips": [{"url": image_url, "imageUrl": image_url, "id": JOB_ID}] if image_url else None,
         "sourceTitle": PROMPT[:60] if PROMPT else "AI Generated Image",
+        "synthesizedPrompt": PROMPT,
         "error": error or None,
     }
     max_retries = 4 if status in ("done", "failed") else 2

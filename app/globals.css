@@ -236,7 +236,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .help-button:hover { color: #ffffff; }
 .mobile-menu { display: none; }
 
-.studio-content, .library-content, .settings-content { max-width: 1320px; margin: 0 auto; padding: 36px 43px 60px; animation: rise-in .35s ease both; }
+.studio-content, .library-content, .settings-content, .image-gen-content { max-width: 1400px; margin: 0 auto; padding: 36px 43px 60px; animation: rise-in .35s ease both; }
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 28px; }
 .page-heading h1, .settings-content h1 { margin: 10px 0 6px; font-size: 32px; line-height: 1.15; font-weight: 700; letter-spacing: -1.2px; color: #ffffff; }
 .page-heading h1 em, .settings-content h1 em { font-size: 32px; }
@@ -595,7 +595,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .help-button span { display: none; }
   
   /* Studio Page Mobile Rules */
-  .studio-content, .library-content, .settings-content { padding: 16px 12px 36px; width: 100%; max-width: 100vw; box-sizing: border-box; overflow-x: hidden; }
+  .studio-content, .library-content, .settings-content, .image-gen-content { padding: 16px 12px 36px; width: 100%; max-width: 100vw; box-sizing: border-box; overflow-x: hidden; }
   .page-heading { align-items: flex-start; flex-direction: column; gap: 10px; margin-bottom: 16px; width: 100%; }
   .page-heading h1, .settings-content h1 { font-size: 22px; }
   .page-heading h1 em, .settings-content h1 em { font-size: 22px; }

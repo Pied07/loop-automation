@@ -2295,7 +2295,7 @@ export default function Home() {
                     id: jobId,
                     imageUrl: finalUrl,
                     prompt: imageGenPrompt.trim(),
-                    synthesizedPrompt: job.synthesizedPrompt || data.prompt || job.sourceTitle,
+                    synthesizedPrompt: job.synthesizedPrompt || data.synthesizedPrompt || data.prompt || job.sourceTitle,
                     style: imageGenStyle,
                     aspect: imageGenAspect,
                     engine: "github-actions-ml",
@@ -4688,7 +4688,7 @@ export default function Home() {
   )}
   </> : <div className="empty-library"><div className="empty-art"><span /><span /><span /><Clapperboard size={27} /></div><h2>{query || filter !== "All videos" ? "No matching clips" : "No clips published yet."}</h2><p>{query || filter !== "All videos" ? "Try another search or category." : "Published viral clips will appear here with YouTube, Facebook, and Instagram links."}</p>{!query && filter === "All videos" && <button className="primary-button" onClick={() => setScreen("studio")}><TrendingUp size={16} /> Create your first viral clip</button>}</div>}</section>}
       {screen === "image-gen" && (
-        <section className="image-gen-content" style={{ maxWidth: '1400px', margin: '0 auto', paddingBottom: '60px' }}>
+        <section className="image-gen-content">
           <div className="page-heading">
             <div>
               <div className="eyebrow"><span className="eyebrow-dot" /> NATIVE ML DIFFUSION STUDIO</div>
