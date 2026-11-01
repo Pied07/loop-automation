@@ -83,8 +83,8 @@ def update_status(status="processing", progress=0, step="", clips=None, source_t
                 time.sleep(wait_sec)
 
 
-def publish_github_release(job_id: str, title: str, clips: list):
-    """Publishes a GitHub Release tagged clips-{JOB_ID} with the completed clips payload."""
+def publish_github_release(job_id: str, title: str, clips: list, files_to_upload: list = None):
+    """Publishes a GitHub Release tagged clips-{JOB_ID} with the completed clips payload and attaches files."""
     if not GITHUB_TOKEN:
         print("Notice: GITHUB_TOKEN not provided, skipping GitHub release creation.")
         return
@@ -111,9 +111,11 @@ def publish_github_release(job_id: str, title: str, clips: list):
             "--title", f"AI Video: {title[:40]}",
             "--notes", body_str,
         ]
+        if files_to_upload:
+            cmd.extend([str(p) for p in files_to_upload if Path(p).exists()])
         res = subprocess.run(cmd, env={**os.environ, "GH_TOKEN": GITHUB_TOKEN}, capture_output=True, text=True)
         if res.returncode == 0:
-            print(f"✅ GitHub CLI release {tag_name} created successfully!")
+            print(f"✅ GitHub CLI release {tag_name} created successfully with assets!")
             return
         else:
             print(f"gh CLI release notice: {res.stderr[:200]}")
@@ -135,66 +137,36 @@ def publish_github_release(job_id: str, title: str, clips: list):
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=20) as r:
+            rel_resp = json.loads(r.read().decode("utf-8"))
+            upload_url_template = rel_resp.get("upload_url", "")
             print(f"✅ Published GitHub Release {tag_name} via REST API")
+
+            if upload_url_template and files_to_upload:
+                upload_base = upload_url_template.split("{")[0]
+                for file_p in files_to_upload:
+                    fp = Path(file_p)
+                    if not fp.exists():
+                        continue
+                    try:
+                        mime = "video/mp4" if fp.suffix.lower() == ".mp4" else "image/jpeg"
+                        with fp.open("rb") as f_data:
+                            asset_bytes = f_data.read()
+                        up_req = urllib.request.Request(
+                            f"{upload_base}?name={urllib.parse.quote(fp.name)}",
+                            data=asset_bytes,
+                            headers={
+                                "Authorization": f"Bearer {GITHUB_TOKEN}",
+                                "Content-Type": mime,
+                                "User-Agent": "The-Viral-Desk-Runner",
+                            },
+                            method="POST",
+                        )
+                        with urllib.request.urlopen(up_req, timeout=120):
+                            print(f"✅ Uploaded release asset {fp.name} via REST API")
+                    except Exception as up_err:
+                        print(f"Notice uploading asset {fp.name}: {up_err}")
     except Exception as e:
         print(f"Notice: Release publication notice: {e}")
-
-
-def upload_file_to_cloudinary(file_path: Path, public_id: str, resource_type: str = "video") -> str:
-    """Signed multipart upload to Cloudinary."""
-    if not (CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET):
-        return ""
-
-    timestamp = str(int(time.time()))
-    signed_params = {"public_id": public_id, "timestamp": timestamp}
-    to_sign = "&".join(f"{k}={signed_params[k]}" for k in sorted(signed_params))
-    signature = hashlib.sha1((to_sign + CLOUDINARY_API_SECRET).encode("utf-8")).hexdigest()
-
-    boundary = f"----CloudAIVideo{int(time.time() * 1000)}{file_path.stat().st_size}"
-    with file_path.open("rb") as f:
-        file_bytes = f.read()
-
-    fields = {
-        "api_key": CLOUDINARY_API_KEY,
-        "timestamp": timestamp,
-        "public_id": public_id,
-        "signature": signature,
-    }
-
-    parts = []
-    for name, value in fields.items():
-        parts.extend([
-            f"--{boundary}\r\n".encode(),
-            f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode(),
-            value.encode("utf-8"),
-            b"\r\n",
-        ])
-
-    mime = "video/mp4" if resource_type == "video" else "image/jpeg"
-    parts.extend([
-        f"--{boundary}\r\n".encode(),
-        f'Content-Disposition: form-data; name="file"; filename="{file_path.name}"\r\n'.encode(),
-        f"Content-Type: {mime}\r\n\r\n".encode(),
-        file_bytes,
-        b"\r\n",
-        f"--{boundary}--\r\n".encode(),
-    ])
-
-    body = b"".join(parts)
-    request = urllib.request.Request(
-        f"https://api.cloudinary.com/v1_1/{CLOUDINARY_CLOUD_NAME}/{resource_type}/upload",
-        data=body,
-        headers={
-            "Content-Type": f"multipart/form-data; boundary={boundary}",
-            "Content-Length": str(len(body)),
-            "User-Agent": "The-Viral-Desk-Runner",
-        },
-        method="POST",
-    )
-
-    with urllib.request.urlopen(request, timeout=180) as response:
-        result = json.loads(response.read().decode("utf-8"))
-    return result.get("secure_url") or result.get("url") or ""
 
 
 def run():
@@ -240,19 +212,15 @@ def run():
 
         print(f"✅ Video rendered successfully: {video_path} ({video_path.stat().st_size} bytes)")
 
-        # 2. Upload video and thumbnail to Cloudinary
-        update_status(status="processing", progress=80, step="Uploading video & thumbnail to Cloudinary...")
+        # 2. Host video and thumbnail on GitHub Release (Zero Cloudinary)
+        update_status(status="processing", progress=80, step="Uploading video & thumbnail to GitHub Release...")
 
-        safe_user_id = re.sub(r"[^A-Za-z0-9_-]+", "_", USER_ID).strip("_") or "creator"
-        safe_job_id = re.sub(r"[^A-Za-z0-9_-]+", "_", JOB_ID).strip("_") or "job"
-        clip_public_id = f"ai_videos/{safe_user_id}/{safe_job_id}"
-        thumb_public_id = f"ai_thumbs/{safe_user_id}/{safe_job_id}"
+        tag_name = f"clips-{JOB_ID}"
+        video_url = f"https://github.com/{GITHUB_REPO}/releases/download/{tag_name}/{video_path.name}"
+        thumb_url = f"https://github.com/{GITHUB_REPO}/releases/download/{tag_name}/{thumb_path.name}" if (thumb_path and thumb_path.exists()) else ""
 
-        video_url = upload_file_to_cloudinary(video_path, clip_public_id, "video")
-        thumb_url = upload_file_to_cloudinary(thumb_path, thumb_public_id, "image") if (thumb_path and thumb_path.exists()) else ""
-
-        print(f"Cloudinary Video URL:     {video_url}")
-        print(f"Cloudinary Thumbnail URL: {thumb_url}")
+        print(f"GitHub Release Video URL:     {video_url}")
+        print(f"GitHub Release Thumbnail URL: {thumb_url}")
 
         clip_item = {
             "id": JOB_ID,
@@ -266,13 +234,16 @@ def run():
             "clipPath": video_url,
             "publicUrl": video_url,
             "videoUrl": video_url,
-            "cloudinaryUrl": video_url,
             "thumbnailUrl": thumb_url,
-            "cloudinaryPublicId": clip_public_id,
             "format": CATEGORY,
             "isAiVideo": True,
             "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         }
+
+        files_to_publish = [video_path]
+        if thumb_path and thumb_path.exists():
+            files_to_publish.append(thumb_path)
+        publish_github_release(JOB_ID, result["title"], [clip_item], files_to_publish)
 
         # 3. Auto-publish if requested
         if AUTO_PUBLISH and APP_URL and video_url:
@@ -307,7 +278,6 @@ def run():
                     "userId": USER_ID,
                     "userEmail": USER_EMAIL,
                     "connections": active_platforms,
-                    "cloudinaryPublicId": clip_public_id,
                     "format": CATEGORY,
                     "category": CATEGORY,
                     "isAiVideo": True,
@@ -327,8 +297,7 @@ def run():
             except Exception as pe:
                 print(f"Notice: Auto-publish notice: {pe}")
 
-        # 4. Mark Job Complete & Publish Release
-        publish_github_release(JOB_ID, result["title"], [clip_item])
+        # 4. Mark Job Complete
         update_status(
             status="done",
             progress=100,

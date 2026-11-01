@@ -172,7 +172,6 @@ export async function POST(req: NextRequest) {
       step: "Downloading video stream...",
     });
 
-    assertCloudinaryConfigured();
     await mkdir(clipsDir, { recursive: true, mode: 0o700 });
 
     const splitResult = await downloadAndSplitVideo(videoUrl, clipsDir);
@@ -220,7 +219,7 @@ export async function POST(req: NextRequest) {
       jobId,
       status: "processing",
       progress: 85,
-      step: "Uploading clips to Cloudinary cloud storage...",
+      step: "Processing clips for session...",
       sourceTitle,
       totalDuration,
     });

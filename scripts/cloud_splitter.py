@@ -247,11 +247,7 @@ def upload_clips_to_cloudinary(job_id: str, clip_paths: list) -> dict:
 
 
 def upload_clips_to_github(job_id: str, title: str, clip_paths: list) -> dict:
-    """Uploads clip files to a GitHub Release and returns { filename: download_url }."""
-    cloudinary_urls = upload_clips_to_cloudinary(job_id, clip_paths)
-    if cloudinary_urls:
-        return cloudinary_urls
-
+    """Uploads clip files to a GitHub Release and returns { filename: download_url } (Zero Cloudinary)."""
     url_map = {}
     tag_name = f"clips-{job_id}"
     print(f"Creating GitHub Release {tag_name} in {GITHUB_REPO}...")
@@ -693,8 +689,8 @@ def run():
         start_time += duration
         part_num += 1
 
-    # 3. Upload all clips to GitHub Releases (free CDN, no Firebase required)
-    storage_step = "Uploading clips to Cloudinary..." if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET else "Uploading clips to GitHub Releases..."
+    # 3. Upload all clips to GitHub Releases (free CDN, Zero Cloudinary)
+    storage_step = "Uploading clips to GitHub Releases..."
     update_job_status(status="processing", progress=85, step=storage_step, source_title=title, total_duration=total_duration)
     try:
         url_map = upload_clips_to_github(JOB_ID, title, created_clip_files)
@@ -718,8 +714,7 @@ def run():
             "url": pub_url,
             "clipPath": pub_url,
             "publicUrl": pub_url,
-            "storagePath": f"cloudinary/{USER_ID}/{JOB_ID}/{Path(fname).stem}",
-            **({"cloudinaryPublicId": cloudinary_public_id(JOB_ID, fname)} if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET else {}),
+            "storagePath": f"github_releases/{USER_ID}/{JOB_ID}/{Path(fname).stem}",
         })
 
     # 3.5 Auto-publish clips to connected platforms if requested
