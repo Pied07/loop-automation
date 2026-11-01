@@ -660,10 +660,10 @@ async function getOrGenerateStoryCardUrl(params: {
       instagramHandle,
     });
 
-    // 4. Upload generated card buffer to Cloudinary
+    // 4. Save generated card buffer to temporary session (zero Cloudinary credits used)
     const { uploadImageToCloudinary } = await import("@/app/cloudinary-upload");
     const cRes = await uploadImageToCloudinary(cardBuffer, `story_polaroid_${Date.now()}_part${partNumber}`);
-    return { secureUrl: cRes.secureUrl, publicId: cRes.publicId };
+    return { secureUrl: cRes.secureUrl, publicId: cRes.publicId, sessionPath: cRes.sessionPath };
   } catch (err: any) {
     console.error("Story card generation error:", err.message);
     return {};
@@ -684,6 +684,7 @@ async function getOrGenerateStoryMedia(params: {
   isVideo?: boolean;
   localVideoPath?: string;
   localOverlayPath?: string;
+  localImagePath?: string;
 }> {
   const { videoPath, publicVideoUrl, title, partNumber, instagramHandle } = params;
   let tmpOverlay: string | undefined;
@@ -744,6 +745,7 @@ async function getOrGenerateStoryMedia(params: {
     publicId: cardData.publicId,
     isVideo: false,
     localOverlayPath: tmpOverlay,
+    localImagePath: cardData.sessionPath,
   };
 }
 
@@ -985,6 +987,7 @@ export async function publishClipAndCleanup(params: {
   let isStoryVideo = false;
   let storyVideoLocalPath: string | undefined;
   let storyOverlayLocalPath: string | undefined;
+  let storyImageLocalPath: string | undefined;
 
   // Pre-generate Story Teaser Video (or aesthetic Polaroid card fallback)
   try {
@@ -1002,6 +1005,7 @@ export async function publishClipAndCleanup(params: {
       isStoryVideo = !!sMedia.isVideo;
       storyVideoLocalPath = sMedia.localVideoPath;
       storyOverlayLocalPath = sMedia.localOverlayPath;
+      storyImageLocalPath = sMedia.localImagePath;
     }
   } catch (cardErr: any) {
     console.warn("Story media pre-generation notice:", cardErr?.message);
@@ -1129,6 +1133,7 @@ export async function publishClipAndCleanup(params: {
                 isStoryVideo = !!sMedia.isVideo;
                 storyVideoLocalPath = sMedia.localVideoPath;
                 storyOverlayLocalPath = sMedia.localOverlayPath;
+                storyImageLocalPath = sMedia.localImagePath;
               }
             }
 
@@ -1182,30 +1187,54 @@ export async function publishClipAndCleanup(params: {
             }
 
             // Fallback to Photo Story if video story didn't complete
-            if (!fbStoryPublished && storyCardUrl) {
-              const photoUrl = storyCardUrl.endsWith(".mp4") ? storyCardUrl.replace(/\.mp4$/, ".jpg") : storyCardUrl;
-              const upRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/photos`, {
-                method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: new URLSearchParams({
-                  access_token: pageToken,
-                  url: photoUrl,
-                  published: "false",
-                }),
-              });
-              const upData = await upRes.json();
-              if (upData?.id) {
+            if (!fbStoryPublished && (storyImageLocalPath || storyCardUrl)) {
+              let photoId = "";
+              // Direct upload via multipart form-data from temporary session file (zero Cloudinary credits used)
+              if (storyImageLocalPath && fs.existsSync(/*turbopackIgnore: true*/ storyImageLocalPath)) {
+                try {
+                  const imgBuf = fs.readFileSync(/*turbopackIgnore: true*/ storyImageLocalPath);
+                  const form = new FormData();
+                  form.append("access_token", pageToken);
+                  form.append("published", "false");
+                  form.append("source", new Blob([new Uint8Array(imgBuf)], { type: "image/jpeg" }), "story.jpg");
+                  const upRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/photos`, {
+                    method: "POST",
+                    body: form,
+                  });
+                  const upData = await upRes.json();
+                  if (upData?.id) photoId = String(upData.id);
+                } catch (fbPhotoErr: any) {
+                  console.warn("Facebook direct session photo upload notice:", fbPhotoErr?.message);
+                }
+              }
+
+              if (!photoId && storyCardUrl && (storyCardUrl.startsWith("http://") || storyCardUrl.startsWith("https://"))) {
+                const photoUrl = storyCardUrl.endsWith(".mp4") ? storyCardUrl.replace(/\.mp4$/, ".jpg") : storyCardUrl;
+                const upRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/photos`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                  body: new URLSearchParams({
+                    access_token: pageToken,
+                    url: photoUrl,
+                    published: "false",
+                  }),
+                });
+                const upData = await upRes.json();
+                if (upData?.id) photoId = String(upData.id);
+              }
+
+              if (photoId) {
                 const storyRes = await fetch(`https://graph.facebook.com/v26.0/${pageId}/photo_stories`, {
                   method: "POST",
                   headers: { "Content-Type": "application/x-www-form-urlencoded" },
                   body: new URLSearchParams({
                     access_token: pageToken,
-                    photo_id: upData.id,
+                    photo_id: photoId,
                   }),
                 });
                 const storyData = await storyRes.json();
                 if (storyData?.id || storyData?.success || storyData?.post_id) {
-                  facebookStoryId = String(storyData.id || storyData.post_id || upData.id);
+                  facebookStoryId = String(storyData.id || storyData.post_id || photoId);
                   logs.push(`✅ Facebook: Story published (Teaser card)`);
                 }
               }
@@ -1401,6 +1430,7 @@ export async function publishClipAndCleanup(params: {
                 isStoryVideo = !!sMedia.isVideo;
                 storyVideoLocalPath = sMedia.localVideoPath;
                 storyOverlayLocalPath = sMedia.localOverlayPath;
+                storyImageLocalPath = sMedia.localImagePath;
               }
             }
 
@@ -1577,28 +1607,33 @@ export async function publishClipAndCleanup(params: {
       }
     }
 
-    // 4. Delete story thumbnail / image / video from Cloudinary (Auto-cleanup to keep storage at 0 MB)
+    // 4. Delete story thumbnail / image / video session assets (Auto-cleanup to keep storage at 0 MB)
     let storyTargetId = uploadedStoryCardId;
     if (!storyTargetId && storyCardUrl && storyCardUrl.includes("res.cloudinary.com")) {
       const match = storyCardUrl.match(/\/(?:image|video)\/upload\/(?:v\d+\/)?([^.]+)/);
       if (match) storyTargetId = match[1];
     }
 
-    if (storyTargetId && cloudName && apiKey && apiSecret) {
+    if (storyTargetId) {
       try {
-        const { deleteCloudinaryAsset } = await import("@/app/cloudinary-upload");
+        const { deleteCloudinaryAsset, deleteSessionImage } = await import("@/app/cloudinary-upload");
         await Promise.allSettled([
+          deleteSessionImage(storyTargetId),
           deleteCloudinaryAsset(storyTargetId, "video"),
           deleteCloudinaryAsset(storyTargetId, "image"),
         ]);
-        logs.push(`🗑️ Cloudinary story asset deleted (${storyTargetId}).`);
+        logs.push(`🗑️ Session story image cleaned up (${storyTargetId}).`);
       } catch (cErr: any) {
-        console.warn("Could not delete story asset from Cloudinary:", cErr.message);
+        console.warn("Could not delete story asset:", cErr.message);
       }
     }
 
-    // 5. Clean up temporary local files for the story video & overlay
+    // 5. Clean up temporary local files for the story image, teaser video & overlay
     try {
+      if (storyImageLocalPath && fs.existsSync(/*turbopackIgnore: true*/ storyImageLocalPath)) {
+        fs.unlinkSync(storyImageLocalPath);
+        logs.push("🗑️ Temporary session story image file deleted.");
+      }
       if (storyVideoLocalPath && fs.existsSync(/*turbopackIgnore: true*/ storyVideoLocalPath)) {
         fs.unlinkSync(storyVideoLocalPath);
       }
@@ -2336,6 +2371,7 @@ export async function generateAiVideoAction(params: {
     let cloudinaryUrl = "";
     let cloudinaryThumb = "";
     const clipId = `ai_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    let sessionThumbPath = "";
     try {
       const { uploadVideoToCloudinary, uploadImageToCloudinary } = await import("@/app/cloudinary-upload");
       const upVid = await uploadVideoToCloudinary(parsed.videoPath, `ai_videos/${clipId}`);
@@ -2345,6 +2381,9 @@ export async function generateAiVideoAction(params: {
         try {
           const upThumb = await uploadImageToCloudinary(parsed.thumbnailPath, `ai_thumbs/${clipId}`);
           cloudinaryThumb = upThumb.secureUrl;
+          if (upThumb.sessionPath) {
+            sessionThumbPath = upThumb.sessionPath;
+          }
         } catch {}
       }
     } catch (cErr: any) {
@@ -2392,6 +2431,17 @@ export async function generateAiVideoAction(params: {
         connections: activePlats,
         cloudinaryPublicId: cloudinaryUrl ? `ai_videos/${clipId}` : undefined,
       });
+
+      // Clean up temporary session thumbnail image after posting
+      try {
+        const { deleteSessionImage } = await import("@/app/cloudinary-upload");
+        if (sessionThumbPath) {
+          await deleteSessionImage(sessionThumbPath);
+        }
+        if (parsed.thumbnailPath && fs.existsSync(parsed.thumbnailPath)) {
+          fs.unlinkSync(parsed.thumbnailPath);
+        }
+      } catch {}
 
       if (database && publishResult && (publishResult.youtubeVideoId || publishResult.facebookVideoId || publishResult.instagramVideoId)) {
         try {

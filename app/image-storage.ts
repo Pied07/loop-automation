@@ -26,3 +26,5 @@ export async function saveImageBuffer(imageBuffer: Buffer, filename: string): Pr
   const mimeType = filename.endsWith(".jpg") || filename.endsWith(".jpeg") ? "image/jpeg" : "image/png";
   return `data:${mimeType};base64,${imageBuffer.toString("base64")}`;
 }
+
+export { deleteSessionImage } from "@/app/cloudinary-upload";
