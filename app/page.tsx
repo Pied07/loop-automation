@@ -1646,40 +1646,7 @@ export default function Home() {
                     }
                   }
 
-                  // Direct Cloudinary CDN fallback after 24s if the video has already finished uploading
-                  if (pollAttempts >= 8 && data.jobId) {
-                    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dbgvwyhdr";
-                    const safeUid = uid.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "creator";
-                    const safeJid = data.jobId.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "job";
-                    const directVideoUrl = `https://res.cloudinary.com/${cloudName}/video/upload/ai_videos/${safeUid}/${safeJid}.mp4`;
-                    const directThumbUrl = `https://res.cloudinary.com/${cloudName}/image/upload/ai_thumbs/${safeUid}/${safeJid}.jpg`;
 
-                    try {
-                      const headRes = await fetch(directVideoUrl, { method: "HEAD" });
-                      if (headRes.ok) {
-                        clearInterval(poll);
-                        resolve({
-                          id: data.jobId,
-                          partNumber: pIdx,
-                          totalParts: totalPartsToGen,
-                          title: partScript ? partScript.slice(0, 50) : `Part ${pIdx}`,
-                          description: partScript,
-                          hashtags: ["viral", "ai", "shorts", "reels"],
-                          duration: aiDuration,
-                          url: directVideoUrl,
-                          clipPath: directVideoUrl,
-                          publicUrl: directVideoUrl,
-                          videoUrl: directVideoUrl,
-                          cloudinaryUrl: directVideoUrl,
-                          thumbnailUrl: directThumbUrl,
-                          cloudinaryPublicId: `ai_videos/${safeUid}/${safeJid}`,
-                          format: selectedCategory,
-                          isAiVideo: true,
-                        });
-                        return;
-                      }
-                    } catch {}
-                  }
                 } catch {
                   // retry polling
                 }
@@ -1708,28 +1675,7 @@ export default function Home() {
             setGeneratedAiVideo(finalData);
           }
 
-          if (finalData.clip) {
-            const newRecord: VideoRecord = {
-              id: finalData.clip.id,
-              title: finalData.clip.title,
-              description: finalData.clip.description,
-              hashtags: finalData.clip.hashtags || [],
-              duration: finalData.clip.duration || aiDuration,
-              videoUrl: finalData.clip.videoUrl || finalData.videoUrl,
-              cloudinaryUrl: finalData.clip.cloudinaryUrl || finalData.videoUrl,
-              thumbnailUrl: finalData.clip.thumbnailUrl || finalData.thumbnailUrl,
-              format: selectedCategory === "Others" ? (customStoryTag || "Custom") : selectedCategory,
-              isAiVideo: true,
-              createdAt: new Date().toISOString(),
-              status: "completed",
-            };
-            setVideos((prev) => deduplicateVideos([[newRecord], prev]));
-            const cached = JSON.parse(localStorage.getItem("tvd-studio-session-videos") || "[]") as VideoRecord[];
-            localStorage.setItem("tvd-studio-session-videos", JSON.stringify(deduplicateVideos([[newRecord], cached])));
-            if (database && auth?.currentUser?.uid) {
-              saveVideo(auth.currentUser.uid, newRecord).catch(() => {});
-            }
-          }
+
           setAiProgress(nextPct);
         } catch (subErr: any) {
           clearInterval(partTimer);
@@ -1758,6 +1704,33 @@ export default function Home() {
     } finally {
       setIsGeneratingAiVideo(false);
     }
+  }
+
+  async function handleDiscardAiVideo(videoItem?: any) {
+    const target = videoItem || generatedAiVideosList[previewPartIdx] || generatedAiVideo;
+    if (!target) return;
+    try {
+      const jobId = target.clip?.id || target.id || target.jobId;
+      if (jobId) {
+        await fetch("/api/ai-video/cleanup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobId, videoUrl: target.videoUrl }),
+        }).catch(() => {});
+      }
+    } catch {}
+
+    if (generatedAiVideosList.length > 1) {
+      const remaining = generatedAiVideosList.filter((_, idx) => idx !== previewPartIdx);
+      setGeneratedAiVideosList(remaining);
+      setGeneratedAiVideo(remaining[0] || null);
+      setPreviewPartIdx(0);
+    } else {
+      setGeneratedAiVideo(null);
+      setGeneratedAiVideosList([]);
+      setPreviewPartIdx(0);
+    }
+    notify("🗑️ Unpublished video discarded and deleted from session.");
   }
 
   async function handlePublishAiVideo(videoItem?: any) {
@@ -4193,6 +4166,18 @@ export default function Home() {
                               {isPublishingAllAi ? `Publishing all ${activeList.length} parts...` : `🚀 Publish All (${activeList.length} Parts)`}
                             </button>
                           )}
+
+                          {/* Discard Unpublished Video from Session */}
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={() => handleDiscardAiVideo(curVideo)}
+                            disabled={isPublishingAi || isPublishingAllAi}
+                            style={{ padding: '8px 14px', fontSize: '12px', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                            title="Discard unpublished video from session"
+                          >
+                            <Trash2 size={13} /> Discard
+                          </button>
                         </div>
                       </div>
                     </div>
